@@ -1,6 +1,6 @@
 # Lifting Sanity
 
-A lifting log that lives on your iPad. Log every set, follow a split, rest between sets and watch your lifts go up. It opens full screen from your Home Screen and works without signal at the gym.
+A lifting log for iPad and iPhone. Log every set, follow a split, rest between sets and watch your lifts go up. It opens full screen from your Home Screen and works without signal at the gym.
 
 **Open it:** https://hoiz77.github.io/LiftingSanity-/ (after GitHub Pages is turned on, see below)
 
@@ -20,18 +20,20 @@ A lifting log that lives on your iPad. Log every set, follow a split, rest betwe
 
 ## Turn on GitHub Pages (once)
 
-1. On GitHub, open this repository and go to **Settings → Pages**.
+1. Open https://github.com/Hoiz77/LiftingSanity-/settings/pages (this is **Settings → Pages** in the repository).
 2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
 3. Pick the **main** branch and the **/ (root)** folder, then **Save**.
 4. After a minute the site is live at https://hoiz77.github.io/LiftingSanity-/
 
-## Put it on your iPad
+## Put it on your iPad or iPhone
+
+The same link works on both. The layout adapts to the screen, and on iPhone you type weights and reps on a built-in number pad with Next, + / − and Log keys, so the keyboard never covers your sets.
 
 1. Open the link above in **Safari**.
 2. Tap **Share**, then **Add to Home Screen**.
 3. Open Lifting Sanity from your Home Screen.
 
-Your workouts are saved on the iPad itself, not online. Make a backup now and then from **Settings → Back up** and keep the file in Files or iCloud Drive. **Restore** loads it back, on this iPad or a new one.
+Your workouts are saved on each device itself, not online, so the iPad and the iPhone each keep their own log. Make a backup now and then from **Settings → Back up** and keep the file in Files or iCloud Drive. **Restore** loads it on any device, which is also how you move your log from one to the other.
 
 ## Files
 

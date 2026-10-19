@@ -186,7 +186,8 @@ const ICONS = {
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   share: 'M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8',
   info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 11v6M12 7.5h.01',
-  grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01'
+  grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+  backspace: 'M9 5h11v14H9l-6-7zM12 9.5l5 5M17 9.5l-5 5'
 };
 const THICK = new Set(['dots', 'grip']);
 const icon = (n, cls = '') => `<svg class="i ${THICK.has(n) ? 'thick ' : ''}${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[n]}"/></svg>`;
@@ -197,7 +198,7 @@ const KEY = 'liftingsanity:data:v1';
 let state;
 let storageOK = true;
 const ui = {
-  tab: 'train', woHidden: false, effOpen: null,
+  tab: 'train', woHidden: false, effOpen: null, kp: null,
   lib: { q: '', g: 'all', m: 'all', eq: 'all' },
   hist: { month: null, day: null }
 };
@@ -207,7 +208,7 @@ function defaults() {
     v: 1,
     settings: {
       unit: 'kg', effort: 'rir', rest: 120, autoRest: true, autoNext: true, view: 'focus',
-      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true
+      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto'
     },
     custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null,
     workouts: [], active: null, rest: null,
@@ -1096,6 +1097,7 @@ function renderWorkout(resetScroll) {
   if (!w || ui.woHidden) {
     el.hidden = true; el.innerHTML = '';
     document.body.classList.remove('wo-open');
+    ui.kp = null; renderKeypad();
     renderMini(); renderRest();
     return;
   }
@@ -1109,6 +1111,8 @@ function renderWorkout(resetScroll) {
   if (m2) m2.scrollTop = resetScroll ? 0 : sc;
   const curNav = $('.nav-ex.cur', el);
   if (curNav) curNav.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  renderKeypad();
+  markKpCell(false);
   renderMini();
   renderRest();
 }
@@ -1193,9 +1197,10 @@ function placeholder(x, j, ctx) {
   }
   return out;
 }
-function setCols(k, uni, eff) {
-  const c = ['var(--c-badge)', 'minmax(0,1fr)'];
-  if (hasWeight(k)) c.push('var(--c-w)');
+function setCols(k, uni, eff, compact) {
+  // compact rows drop the "previous" column, so the first input takes the spare width
+  const c = compact ? ['var(--c-badge)'] : ['var(--c-badge)', 'minmax(0,1fr)'];
+  if (hasWeight(k)) c.push(compact ? 'minmax(0,1fr)' : 'var(--c-w)');
   if (hasReps(k)) { if (uni) c.push('var(--c-lr)', 'var(--c-lr)'); else c.push('var(--c-r)'); }
   if (hasDist(k)) c.push('var(--c-w)');
   if (hasTime(k)) c.push('var(--c-t)');
@@ -1219,8 +1224,8 @@ function exCardHTML(w, i, focus) {
   if (x.note) h += `<button class="exc-note" data-a="exNote" data-e="${i}">${icon('note')}<span>${esc(x.note)}</span></button>`;
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>Last time you hit ${ctx.suggest.hi}+ reps on every set. Try <b>${esc(fmtW(ctx.suggest.w))}</b> today.</span></p>`;
   else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>“Previous” is from before your reset (${esc(fmtShort(ctx.lp.w.start))}). Records for this block start fresh.</span></p>`;
-  const cols = setCols(k, x.uni, effOn);
-  h += `<div class="sets" style="--cols:${cols}"><div class="set-row head"><span>Set</span><span>Previous</span>`;
+  const cols = setCols(k, x.uni, effOn), colsC = setCols(k, x.uni, effOn, true);
+  h += `<div class="sets ${x.uni ? 'uni' : ''}" style="--cols:${cols};--cols-c:${colsC}"><div class="set-row head"><span>Set</span><span>Previous</span>`;
   if (hasWeight(k)) h += `<span>${esc(weightLabel(k))}</span>`;
   if (hasReps(k)) h += x.uni ? `<span>Left</span><span>Right</span>` : `<span>Reps</span>`;
   if (hasDist(k)) h += `<span>${distUnit(k)}</span>`;
@@ -1239,7 +1244,10 @@ function exCardHTML(w, i, focus) {
 }
 function setRowHTML(i, x, j, k, ctx, effOn) {
   const s = x.sets[j], ph = placeholder(x, j, ctx), prev = ctx.prevSets[j], prs = ctx.prs[j] || [];
-  const inp = (f, val, pv, mode, aria) => `<input class="cell" data-f="${f}" data-e="${i}" data-s="${j}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
+  const pad = useKeypad();
+  const inp = (f, val, pv, mode, aria) => pad
+    ? `<button class="cell" data-a="kp" data-f="${f}" data-e="${i}" data-s="${j}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
+    : `<input class="cell" data-f="${f}" data-e="${i}" data-s="${j}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
   const n = j + 1;
   let h = `<div class="set-row ${s.done ? 'done' : ''} ${s.t === 'W' ? 'warm' : ''}" data-s="${j}">`;
   h += badge(s.t, setLabel(x.sets, j), `data-a="setType" data-e="${i}" data-s="${j}"`);
@@ -1273,6 +1281,7 @@ function woGo(i, smooth) {
   if (!w || i < 0 || i >= w.ex.length) return;
   w.cur = i;
   ui.effOpen = null;
+  ui.kp = null;
   save();
   if (state.settings.view === 'focus') {
     renderWorkout(true);
@@ -1293,7 +1302,7 @@ function hasValue(k, x, s) {
 function toggleSet(i, j) {
   const w = A(), x = w.ex[i], s = x.sets[j], k = getEx(x.exId).k;
   ui.effOpen = null;
-  if (s.done) { s.done = false; delete s.at; save(); renderWorkout(); return; }
+  if (s.done) { s.done = false; delete s.at; ui.kp = null; save(); renderWorkout(); return; }
   const ph = placeholder(x, j, exCtx(w, x));
   for (const f of ['w', 'r', 'rl', 'rr', 'sec', 'dist']) if (s[f] == null && ph[f] != null) s[f] = ph[f];
   if (!x.uni) { delete s.rl; delete s.rr; } else delete s.r;
@@ -1305,6 +1314,7 @@ function toggleSet(i, j) {
   }
   s.done = true;
   s.at = Date.now();
+  ui.kp = null;
   if (navigator.vibrate) navigator.vibrate(15);
   const editing = w.mode === 'edit';
   const ss = ssInfo(w, i);
@@ -1369,13 +1379,13 @@ function addWarmups(i) {
   save(); renderWorkout();
   toast(`Added ${sets.length} warm-up sets up to ${fmtW(target)}.`);
 }
-function woInput(el) {
+function woInput(el) { woSetField(+el.dataset.e, +el.dataset.s, el.dataset.f, el.value); }
+function woSetField(i, j, f, v) {
   const w = A();
   if (!w) return;
-  const i = +el.dataset.e, j = +el.dataset.s, f = el.dataset.f;
   const x = w.ex[i], s = x && x.sets[j];
   if (!s) return;
-  const k = getEx(x.exId).k, v = el.value;
+  const k = getEx(x.exId).k;
   if (f === 'w') s.w = toKg(parseNum(v));
   else if (f === 'sec') s.sec = parseTime(v);
   else if (f === 'dist') s.dist = toMeters(parseNum(v), k);
@@ -1540,6 +1550,80 @@ function plateSheet(kg) {
   });
 }
 
+/* ============================== Number pad (phones) ============================== */
+
+function useKeypad() {
+  const k = state.settings.keypad;
+  if (k === 'app') return true;
+  if (k === 'system') return false;
+  return matchMedia('(max-width: 600px) and (pointer: coarse)').matches;
+}
+function rowFields(x, k) {
+  const f = [];
+  if (hasWeight(k)) f.push('w');
+  if (hasReps(k)) f.push(...(x.uni ? ['rl', 'rr'] : ['r']));
+  if (hasDist(k)) f.push('dist');
+  if (hasTime(k)) f.push('sec');
+  return f;
+}
+function kpField() {
+  const w = A(), k = ui.kp;
+  if (!w || !k) return null;
+  const x = w.ex[k.e], set = x && x.sets[k.s];
+  if (!set) return null;
+  const kind = getEx(x.exId).k;
+  return rowFields(x, kind).includes(k.f) ? { w, x, set, k: kind } : null;
+}
+function kpCell() { const k = ui.kp; return k ? $(`#workout .cell[data-e="${k.e}"][data-s="${k.s}"][data-f="${k.f}"]`) : null; }
+function kpCurrent() {
+  const fld = kpField();
+  if (!fld) return '';
+  const v = fld.set[ui.kp.f], f = ui.kp.f;
+  if (v == null) return '';
+  return f === 'w' ? dispW(v) : f === 'sec' ? fmtClock(v) : f === 'dist' ? dispDist(v, fld.k) : String(v);
+}
+function kpShow(buf) { const c = kpCell(); if (c) c.innerHTML = buf ? esc(buf) : `<span class="ph">${esc(c.dataset.ph || '')}</span>`; }
+function kpSet(buf) { ui.kp.buf = buf; woSetField(ui.kp.e, ui.kp.s, ui.kp.f, buf); kpShow(buf); }
+function kpClose() { ui.kp = null; renderWorkout(); }
+const KP_NAMES = { w: 'Weight', r: 'Reps', rl: 'Left reps', rr: 'Right reps', sec: 'Time', dist: 'Distance' };
+function renderKeypad() {
+  const el = $('#keypad');
+  const fld = kpField();
+  if (!fld || !kpCell()) {
+    ui.kp = null; el.hidden = true; el.innerHTML = '';
+    document.body.classList.remove('kp-open');
+    return;
+  }
+  const { x, k } = fld, f = ui.kp.f;
+  const unit = f === 'w' ? weightLabel(k) : f === 'dist' ? distUnit(k) : f === 'sec' ? 'min:sec' : '';
+  const step = f === 'w' ? trimNum(state.settings.step) : f === 'sec' ? '15s' : f === 'dist' ? (k === 'wdist' ? '5' : '0.1') : '1';
+  const dot = f === 'sec' ? ':' : f === 'w' || f === 'dist' ? '.' : '';
+  const key = c => `<button class="kp-k" data-a="kpKey" data-k="${c}">${c}</button>`;
+  el.innerHTML = `<div class="kp-head"><div class="kp-title"><b>${esc(getEx(x.exId).name)}</b><span>Set ${esc(setLabel(x.sets, ui.kp.s))} · ${KP_NAMES[f]}${unit ? ` (${esc(unit)})` : ''}</span></div>
+    <span class="kp-rest" data-kprest hidden></span><button class="kp-hide" data-a="kpClose" aria-label="Hide number pad">${icon('down')}</button></div>
+    <div class="kp-grid">${key('1')}${key('2')}${key('3')}<button class="kp-k fn" data-a="kpBack" aria-label="Delete">${icon('backspace')}</button>
+    ${key('4')}${key('5')}${key('6')}<button class="kp-k fn" data-a="kpStep" data-d="-1">−${step}</button>
+    ${key('7')}${key('8')}${key('9')}<button class="kp-k fn" data-a="kpStep" data-d="1">+${step}</button>
+    ${dot ? key(dot) : '<span></span>'}${key('0')}<button class="kp-k fn" data-a="kpNext">Next</button><button class="kp-k log" data-a="kpLog">${icon('check')}Log</button></div>`;
+  el.hidden = false;
+  document.body.classList.add('kp-open');
+  tickRest();
+}
+function markKpCell(scroll) {
+  for (const c of $$('#workout .cell.kp-on')) c.classList.remove('kp-on');
+  const c = kpCell();
+  if (!c) return;
+  c.classList.add('kp-on');
+  if (!scroll) return;
+  requestAnimationFrame(() => {
+    const main = $('#workout .wo-main'), kp = $('#keypad');
+    if (!main || kp.hidden) return;
+    const r = c.getBoundingClientRect(), top = kp.getBoundingClientRect().top, mtop = main.getBoundingClientRect().top;
+    if (r.bottom > top - 16) main.scrollBy({ top: r.bottom - top + 72, behavior: 'smooth' });
+    else if (r.top < mtop + 8) main.scrollBy({ top: r.top - mtop - 72, behavior: 'smooth' });
+  });
+}
+
 /* ============================== Rest timer ============================== */
 
 function startRest(sec, next) {
@@ -1560,6 +1644,12 @@ function renderRest() {
 }
 function tickRest() {
   const r = state.rest;
+  const kr = $('[data-kprest]');
+  if (kr) {
+    const l = r ? Math.ceil((r.end - Date.now()) / 1000) : 0;
+    kr.hidden = !r;
+    if (r) { kr.textContent = l > 0 ? 'Rest ' + fmtClock(l) : 'Rest over'; kr.classList.toggle('over', l <= 0); }
+  }
   if (!r) return;
   const el = $('#restbar');
   const left = (r.end - Date.now()) / 1000;
@@ -2149,6 +2239,7 @@ VIEWS.settings = function () {
   </div>
   <h2 class="section-h">During a workout</h2><div class="card list-card">
     ${row('Layout', 'One exercise at a time with big next and previous buttons, or every exercise in one list.', seg('setView', s.view, [['focus', 'One at a time'], ['list', 'List']]))}
+    ${row('Number pad', 'Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.', seg('setKeypad', s.keypad, [['auto', 'Auto'], ['app', 'In-app pad'], ['system', 'Keyboard']]))}
     ${row('Default rest', 'Each exercise can have its own.', `<label class="select-wrap sm"><select data-f="rest">${REST_PRESETS.map(v => `<option value="${v}" ${v === s.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>`)}
     ${row('Start rest timer when a set is checked', '', toggle(s.autoRest, 'tgl', 'data-k="autoRest"'))}
     ${row('Move to the next exercise when one is done', 'In one-at-a-time layout.', toggle(s.autoNext, 'tgl', 'data-k="autoNext"'))}
@@ -2327,7 +2418,56 @@ const ACT = {
     if (!x.uni && p.rl != null && p.r == null) { s.r = Math.max(p.rl || 0, p.rr || 0); delete s.rl; delete s.rr; }
     save(); renderWorkout();
   },
-  effort: b => { const key = `${b.dataset.e}:${b.dataset.s}`; ui.effOpen = ui.effOpen === key ? null : key; renderWorkout(); },
+  effort: b => { const key = `${b.dataset.e}:${b.dataset.s}`; ui.effOpen = ui.effOpen === key ? null : key; ui.kp = null; renderWorkout(); },
+  kp: b => { ui.kp = { e: +b.dataset.e, s: +b.dataset.s, f: b.dataset.f, buf: null, fresh: true }; ui.effOpen = null; $$('#workout .eff-pick').forEach(n => n.remove()); renderKeypad(); markKpCell(true); },
+  kpKey: b => {
+    if (!kpField()) return;
+    const ch = b.dataset.k;
+    let buf = ui.kp.fresh ? '' : (ui.kp.buf ?? kpCurrent());
+    ui.kp.fresh = false;
+    if (ch === '.' && buf.includes('.')) return;
+    if (ch === '.' && !buf) buf = '0';
+    if (ch === ':' && (!buf || buf.split(':').length > 2)) return;
+    if (buf.length >= 8) return;
+    kpSet(buf + ch);
+  },
+  kpBack: () => {
+    if (!kpField()) return;
+    const buf = ui.kp.fresh ? '' : (ui.kp.buf ?? kpCurrent()).slice(0, -1);
+    ui.kp.fresh = false;
+    kpSet(buf);
+  },
+  kpStep: b => {
+    const fld = kpField();
+    if (!fld) return;
+    const d = +b.dataset.d, f = ui.kp.f, k = fld.k;
+    const cur = fld.set[f] ?? placeholder(fld.x, ui.kp.s, exCtx(fld.w, fld.x))[f] ?? 0;
+    let buf;
+    if (f === 'w') buf = trimNum(Math.max(0, (+dispW(cur) || 0) + d * state.settings.step));
+    else if (f === 'sec') buf = fmtClock(Math.max(0, cur + d * 15));
+    else if (f === 'dist') buf = trimNum(Math.max(0, (+dispDist(cur, k) || 0) + d * (k === 'wdist' ? 5 : 0.1)));
+    else buf = String(Math.max(0, Math.round(cur) + d));
+    kpSet(buf);
+    ui.kp.fresh = true;
+  },
+  kpNext: () => {
+    const fld = kpField();
+    if (!fld) { kpClose(); return; }
+    const fields = rowFields(fld.x, fld.k), n = fields.indexOf(ui.kp.f);
+    kpShow(kpCurrent());
+    if (n < fields.length - 1) ui.kp.f = fields[n + 1];
+    else if (ui.kp.s < fld.x.sets.length - 1) { ui.kp.s++; ui.kp.f = fields[0]; }
+    else { kpClose(); return; }
+    ui.kp.fresh = true; ui.kp.buf = null;
+    renderKeypad(); markKpCell(true);
+  },
+  kpLog: () => {
+    const fld = kpField();
+    if (!fld) { kpClose(); return; }
+    if (fld.set.done) { kpClose(); return; }
+    toggleSet(ui.kp.e, ui.kp.s);
+  },
+  kpClose: () => kpClose(),
   effPick: b => { const s = A().ex[+b.dataset.e].sets[+b.dataset.s]; s.rir = b.dataset.v === '' ? null : +b.dataset.v; if (s.rir == null) delete s.rir; ui.effOpen = null; save(); renderWorkout(); },
   restAdj: b => { const r = state.rest; if (!r) return; r.end += +b.dataset.d * 1000; r.total = Math.max(r.total, Math.ceil((r.end - Date.now()) / 1000)); if (r.end > Date.now()) { r.alerted = false; $('#restbar').classList.remove('over'); const l = $('.rb-label', $('#restbar')); if (l) l.textContent = 'Rest'; } save(); tickRest(); },
   restSkip: () => { state.rest = null; save(); renderRest(); },
@@ -2362,6 +2502,7 @@ const ACT = {
   },
   setEffort: b => { state.settings.effort = b.dataset.v; save(); render(); },
   setView: b => { state.settings.view = b.dataset.v; save(); render(); },
+  setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
@@ -2446,7 +2587,7 @@ function handleInput(el, ev) {
 }
 document.addEventListener('focusin', ev => {
   const el = ev.target;
-  if (el.classList && el.classList.contains('cell') && el.tagName === 'INPUT') setTimeout(() => { try { el.select(); } catch (e) { /* not selectable */ } }, 0);
+  if (el.classList && el.classList.contains('cell') && el.tagName === 'INPUT' && !el.readOnly) setTimeout(() => { try { el.select(); } catch (e) { /* not selectable */ } }, 0);
 });
 document.addEventListener('keydown', ev => {
   const top = sheets[sheets.length - 1];
@@ -2478,7 +2619,16 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', persist);
 window.addEventListener('storage', ev => { if (ev.key === KEY && ev.newValue) { try { state = migrate(JSON.parse(ev.newValue)); rebuildCustom(); renderWorkout(); render(); } catch (e) { /* ignore */ } } });
 let resizeT;
-window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { drawCharts(document); }, 150); });
+let padMode = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => {
+    drawCharts(document);
+    const m = useKeypad();
+    if (padMode !== null && m !== padMode && A() && !ui.woHidden) { ui.kp = null; renderWorkout(); }
+    padMode = m;
+  }, 150);
+});
 
 setInterval(() => {
   const w = state.active;

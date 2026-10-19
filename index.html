@@ -6,7 +6,8 @@
 <title>Lifting Sanity</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Log every set, follow your split and watch your lifts go up. Works offline on iPad.">
-<meta name="theme-color" content="#101215">
+<meta name="theme-color" content="#101215" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f3f5" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -31,7 +32,7 @@
   --scrim: rgba(4, 6, 10, .62); --shadow: 0 12px 36px rgba(0, 0, 0, .5);
   --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
   --ui: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --tabbar: 62px; --rail: 92px;
+  --tabbar: 62px; --rail: 92px; --status-band: #101215;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
@@ -66,7 +67,7 @@ body {
   font: 400 16px/1.45 var(--ui); -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none;
 }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 45; background: var(--bg); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 100; background: var(--status-band); pointer-events: none; }
 body.wo-open { overflow: hidden; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; text-align: inherit; }
 button:disabled { cursor: default; }
@@ -211,7 +212,7 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .ex-preview { list-style: none; padding: 0; margin: 2px 0 4px; display: grid; }
 .ex-preview li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
 .ex-preview li:last-child { border-bottom: 0; }
-.ex-preview li > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.ex-preview li > span:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ex-preview.big li { padding: 11px 0; }
 .ex-preview.big b { font-weight: 600; font-size: 16px; }
 .ex-preview.big small { display: block; color: var(--muted); font-size: 13px; }
@@ -280,6 +281,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
   body.wo-open #restbar { left: calc(50% + 140px); width: min(640px, calc(100% - 280px - 48px)); }
   body.wo-open #toast { left: calc(50% + 140px); }
   body.wo-open.resting #toast { bottom: 130px; }
+  #keypad { left: 280px; }
 }
 
 /* ---------- workout ---------- */
@@ -377,6 +379,28 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .exc-nav .btn { min-height: 58px; }
 .exc-nav .next { justify-content: space-between; font-size: 17px; min-width: 0; }
 .exc-nav .next span { overflow: hidden; text-overflow: ellipsis; }
+button.cell { display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
+button.cell .ph { color: var(--muted); font-weight: 500; }
+.cell.kp-on, .set-row.done .cell.kp-on { border-color: var(--accent); background: var(--panel-3); }
+.cell.kp-on::after { content: ""; width: 2px; height: 22px; margin-left: 2px; background: var(--accent); animation: blink 1s steps(1) infinite; flex-shrink: 0; }
+#keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
+.kp-head { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: 0 2px 8px; }
+.kp-title { flex: 1; min-width: 0; display: grid; }
+.kp-title b { font: 700 18px/1.15 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kp-title span { font-size: 13px; color: var(--ink-2); }
+.kp-rest { font: 700 20px var(--display); color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kp-rest.over { color: var(--good); }
+.kp-hide { width: 46px; height: 40px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-2); }
+.kp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; max-width: 640px; margin: 0 auto; }
+.kp-k { min-height: 54px; border-radius: 12px; background: var(--panel-3); display: flex; align-items: center; justify-content: center; gap: 6px; font: 600 26px var(--ui); font-variant-numeric: tabular-nums; user-select: none; -webkit-user-select: none; }
+.kp-k:active { background: var(--line-2); }
+.kp-k.fn { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); font-size: 17px; font-weight: 700; }
+.kp-k.log { background: var(--good); color: var(--on-good); font-size: 18px; font-weight: 700; }
+.kp-k .i { width: 22px; height: 22px; }
+.kp-k.log .i { stroke-width: 3; }
+body.kp-open #restbar { display: none !important; }
+body.kp-open .wo-spacer { height: calc(330px + env(safe-area-inset-bottom, 0px)); }
+body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !important; }
 
 /* ---------- sheets ---------- */
 .sheet-wrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; }
@@ -603,12 +627,23 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
   .exd-sess { grid-template-columns: 1fr; gap: 6px; }
   .rb-btns button { min-width: 44px; padding: 0 8px; }
   .rb-time { font-size: 30px; }
-  .wo-h .btn.primary { padding: 0 14px; }
+  .wo-h { gap: 2px; padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+  .wo-h .btn.primary { padding: 0 14px; margin-left: 4px; }
+  .wo-name { font-size: 22px; }
+  .wo-meta { font-size: 13px; gap: 0 10px; }
+  .sets.uni .set-row { grid-template-columns: var(--cols-c); }
+  .sets.uni .prev, .sets.uni .set-row.head span:nth-child(2) { display: none; }
+  .exc-actions .btn { min-height: 42px; padding: 0 12px; font-size: 15px; }
+  .split { padding: 16px; }
+  .upnext { padding: 14px; }
+  .days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-h-side { width: 100%; }
 }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(26px); } }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes flash { 50% { background: var(--good-soft); } }
+@keyframes blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
 }
@@ -620,6 +655,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 <div id="mini" hidden></div>
 <section id="workout" hidden aria-label="Workout"></section>
 <div id="restbar" hidden></div>
+<div id="keypad" hidden></div>
 <div id="sheets"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="exercises.js"></script>
