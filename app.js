@@ -2176,6 +2176,13 @@ function exportData() {
 async function exportFile() {
   const name = `lifting-sanity-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const blob = new Blob([exportData()], { type: 'application/json' });
+  // inside claude.ai the page can't download on its own, so the viewer saves through the host
+  const host = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (host) {
+    try { await host.save({ filename: name, data: blob }); toast('Backup saved.'); }
+    catch (e) { if (!e || e.code !== 'declined') toast('Saving isn’t available here. Use Copy instead.'); }
+    return;
+  }
   try {
     const file = new File([blob], name, { type: 'application/json' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Lifting Sanity backup' }); return; }
