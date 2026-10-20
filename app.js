@@ -63,7 +63,17 @@ const LIB = parseLib(window.FORGE_LIBRARY);
 const LIB_MAP = new Map(LIB.map(e => [e.id, e]));
 // the open exercises-dataset adds ~1,200 more; names already in the curated list keep the curated entry
 for (const e of window.LS_EXTRA ? parseLib(window.LS_EXTRA) : []) if (!LIB_MAP.has(e.id)) { LIB.push(e); LIB_MAP.set(e.id, e); }
-const STEPS = window.LS_STEPS || {};
+// how-to steps are big and only shown in exercise details: fetched (or read from the page) the first time they're wanted
+let STEPS = null, stepsLoading = null;
+function loadSteps() {
+  if (STEPS) return Promise.resolve(STEPS);
+  if (!stepsLoading) {
+    const inline = document.getElementById('ls-steps');
+    stepsLoading = (inline ? Promise.resolve().then(() => JSON.parse(inline.textContent)) : fetch('steps.json').then(r => r.json()))
+      .then(d => (STEPS = d)).catch(() => { stepsLoading = null; return null; });
+  }
+  return stepsLoading;
+}
 const PROGRAMS = window.FORGE_PROGRAMS;
 
 /* ============================== Utilities ============================== */
@@ -422,7 +432,7 @@ function ensureSplits() {
 let saveTimer = null;
 function save(now) {
   clearTimeout(saveTimer);
-  if (now) persist(); else saveTimer = setTimeout(persist, 300);
+  if (now) persist(); else saveTimer = setTimeout(persist, 900);
 }
 function persist() {
   clearTimeout(saveTimer);
@@ -435,13 +445,19 @@ function persist() {
 /* ============================== Exercises ============================== */
 
 let customMap = new Map();
-function rebuildCustom() { customMap = new Map(state.custom.map(c => [c.id, c])); }
+function rebuildCustom() { customMap = new Map(state.custom.map(c => [c.id, c])); allCache = null; }
 function getEx(id) {
   return LIB_MAP.get(id) || customMap.get(id) || { id, name: 'Deleted exercise', m: 'fullbody', eq: 'other', k: 'wr', sec: [], uni: false };
 }
+// sorted once and kept until your own exercises change; the search text for each is worked out once too
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+let allCache = null;
 function allExercises() {
-  return [...LIB, ...state.custom.filter(c => !c.hidden)].sort((a, b) => a.name.localeCompare(b.name));
+  if (!allCache) allCache = [...LIB, ...state.custom.filter(c => !c.hidden)].sort((a, b) => collator.compare(a.name, b.name));
+  return allCache;
 }
+const hays = new WeakMap();
+const hayOf = e => { const key = e.name + e.m + e.eq + e.sec; let h = hays.get(e); if (h == null || h.key !== key) hays.set(e, h = { key, t: (e.name + ' ' + MUSCLES[e.m] + ' ' + EQUIP[e.eq] + ' ' + e.sec.map(x => MUSCLES[x]).join(' ')).toLowerCase() }); return h.t; };
 const hasWeight = k => k === 'wr' || k === 'bw' || k === 'aw' || k === 'wdur' || k === 'wdist';
 const hasReps = k => k === 'wr' || k === 'bw' || k === 'aw';
 const hasTime = k => k === 'dur' || k === 'wdur' || k === 'dist';
@@ -455,12 +471,13 @@ function filterExercises({ q = '', g = 'all', m = 'all', eq = 'all' }) {
     if (m !== 'all' && e.m !== m) return false;
     if (eq !== 'all' && e.eq !== eq) return false;
     if (!terms.length) return true;
-    const hay = (e.name + ' ' + MUSCLES[e.m] + ' ' + EQUIP[e.eq] + ' ' + e.sec.map(x => MUSCLES[x]).join(' ')).toLowerCase();
+    const hay = hayOf(e);
     return terms.every(t => hay.includes(t));
   });
   if (terms.length) {
+    // names that start with what you typed come first; the list is already in name order, so a stable sort keeps the rest
     const q0 = q.toLowerCase().trim();
-    list.sort((a, b) => (b.name.toLowerCase().startsWith(q0) - a.name.toLowerCase().startsWith(q0)) || a.name.localeCompare(b.name));
+    list.sort((a, b) => hayOf(b).startsWith(q0) - hayOf(a).startsWith(q0));
   }
   return list;
 }
@@ -771,7 +788,7 @@ function lastPerf(exId, before, excludeId) {
   }
   return null;
 }
-function sessionNumber(w) { return state.workouts.indexOf(w) + 1; }
+function sessionNumber(w) { return sessionNums && sessionNums.has(w) ? sessionNums.get(w) : state.workouts.indexOf(w) + 1; }
 function muscleSets(ws) {
   const m = {};
   for (const w of ws) for (const x of w.ex) {
@@ -896,7 +913,7 @@ function render() {
   renderMini();
   requestAnimationFrame(() => drawCharts($('#view')));
 }
-function go(tab) { ui.tab = tab; render(); window.scrollTo(0, 0); }
+function go(tab) { ui.tab = tab; ui.histLimit = null; render(); window.scrollTo(0, 0); }
 
 function renderMini() {
   const el = $('#mini');
@@ -1476,7 +1493,14 @@ function renderWorkout(resetScroll) {
   const main = $('.wo-main', el);
   const sc = main ? main.scrollTop : 0;
   if (w.cur == null || w.cur >= w.ex.length) w.cur = Math.max(0, w.ex.length - 1);
+  const shown = new Map();
+  for (const im of el.querySelectorAll('img')) { const k = im.getAttribute('src'); if (!shown.has(k)) shown.set(k, []); shown.get(k).push(im); }
   el.innerHTML = workoutHTML(w);
+  // pictures already on screen are put back as they were, so they don't blink each time a set is checked
+  for (const im of el.querySelectorAll('img')) {
+    const old = (shown.get(im.getAttribute('src')) || []).shift();
+    if (old) { old.className = im.className; old.alt = im.alt; im.replaceWith(old); }
+  }
   el.hidden = false;
   document.body.classList.add('wo-open');
   const m2 = $('.wo-main', el);
@@ -2202,7 +2226,7 @@ function startRest(sec, next) {
 }
 function renderRest() {
   const el = $('#restbar'), r = state.rest;
-  if (!r) { el.hidden = true; el.className = ''; document.body.classList.remove('resting'); return; }
+  if (!r) { el.hidden = true; el.className = ''; document.body.classList.remove('resting'); const kr = $('[data-kprest]'); if (kr) kr.hidden = true; return; }
   el.hidden = false;
   document.body.classList.add('resting');
   el.innerHTML = `<div class="rb-track"><div class="rb-fill"></div></div>
@@ -2210,20 +2234,21 @@ function renderRest() {
     <div class="rb-btns"><button data-a="restAdj" data-d="-15" aria-label="15 seconds less">−15</button><button data-a="restAdj" data-d="15" aria-label="15 seconds more">+15</button><button data-a="restPresets" aria-label="Choose rest length">${icon('timer')}</button><button class="skip" data-a="restSkip">Skip</button></div></div>`;
   tickRest();
 }
+const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
 function tickRest() {
   const r = state.rest;
   const kr = $('[data-kprest]');
   if (kr) {
     const l = r ? Math.ceil((r.end - Date.now()) / 1000) : 0;
     kr.hidden = !r;
-    if (r) { kr.textContent = l > 0 ? 'Rest ' + fmtClock(l) : 'Rest over'; kr.classList.toggle('over', l <= 0); }
+    if (r) { setText(kr, l > 0 ? 'Rest ' + fmtClock(l) : 'Rest over'); kr.classList.toggle('over', l <= 0); }
   }
   if (!r) return;
   const el = $('#restbar');
   const left = (r.end - Date.now()) / 1000;
   const t = $('.rb-time', el), f = $('.rb-fill', el);
   if (left > 0) {
-    if (t) t.textContent = fmtClock(Math.ceil(left));
+    if (t) setText(t, fmtClock(Math.ceil(left)));
     if (f) f.style.transform = `scaleX(${Math.max(0, left / r.total)})`;
     el.classList.toggle('soon', left <= 10);
   } else {
@@ -2323,7 +2348,7 @@ function pickExercises({ title, single = false, onPick }) {
       })
     },
     onInput: (el, def) => {
-      if (el.dataset.f === 'pkq') { f.q = el.value; limit = PAGE; $('#pkList', def.el).innerHTML = listHTML(); }
+      if (el.dataset.f === 'pkq') { f.q = el.value; limit = PAGE; typed(() => { const l = $('#pkList', def.el); if (l) l.innerHTML = listHTML(); }); }
       if (el.dataset.f === 'pkeq') { f.eq = el.value; limit = PAGE; $('#pkList', def.el).innerHTML = listHTML(); }
     }
   });
@@ -2577,6 +2602,9 @@ VIEWS.history = function () {
   if (!ws.length) return h + `<section class="card pad empty"><h2>No workouts yet</h2><p class="muted">Finish a workout and it shows up here, with every set you did.</p></section>`;
   let list = ws.slice().reverse();
   if (ui.hist.day) list = list.filter(w => dayStart(w.start) === ui.hist.day);
+  const all = list.length;
+  list = list.slice(0, ui.histLimit || HIST_PAGE);
+  sessionNums = new Map(ws.map((w, n) => [w, n + 1]));
   if (ui.hist.day) h += `<div class="filter-note"><span>Showing ${esc(fmtDateY(ui.hist.day))}</span><button class="btn sm ghost" data-a="histDay" data-v="">Show all</button></div>`;
   let lastBlock = null;
   h += `<div class="hist-list">`;
@@ -2588,8 +2616,11 @@ VIEWS.history = function () {
     }
     h += histCard(w);
   }
-  return h + `</div>`;
+  sessionNums = null;
+  return h + `</div>` + (all > list.length ? `<button class="btn wide more" data-a="histMore" data-auto>Show ${Math.min(HIST_PAGE, all - list.length)} more · ${all - list.length} left</button>` : '');
 };
+const HIST_PAGE = 25;
+let sessionNums = null;
 function histCard(w) {
   const n = sessionNumber(w);
   const prs = (w.prs || []).length;
@@ -2659,15 +2690,21 @@ VIEWS.library = function () {
   return `<header class="page-h"><div><p class="eyebrow">${LIB.length} built in · ${state.custom.filter(c => !c.hidden).length} of yours</p><h1>Exercises</h1></div><button class="btn sm" data-a="libNew">${icon('plus')}New exercise</button></header>
     ${filterBar(ui.lib, 'lib')}<div class="ex-list card" id="libList">${libListHTML()}</div>`;
 };
-const PAGE = 120;
+const PAGE = 40;
+// typing in a search box: wait until there's a short pause before redrawing the list
+let typeT = null;
+const typed = fn => { clearTimeout(typeT); typeT = setTimeout(fn, 140); };
 function moreButton(shown, total, action) {
-  return total > shown ? `<button class="btn wide more" data-a="${action}">Show ${Math.min(PAGE, total - shown)} more · ${total - shown} left</button>` : '';
+  return total > shown ? `<button class="btn wide more" data-a="${action}" data-auto>Show ${Math.min(PAGE, total - shown)} more · ${total - shown} left</button>` : '';
+}
+function libRows(list) {
+  const used = {};
+  for (const w of state.workouts) for (const x of w.ex) used[x.exId] = w.start;
+  return list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}</small></span>${used[e.id] ? `<span class="muted small">${esc(relDay(used[e.id]))}</span>` : ''}${icon('right', 'chev')}</button>`).join('');
 }
 function libListHTML() {
   const all = filterExercises(ui.lib), list = all.slice(0, ui.libLimit || PAGE);
-  const used = {};
-  for (const w of state.workouts) for (const x of w.ex) used[x.exId] = w.start;
-  return `<p class="eyebrow list-h">${all.length} exercise${all.length === 1 ? '' : 's'}</p>` + list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}</small></span>${used[e.id] ? `<span class="muted small">${esc(relDay(used[e.id]))}</span>` : ''}${icon('right', 'chev')}</button>`).join('')
+  return `<p class="eyebrow list-h">${all.length} exercise${all.length === 1 ? '' : 's'}</p>` + libRows(list)
     + moreButton(list.length, all.length, 'libMore')
     + (list.length ? '' : `<p class="muted pad">Nothing matches. <button class="link" data-a="libNew">Create “${esc(ui.lib.q)}”</button></p>`);
 }
@@ -2675,8 +2712,10 @@ function exerciseSheet(exId) {
   const st = { range: 'block', metric: null };
   openSheet({
     full: true, live: true,
-    render: () => {
+    render: self => {
       const ex = getEx(exId), k = ex.k;
+      if (!STEPS) loadSteps().then(d => { if (d && d[exId] && sheets.includes(self)) refreshSheet(self); });
+      const steps = STEPS && STEPS[exId];
       const metrics = metricsFor(k);
       if (!st.metric) st.metric = metrics[0][0];
       const base = baseline(exId);
@@ -2706,8 +2745,8 @@ function exerciseSheet(exId) {
           <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>Front</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>Back</figcaption></figure></div></div>
         <div class="exd-legend"><span><i class="dot hit"></i>Main: ${esc(MUSCLES[ex.m])}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>Also: ${esc(ex.sec.map(m => MUSCLES[m]).join(', '))}</span>` : ''}
           <button class="btn sm" data-a="photo">${icon('camera')}${photo ? 'Change photo' : 'Add your own photo'}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">Remove photo</button>` : ''}</div>
-        ${STEPS[exId] ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}How to do it<span class="muted">${STEPS[exId].length} steps</span>${icon('down', 'chev')}</summary>
-          <ol class="steps">${STEPS[exId].map(s => `<li>${esc(s)}</li>`).join('')}</ol><p class="muted small">Instructions from the open <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT).</p></details>` : ''}
+        ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}How to do it<span class="muted">${steps.length} steps</span>${icon('down', 'chev')}</summary>
+          <ol class="steps">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol><p class="muted small">Instructions from the open <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT).</p></details>` : ''}
         <div class="exd-tags"><span class="pill">${esc(MUSCLES[ex.m])}</span>${ex.sec.map(m => `<span class="pill quiet">${esc(MUSCLES[m])}</span>`).join('')}<span class="pill quiet">${esc(EQUIP[ex.eq])}</span><span class="pill quiet">${esc(KINDS[k])}</span>
           <a class="btn sm ghost" href="${yt}" target="_blank" rel="noopener">${icon('external')}Watch how it’s done</a></div>
         ${hasArchived || resets.length || state.blocks.length > 1 ? `<div class="seg" role="group" aria-label="Time range"><button class="${st.range === 'block' ? 'on' : ''}" data-a="range" data-v="block">Since last reset</button><button class="${st.range === 'all' ? 'on' : ''}" data-a="range" data-v="all">All time</button></div>` : ''}
@@ -3135,13 +3174,18 @@ const ACT = {
   restPresets: () => restChooser({ title: 'Rest length', current: state.rest ? state.rest.total : null, onPick: v => startRest(v, state.rest ? state.rest.next : '') }),
   // history
   histMonth: b => { const d = new Date(ui.hist.month); d.setMonth(d.getMonth() + +b.dataset.d); ui.hist.month = d.getTime(); render(); },
-  histDay: b => { const v = b.dataset.v; ui.hist.day = v ? (ui.hist.day === +v ? null : +v) : null; render(); },
+  histDay: b => { const v = b.dataset.v; ui.hist.day = v ? (ui.hist.day === +v ? null : +v) : null; ui.histLimit = null; render(); },
   openWorkout: b => workoutSheet(b.dataset.id),
   logPast: () => logPastWorkout(),
   // library
   libG: b => { ui.lib.g = b.dataset.v; ui.lib.m = 'all'; ui.libLimit = PAGE; render(); },
   libM: b => { ui.lib.m = b.dataset.v; ui.libLimit = PAGE; render(); },
-  libMore: () => { ui.libLimit = (ui.libLimit || PAGE) + PAGE; $('#libList').innerHTML = libListHTML(); },
+  histMore: () => { const y = scrollY; ui.histLimit = (ui.histLimit || HIST_PAGE) + HIST_PAGE; render(); scrollTo(0, y); },
+  libMore: b => {
+    const from = ui.libLimit || PAGE, all = filterExercises(ui.lib);
+    ui.libLimit = from + PAGE;
+    b.outerHTML = libRows(all.slice(from, ui.libLimit)) + moreButton(ui.libLimit, all.length, 'libMore');
+  },
   libNew: () => customExerciseSheet(null, ui.lib.q, id => exerciseSheet(id)),
   openEx: b => exerciseSheet(b.dataset.id),
   // progress
@@ -3211,6 +3255,16 @@ function showCopyBox(text) {
 
 function sheetFor(el) { const w = el.closest('[data-sheet]'); return w ? sheets.find(s => s.id === w.dataset.sheet) : null; }
 
+// long lists draw a page at a time; the next page comes in as you scroll near the end
+let moreQueued = false;
+document.addEventListener('scroll', () => {
+  if (moreQueued) return;
+  moreQueued = true;
+  requestAnimationFrame(() => {
+    moreQueued = false;
+    for (const b of $$('[data-auto]')) if (b.isConnected && b.getBoundingClientRect().top < innerHeight + 400) { b.removeAttribute('data-auto'); b.click(); }
+  });
+}, { capture: true, passive: true });
 // an illustration that can't load (offline and never seen) falls back to the muscle map
 document.addEventListener('error', ev => {
   const img = ev.target;
@@ -3262,7 +3316,7 @@ function handleInput(el, ev) {
   if (def) { if (def.onInput) def.onInput(el, def, ev); return; }
   if (el.closest('#workout')) { woInput(el); return; }
   const f = el.dataset.f;
-  if (f === 'libq') { ui.lib.q = el.value; ui.libLimit = PAGE; $('#libList').innerHTML = libListHTML(); }
+  if (f === 'libq') { ui.lib.q = el.value; ui.libLimit = PAGE; typed(() => { const l = $('#libList'); if (l) l.innerHTML = libListHTML(); }); }
   else if (f === 'libeq') { ui.lib.eq = el.value; ui.libLimit = PAGE; $('#libList').innerHTML = libListHTML(); }
   else if (f === 'rest' || f === 'bar' || f === 'step') { state.settings[f] = +el.value; save(); }
   else if (f === 'importFile') {
@@ -3351,12 +3405,14 @@ window.addEventListener('resize', () => {
 
 setInterval(() => {
   const w = state.active;
-  if (w && w.mode !== 'edit') for (const el of $$('[data-clock]')) el.textContent = fmtClock((Date.now() - w.start) / 1000);
+  if (w && w.mode !== 'edit' && !document.hidden) for (const el of $$('[data-clock]')) setText(el, fmtClock((Date.now() - w.start) / 1000));
 }, 1000);
-setInterval(tickRest, 250);
+setInterval(() => { if (state.rest && !document.hidden) tickRest(); }, 250);
 
 /* ============================== Start ============================== */
 
+// the display font loads without holding up the first screen (system font until it arrives)
+for (const l of $$('link[data-font]')) l.media = 'all';
 document.body.insertAdjacentHTML('afterbegin', FIG_SPRITE);
 load();
 rebuildCustom();
@@ -3366,7 +3422,12 @@ render();
 if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => setTimeout(warmArt, 3000)).catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) {
+  // a new version installs in the background; offer to switch to it (the saved copy keeps opening instantly until then)
+  const hadWorker = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) toast('Lifting Sanity has been updated.', { label: 'Reload', fn: () => { persist(); location.reload(); } }); });
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => setTimeout(warmArt, 3000)).catch(() => {});
+}
 
 window.LiftingSanity = { get state() { return state; }, save: () => save(true) };
 })();

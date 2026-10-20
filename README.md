@@ -47,7 +47,8 @@ Your workouts are saved on each device itself, not online, so the iPad and the i
 | `app.js` | Everything the app does |
 | `exercises.js` | The exercise library and the ready-made splits |
 | `visuals.js` | Which RepDB illustration goes with each exercise (links only, no pictures stored here) |
-| `library-extra.js` | About 1,200 more exercises and the how-to steps, made from [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) |
+| `library-extra.js` | About 1,200 more exercises, made from [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) |
+| `steps.json` | Step-by-step how-to instructions, loaded the first time you open an exercise's details |
 | `sw.js` | Keeps the app on the device so it opens offline |
 | `manifest.webmanifest`, `icon-*.png` | Home Screen name and icon |
 
@@ -57,4 +58,4 @@ No build step and no dependencies. Edit a file, push, and the site updates.
 
 Illustrations: [Exercise data by RepDB (repdb.co)](https://repdb.co), free tier. They are loaded from RepDB's own published copy at [RepDB/exercise-dataset](https://github.com/RepDB/exercise-dataset) and are not stored in this repository.
 
-Exercise names, muscles, equipment and instructions in `library-extra.js` come from [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (MIT License). That dataset's images and GIFs belong to Gym visual and are licensed separately, so they are not included; the app draws its own muscle maps and lets you add your own photos.
+Exercise names, muscles and equipment in `library-extra.js` and the instructions in `steps.json` come from [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (MIT License). That dataset's images and GIFs belong to Gym visual and are licensed separately, so they are not included; the app draws its own muscle maps and lets you add your own photos.

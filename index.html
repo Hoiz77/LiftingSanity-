@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&display=swap" media="print" data-font>
 <style>
 /* Layout: a tab rail on the left on iPad (a bottom bar on iPhone) beside one working column.
    The live workout is a logbook: exercises down the left, the set sheet on the right.
@@ -83,6 +83,8 @@ body {
 }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 100; background: var(--status-band); pointer-events: none; }
 body.wo-open { overflow: hidden; }
+/* while a workout is open it covers everything: the screens underneath needn't be painted */
+body.wo-open #view, body.wo-open #tabs, body.wo-open #mini { visibility: hidden; }
 /* an app, not a page: long-press shouldn't select text or pop up the copy menu */
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, select, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
@@ -256,7 +258,8 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .card.resume { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; margin-bottom: 16px; background: var(--good-soft); border-color: transparent; }
 .card.resume > span:nth-child(2) { flex: 1; display: grid; }
 .card.resume small { color: var(--ink-2); }
-.live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 4px var(--good-soft); flex-shrink: 0; animation: pulse 1.6s ease-in-out infinite; }
+.live-dot { position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
+.live-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; background: var(--good); opacity: .25; animation: pulse 1.6s ease-in-out infinite; }
 .split { display: grid; gap: 14px; }
 .split-h { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 0 2px; }
 .split-h h2 { font-size: 28px; margin-top: 3px; }
@@ -623,6 +626,8 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .list-h { padding: 16px 16px 6px; }
 .ex-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 66px; padding: 9px 16px; border-bottom: 1px solid var(--line); text-align: left; }
 .ex-row:last-child { border-bottom: 0; }
+.ex-row, .hist-card { content-visibility: auto; contain-intrinsic-size: auto 66px; }
+.hist-card { contain-intrinsic-size: auto 150px; }
 .ex-row.on { background: var(--accent-soft); }
 .ex-row.create { color: var(--accent); }
 .ex-row.create .i { width: 48px; }
@@ -865,7 +870,7 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
   .tset { grid-template-columns: 38px minmax(0, 1fr) minmax(0, 1fr) 52px 40px; gap: 6px; }
   .page-h-side { width: 100%; }
 }
-@keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
+@keyframes pulse { 50% { transform: scale(1.6); opacity: 0; } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(26px); } }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes flash { 50% { background: var(--good-soft); } }
