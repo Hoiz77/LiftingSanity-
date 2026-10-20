@@ -34,7 +34,7 @@
   --p-b: #8e8e93; --p-d: #5e5ce6; --p-a: #ff9f0a; --p-rp: #ff375f; --p-m: #66d4cf; --p-c: #a3d65c; --p-p: #ac8e68; --p-e: #64d2ff;
   --steel: #9aa0a8; --plate-red: #ff453a; --plate-blue: #0a84ff; --plate-yellow: #ffd60a; --plate-green: #30d158; --plate-white: #f2f2f7;
   --term-bg: #050506; --term-ink: #4cd964;
-  --bar-bg: rgba(18, 18, 20, .97); --scrim: rgba(0, 0, 0, .62); --shadow: 0 18px 44px rgba(0, 0, 0, .6);
+  --bar-bg: rgb(18, 18, 20); --scrim: rgba(0, 0, 0, .62); --shadow: 0 18px 44px rgba(0, 0, 0, .6);
   --display: "Archivo", "Arial Black", "Helvetica Neue", system-ui, sans-serif;
   --ui: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   --tabbar: 62px; --rail: 92px; --status-band: #000000;
@@ -52,7 +52,7 @@
     --side-l: #1e9e45; --side-r: #9f45d8;
     --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
     --term-bg: #ffffff; --term-ink: #2f9e44;
-    --bar-bg: rgba(249, 249, 251, .97); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
+    --bar-bg: rgb(249, 249, 251); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
     --status-band: #f2f2f7;
     --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
     color-scheme: light;
@@ -68,7 +68,7 @@
   --side-l: #1e9e45; --side-r: #9f45d8;
   --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
   --term-bg: #ffffff; --term-ink: #2f9e44;
-  --bar-bg: rgba(249, 249, 251, .97); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
+  --bar-bg: rgb(249, 249, 251); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
   --status-band: #f2f2f7;
   --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
   color-scheme: light;
@@ -130,6 +130,8 @@ p { margin: 0; }
 
 /* ---------- shell ---------- */
 #view { overflow-x: clip; }
+/* the Y2K clock strip: only that style shows it (its stylesheet is switched off otherwise, so it's hidden here) */
+#hud { display: none; }
 #tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex;
   height: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px));
@@ -598,12 +600,15 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .set-row.done .check { background: var(--good); color: var(--on-good); }
 .pr-row { display: flex; gap: 6px; align-items: center; color: var(--good); font: 600 13px var(--ui); padding: 0 8px 2px 56px; }
 .pr-row .i { width: 15px; height: 15px; }
-.eff-pick { display: grid; gap: 8px; padding: 10px; margin: 0 4px; background: var(--panel-2); border-radius: 16px; }
+.eff-pick { display: grid; gap: 10px; padding: 10px 10px 12px; margin: 0 4px; background: var(--panel-2); border-radius: 16px; }
+.eff-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; padding-left: 2px; }
 .eff-q { font-size: 13px; color: var(--ink-2); }
-.eff-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.eff-chips button { min-width: 50px; min-height: 44px; padding: 0 10px; border-radius: 999px; background: var(--panel-3); font: 700 18px var(--ui); font-variant-numeric: tabular-nums; }
+.eff-clear { min-height: 30px; padding: 0 12px; border-radius: 999px; font: 600 13px var(--ui); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); }
+.eff-chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.eff-chips.rpe { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.eff-chips button { display: grid; place-items: center; min-width: 0; height: 44px; padding: 0; border-radius: 12px; background: var(--panel-3); text-align: center; line-height: 1; font: 700 18px var(--ui); font-variant-numeric: tabular-nums; }
 .eff-chips button.on { background: var(--accent); color: var(--on-accent); }
-.eff-chips button.clear { font-size: 14px; font-weight: 600; color: var(--ink-2); background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+.eff-chips button.target { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
 .exc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .set-ctl { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel-2); }
 .set-ctl .btn { min-height: 40px; background: transparent; }
@@ -654,7 +659,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .confirm > p b { color: var(--ink); }
 .confirm .row-btns .btn { flex: 1 1 140px; }
 .rest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
-.rest-grid button { min-height: 58px; border-radius: 18px; background: var(--panel-2); font: 800 21px var(--display); font-stretch: 108%; font-variant-numeric: tabular-nums; }
+.rest-grid button { display: grid; place-items: center; text-align: center; min-height: 58px; border-radius: 18px; background: var(--panel-2); font: 800 21px var(--display); font-stretch: 108%; font-variant-numeric: tabular-nums; }
 .rest-grid button.on { background: var(--accent); color: var(--on-accent); }
 .big-title { font-size: 40px; margin: 6px 0 2px; }
 .sub-h { display: flex; gap: 8px; align-items: center; font-size: 20px; margin: 24px 0 10px; }

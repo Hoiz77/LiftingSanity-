@@ -1148,6 +1148,7 @@ function applyTheme() {
   const sheet = $('#y2kcss');
   if (sheet) sheet.media = y2k ? 'all' : 'not all';
   if (y2k) startY2k();
+  else { clearInterval(hudTimer); const hud = $('#hud'); if (hud) hud.innerHTML = ''; }
 }
 /* ----- Y2K style extras: its fonts, a number-grid backdrop and the HUD strip (styles live in y2k.css) ----- */
 let hudTimer = null;
@@ -2313,11 +2314,14 @@ function repeatSet(i) {
 function effPicker(i, j, s, j2, s2) {
   const rpe = state.settings.effort === 'rpe';
   const vals = rpe ? [[4, '6'], [3, '7'], [2.5, '7.5'], [2, '8'], [1.5, '8.5'], [1, '9'], [0.5, '9.5'], [0, '10']] : [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5+']];
-  const chips = (jj, o, one) => `<div class="eff-chips">${vals.map(([v, l]) =>
-    `<button class="${o.rir === v ? 'on' : ''}" data-a="effPick" data-e="${i}" data-s="${jj}" data-v="${v}"${one}>${l}</button>`).join('')}<button class="clear" data-a="effPick" data-e="${i}" data-s="${jj}" data-v=""${one}>Clear</button></div>`;
+  // one even row of choices (RPE: two rows of four); the target, while nothing is picked, gets a ring
+  const chips = (jj, o, one) => `<div class="eff-chips ${rpe ? 'rpe' : ''}">${vals.map(([v, l]) =>
+    `<button class="${o.rir === v ? 'on' : o.rir == null && o.trir === v ? 'target' : ''}" data-a="effPick" data-e="${i}" data-s="${jj}" data-v="${v}"${one} aria-pressed="${o.rir === v}">${l}</button>`).join('')}</div>`;
   const q = rpe ? 'How hard was it? (RPE)' : 'Reps left in the tank (RIR)';
-  if (s2 == null) return `<div class="eff-pick"><span class="eff-q">${q}</span>${chips(j, s, '')}</div>`;
-  return `<div class="eff-pick sides"><span class="eff-q">${q}, each side</span>${[[j, s], [j2, s2]].map(([jj, o]) => `<div class="eff-side"><b class="side-${o.side}">${sideName(o.side)}</b>${chips(jj, o, ' data-one="1"')}</div>`).join('')}</div>`;
+  // Clear empties this set (both sides of a one-row left/right set)
+  const head = `<div class="eff-head"><span class="eff-q">${q}${s2 != null ? ', each side' : ''}</span><button class="eff-clear" data-a="effPick" data-e="${i}" data-s="${j}" data-v="">Clear</button></div>`;
+  if (s2 == null) return `<div class="eff-pick">${head}${chips(j, s, '')}</div>`;
+  return `<div class="eff-pick sides">${head}${[[j, s], [j2, s2]].map(([jj, o]) => `<div class="eff-side"><b class="side-${o.side}">${sideName(o.side)}</b>${chips(jj, o, ' data-one="1"')}</div>`).join('')}</div>`;
 }
 function nextExIndex(w, i) {
   for (let n = i + 1; n < w.ex.length; n++) if (!exComplete(w.ex[n])) return n;
