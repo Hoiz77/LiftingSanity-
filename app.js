@@ -1362,13 +1362,14 @@ function planReview(split) {
       if (helperOnly.length) say('tip', `Only worked as a helper (no exercise targets it): ${helperOnly.map(m => `${name(m)} (${trimNum(st.sets[m], 1)} half-sets a week)`).join(', ')}. A direct exercise would grow it more, for example ${helperOnly.map(best).filter(Boolean).slice(0, 2).join(' or ')}.`, ['pelland2026']);
       const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
       if (once.length) say('tip', `Trained directly about once a week: ${once.map(name).join(', ')}. Spreading the same sets over two sessions tends to help a little, though weekly sets matter more than frequency.`, ['schoenfeld2016f', 'pelland2026']);
-      else if (trained.length) say('good', `Every trained muscle gets direct work about ${trimNum(Math.min(...trained.map(m => st.days[m] || 0)), 1)} times a week or more.`, ['schoenfeld2016f']);
+      else if (trained.length > helperOnly.length) say('good', `Every muscle you target is trained directly about ${trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1)} times a week or more.`, ['schoenfeld2016f']);
       // effort
       const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
       if (rirs.length) {
-        const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length;
-        if (avg <= 3) say('good', `Working sets aim for about ${trimNum(avg, 1)} reps in reserve. Close to failure is where growth is best; going all the way to failure on every set is optional.`, ['robinson2024', 'refalo2023']);
-        else say('tip', `Working sets aim for about ${trimNum(avg, 1)} reps in reserve. Growth tends to improve as sets end closer to failure; try 0 to 3.`, ['robinson2024']);
+        const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length, lo = Math.min(...rirs), hi = Math.max(...rirs);
+        const span = lo === hi ? `${lo} rep${lo === 1 ? '' : 's'}` : `${lo} to ${hi} reps`;
+        if (avg <= 3) say('good', `Working sets aim to stop ${span} short of failure. Close to failure is where growth is best; going all the way to failure on every set is optional.`, ['robinson2024', 'refalo2023']);
+        else say('tip', `Working sets aim to stop ${span} short of failure. Growth tends to improve as sets end closer to failure; try 0 to 3.`, ['robinson2024']);
       } else say('tip', 'No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.', ['robinson2024']);
       // exercise selection
       const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
