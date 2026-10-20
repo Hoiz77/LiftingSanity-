@@ -34,7 +34,7 @@
   --p-b: #8e8e93; --p-d: #5e5ce6; --p-a: #ff9f0a; --p-rp: #ff375f; --p-m: #66d4cf; --p-c: #a3d65c; --p-p: #ac8e68; --p-e: #64d2ff;
   --steel: #9aa0a8; --plate-red: #ff453a; --plate-blue: #0a84ff; --plate-yellow: #ffd60a; --plate-green: #30d158; --plate-white: #f2f2f7;
   --term-bg: #050506; --term-ink: #4cd964;
-  --bar-bg: rgba(14, 14, 16, .78); --scrim: rgba(0, 0, 0, .62); --shadow: 0 18px 44px rgba(0, 0, 0, .6);
+  --bar-bg: rgba(18, 18, 20, .97); --scrim: rgba(0, 0, 0, .62); --shadow: 0 18px 44px rgba(0, 0, 0, .6);
   --display: "Archivo", "Arial Black", "Helvetica Neue", system-ui, sans-serif;
   --ui: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   --tabbar: 62px; --rail: 92px; --status-band: #000000;
@@ -52,7 +52,7 @@
     --side-l: #1e9e45; --side-r: #9f45d8;
     --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
     --term-bg: #ffffff; --term-ink: #2f9e44;
-    --bar-bg: rgba(249, 249, 251, .82); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
+    --bar-bg: rgba(249, 249, 251, .97); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
     --status-band: #f2f2f7;
     --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
     color-scheme: light;
@@ -68,7 +68,7 @@
   --side-l: #1e9e45; --side-r: #9f45d8;
   --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
   --term-bg: #ffffff; --term-ink: #2f9e44;
-  --bar-bg: rgba(249, 249, 251, .82); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
+  --bar-bg: rgba(249, 249, 251, .97); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
   --status-band: #f2f2f7;
   --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
   color-scheme: light;
@@ -135,7 +135,7 @@ p { margin: 0; }
   height: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(4px, env(safe-area-inset-left, 0px)); padding-right: max(4px, env(safe-area-inset-right, 0px));
-  background: var(--bar-bg); -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
+  background: var(--bar-bg);
   border-top: 1px solid var(--line);
 }
 .brand { display: none; }
@@ -323,7 +323,7 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 
 /* ---------- mini bar, toast, rest timer ---------- */
 #mini { position: fixed; z-index: 35; left: 12px; right: 12px; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 10px); max-width: 620px; margin: 0 auto; }
-.mini-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 0 18px; border-radius: 999px; background: var(--bar-bg); -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); box-shadow: var(--shadow), inset 0 0 0 1px var(--line-2); text-align: left; }
+.mini-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 0 18px; border-radius: 999px; background: var(--bar-bg); box-shadow: var(--shadow), inset 0 0 0 1px var(--line-2); text-align: left; }
 .mini-name { font: 800 17px/1.1 var(--display); font-stretch: 108%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .mini-meta { color: var(--ink-2); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mini-go { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 700; white-space: nowrap; }
@@ -335,7 +335,7 @@ body.has-mini #toast { bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 
 body.wo-open #toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); }
 body.resting #toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 126px); }
 body.resting:not(.wo-open) #toast { bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 122px); }
-#restbar { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(640px, calc(100% - 24px)); background: var(--bar-bg); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px); border-radius: 26px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line-2); overflow: hidden; }
+#restbar { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(640px, calc(100% - 24px)); background: var(--bar-bg); border-radius: 26px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line-2); overflow: hidden; }
 body:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 10px); }
 body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 76px); }
 .rb-track { height: 4px; background: var(--line); }
@@ -429,6 +429,9 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .exc.slide-in.from-left { animation-name: slideInL; }
 /* list: the card you've just moved to glows for a moment */
 .exc.arrive { animation: arrive 1.1s ease-out; }
+/* a set you just checked: the check pops and the row glows briefly */
+.set-row.just .check { animation: pop .32s cubic-bezier(.3, 1.6, .5, 1); }
+.set-row.just { animation: rowflash .6s ease-out; }
 .exc-h { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; padding: 0 4px; }
 .exc-t { display: grid; gap: 6px; min-width: 0; flex: 1; }
 .exc-name { font: 700 23px/1.12 var(--ui); letter-spacing: -.01em; text-align: left; }
@@ -996,7 +999,7 @@ button.cell { display: flex; align-items: center; justify-content: center; overf
 button.cell .ph { color: var(--muted); font-weight: 500; }
 .cell.kp-on, .set-row.done .cell.kp-on { border-color: var(--accent); background: var(--panel-3); }
 .cell.kp-on::after { content: ""; width: 2px; height: 22px; margin-left: 2px; background: var(--accent); animation: blink 1s steps(1) infinite; flex-shrink: 0; }
-#keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--bar-bg); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
+#keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--bar-bg); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
 .kp-head { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: 0 2px 8px; }
 .kp-title { flex: 1; min-width: 0; display: grid; }
 .kp-title b { font: 700 16px/1.2 var(--ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1051,6 +1054,8 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 @keyframes pulse { 50% { transform: scale(1.6); opacity: 0; } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(44px); } }
 @keyframes slideInL { from { opacity: 0; transform: translateX(-44px); } }
+@keyframes pop { 0% { transform: scale(.82); } 100% { transform: scale(1); } }
+@keyframes rowflash { 0% { box-shadow: inset 0 0 0 2px var(--good); } 100% { box-shadow: inset 0 0 0 2px transparent; } }
 @keyframes arrive { 0%, 35% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes flash { 50% { background: var(--good-soft); } }

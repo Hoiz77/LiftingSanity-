@@ -1902,14 +1902,29 @@ function renderWorkout(resetScroll) {
   const main = $('.wo-main', el);
   const sc = main ? main.scrollTop : 0;
   if (w.cur == null || w.cur >= w.ex.length) w.cur = Math.max(0, w.ex.length - 1);
-  const shown = new Map();
-  for (const im of el.querySelectorAll('img')) { const k = im.getAttribute('src'); if (!shown.has(k)) shown.set(k, []); shown.get(k).push(im); }
-  el.innerHTML = workoutHTML(w);
-  // pictures already on screen are put back as they were, so they don't blink each time a set is checked
-  for (const im of el.querySelectorAll('img')) {
-    const old = (shown.get(im.getAttribute('src')) || []).shift();
-    if (old) { old.className = im.className; old.alt = im.alt; im.replaceWith(old); }
+  const P = workoutParts(w);
+  if (!resetScroll && !el.hidden && el.dataset.wk === P.key && $('.wo', el)) {
+    // same layout: replace only the parts that changed (checking a set redraws one card, not all of them)
+    swapPart($('.wo-h', el), P.head);
+    swapPart($('.wo-prog', el), P.prog);
+    const nav = $('.wo-nav', el), sl = nav ? nav.scrollLeft : 0;
+    if (swapPart(nav, P.nav)) $('.wo-nav', el).scrollLeft = sl;
+    const cards = $$('.wo-main > .exc', el);
+    P.cards.forEach((h, n) => { if (cards[n]) swapPart(cards[n], h); });
+  } else {
+    const shown = new Map();
+    for (const im of el.querySelectorAll('img')) { const k = im.getAttribute('src'); if (!shown.has(k)) shown.set(k, []); shown.get(k).push(im); }
+    el.innerHTML = workoutHTML(w, P);
+    // pictures already on screen are put back as they were, so they don't blink each time a set is checked
+    for (const im of el.querySelectorAll('img')) {
+      const old = (shown.get(im.getAttribute('src')) || []).shift();
+      if (old) { old.className = im.className; old.alt = im.alt; im.replaceWith(old); }
+    }
+    el.dataset.wk = P.key;
+    $('.wo-h', el)._h = P.head; $('.wo-prog', el)._h = P.prog; $('.wo-nav', el)._h = P.nav;
+    $$('.wo-main > .exc', el).forEach((c, n) => { c._h = P.cards[n]; });
   }
+  ui.flash = null;
   el.hidden = false;
   document.body.classList.add('wo-open');
   const m2 = $('.wo-main', el);
@@ -1924,6 +1939,22 @@ function renderWorkout(resetScroll) {
   markKpCell(false);
   renderMini();
   renderRest();
+}
+// swap one part of the workout screen for new markup if it changed, keeping the pictures already showing (no blink)
+function swapPart(old, html) {
+  if (!old || old._h === html) return false;
+  const t = document.createElement('template');
+  t.innerHTML = html;
+  const nn = t.content.firstElementChild;
+  const shown = new Map();
+  for (const im of old.querySelectorAll('img')) { const k = im.getAttribute('src'); if (!shown.has(k)) shown.set(k, []); shown.get(k).push(im); }
+  for (const im of nn.querySelectorAll('img')) {
+    const o = (shown.get(im.getAttribute('src')) || []).shift();
+    if (o) { o.className = im.className; o.alt = im.alt; im.replaceWith(o); }
+  }
+  old.replaceWith(nn);
+  nn._h = html;
+  return true;
 }
 // the exercise strip follows the current exercise, sideways only (never moves the page up or down)
 function navTo(i, smooth) {
@@ -1945,38 +1976,41 @@ function trackCur() {
   if (at !== w.cur && at < w.ex.length) { w.cur = at; save(); navTo(at, true); }
 }
 document.addEventListener('scroll', ev => { if (ev.target.classList && ev.target.classList.contains('wo-main') && !curRaf) curRaf = requestAnimationFrame(trackCur); }, { capture: true, passive: true });
-function workoutHTML(w) {
+// the workout screen in parts (header, progress, exercise strip, one card per exercise), so a redraw can swap only what changed
+function workoutParts(w) {
   const editing = w.mode === 'edit';
   const focus = state.settings.view === 'focus';
   const { done, total } = woTally(w);
   const num = editing && w.editOf ? sessionNumber(state.workouts.find(o => o.id === w.editOf)) : state.workouts.length + 1;
-  let h = `<div class="wo ${focus ? 'focus' : 'list'}">
-  <header class="wo-h">
+  const head = `<header class="wo-h">
     <button class="icon-btn" data-a="woMin" aria-label="Minimize workout">${icon('down')}</button>
     <div class="wo-title"><button class="wo-name" data-a="woRename">${esc(w.name)}</button>
       <div class="wo-meta">${editing ? `<span>${esc(fmtDate(w.start))} · ${fmtDuration((w.end || w.start) - w.start)}</span>` : `<span class="clock" data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span>`}<span>Session #${num}</span><span><b>${done}</b>/${total} sets</span><span>${fmtVol(workoutVolume(w))}</span></div></div>
     ${editing ? '' : `<button class="icon-btn" data-a="woRest" aria-label="Start a rest timer">${icon('timer')}</button>`}
     <button class="icon-btn" data-a="woMenu" aria-label="Workout options">${icon('dots')}</button>
     <button class="btn primary" data-a="woFinish">${editing ? 'Save' : 'Finish'}</button>
-  </header>
-  <div class="wo-prog" aria-hidden="true">${w.ex.map((x, i) => {
+  </header>`;
+  const prog = `<div class="wo-prog" aria-hidden="true">${w.ex.map((x, i) => {
     const t = x.sets.length, d = x.sets.filter(s => s.done).length;
     return `<span class="${i === w.cur ? 'cur' : ''} ${t && d === t ? 'full' : ''}"><i style="width:${t ? Math.round(d / t * 100) : 0}%"></i></span>`;
-  }).join('')}</div>
-  <div class="wo-body">
-    <nav class="wo-nav" aria-label="Exercises">${w.ex.map((x, i) => {
+  }).join('')}</div>`;
+  const nav = `<nav class="wo-nav" aria-label="Exercises">${w.ex.map((x, i) => {
       const ss = ssInfo(w, i), { done: d, total: t } = setTally(x);
       return `<button class="nav-ex ${i === w.cur ? 'cur' : ''} ${exComplete(x) ? 'complete' : ''} ${ss ? 'ss' : ''}" data-a="woGo" data-i="${i}">
         ${thumb(x.exId, 'sm nav-pic')}<span class="nav-txt"><span class="nav-name">${esc(getEx(x.exId).name)}</span><span class="nav-bar"><i style="width:${t ? Math.round(d / t * 100) : 0}%"></i></span></span><span class="nav-n">${exComplete(x) ? icon('check') : ss ? ss.label : `${d}/${t}`}</span></button>`;
-    }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">Add exercise</span></button></nav>
-    <div class="wo-main">`;
+    }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">Add exercise</span></button></nav>`;
+  const cards = !w.ex.length ? [] : focus ? [exCardHTML(w, w.cur, true)] : w.ex.map((x, i) => exCardHTML(w, i, false));
+  // what decides the layout: anything else can be updated card by card
+  const key = [focus ? 'f' + w.cur : 'l', w.ex.map(x => x.id).join(','), editing ? 'e' : ''].join('|');
+  return { focus, head, prog, nav, cards, key };
+}
+function workoutHTML(w, P = workoutParts(w)) {
+  let h = `<div class="wo ${P.focus ? 'focus' : 'list'}">${P.head}${P.prog}<div class="wo-body">${P.nav}<div class="wo-main">`;
   if (!w.ex.length) {
     h += `<div class="wo-empty"><h2>Add your first exercise</h2><p class="muted">Search ${LIB.length.toLocaleString()} exercises or create your own.</p><button class="btn primary big" data-a="woAddEx">${icon('plus')}Add exercises</button></div>`;
-  } else if (focus) {
-    h += exCardHTML(w, w.cur, true);
   } else {
-    h += w.ex.map((x, i) => exCardHTML(w, i, false)).join('');
-    h += `<button class="btn wide add-ex" data-a="woAddEx">${icon('plus')}Add exercises</button>`;
+    h += P.cards.join('');
+    if (!P.focus) h += `<button class="btn wide add-ex" data-a="woAddEx">${icon('plus')}Add exercises</button>`;
   }
   h += `<div class="wo-spacer"></div></div></div></div>`;
   return h;
@@ -2113,7 +2147,7 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
     : `<input class="cell" data-f="${f}" data-e="${i}" data-s="${j}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
   const n = s.side ? `${sideName(s.side).toLowerCase()} side` : `set ${j + 1}`;
   const above = s.done ? null : setAbove(x, j);
-  const cls = ['set-row', s.done ? 'done' : '', s.t === 'W' ? 'warm' : '', s.side ? 'side-' + s.side : ''].join(' ');
+  const cls = ['set-row', s.done ? 'done' : '', s.t === 'W' ? 'warm' : '', s.side ? 'side-' + s.side : '', s.done && ui.flash === s.id ? 'just' : ''].join(' ');
   let h = `<div class="row-wrap"><button class="row-del" data-a="rowDel" data-e="${i}" data-s="${j}" tabindex="-1">${icon('trash')}<span>Delete</span></button><div class="${cls}" data-s="${j}">`;
   h += badge(s.t, setLabel(x.sets, j), `data-a="setType" data-e="${i}" data-s="${j}"`, s.side);
   // "same as above" copies the set you just did; the line under it is last session's set
@@ -2197,7 +2231,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   const up = upA || upB ? `${upA && upA.w != null && hasWeight(k) ? dispW(upA.w) + ' × ' : ''}${upA ? upA.r ?? '–' : '–'}/${upB ? upB.r ?? '–' : '–'}` : '';
   const sp = x.sets[p], sq = x.sets[q];
   let h = `<div class="row-wrap"><button class="row-del" data-a="rowDel" data-e="${i}" data-s="${j}" tabindex="-1">${icon('trash')}<span>Delete</span></button>`
-    + `<div class="set-row one ${done ? 'done' : ''} ${part ? 'part' : ''} ${a.t === 'W' ? 'warm' : ''}" data-s="${j}">`;
+    + `<div class="set-row one ${done ? 'done' : ''} ${part ? 'part' : ''} ${a.t === 'W' ? 'warm' : ''} ${done && (ui.flash === a.id || ui.flash === b.id) ? 'just' : ''}" data-s="${j}">`;
   h += `<button class="badge t-${a.t} ${a.t === 'N' ? 'lr' : ''}" data-a="setType" data-e="${i}" data-s="${j}" aria-label="Set ${esc(oneLabel(x.sets, j))}, left and right. Change type">${esc(oneLabel(x.sets, j))}</button>`;
   h += `<div class="prev">${up ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="Same as the set above, ${esc(up)}">${icon('same')}<span>${esc(up)}</span></button>` : ''}`
     + (last ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="Use last time, ${esc(last)}">${up ? '' : '<i>Last</i>'}${esc(last)}</button>` : up ? '' : '<span class="none">—</span>') + `</div>`;
@@ -2331,6 +2365,7 @@ function toggleSet(i, j, viaPad) {
   s.done = true;
   s.at = Date.now();
   delete s.lr;
+  ui.flash = s.id; // the row just checked gets a short pop
   ui.kp = null;
   if (navigator.vibrate) navigator.vibrate(15);
   // first side of a left/right set: no rest yet, straight on to the other side
