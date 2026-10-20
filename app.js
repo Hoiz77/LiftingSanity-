@@ -552,7 +552,9 @@ function getEx(id) {
 }
 /* ----- exercise science (science.js): mechanics, ratings, studies ----- */
 const SCI = window.LS_SCIENCE;
-const sciOf = id => SCI ? SCI.analyze(getEx(id)) : null;
+// for machines, the resistance profile you set (cams differ) feeds the curve, the diagram and the rating
+const profOf = id => (state.exPrefs[id] || {}).profile;
+const sciOf = id => SCI ? SCI.analyze(getEx(id), profOf(id)) : null;
 const scoreOf = id => { const a = sciOf(id); return a ? a.score : null; };
 const scorePill = id => { const v = scoreOf(id); return v == null ? '' : `<span class="score ${v >= 9 ? 'hi' : v >= 7 ? 'good' : v >= 5 ? 'ok' : 'lo'}" title="Growth rating ${v}/10">${v}</span>`; };
 // the best-rated exercises for a muscle, best first; ones with pictures win ties
@@ -563,6 +565,63 @@ function bestFor(m, n = 3, not = null, min = 0) {
     .slice(0, n);
 }
 const refLink = k => { const r = SCI && SCI.REFS[k]; return r ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a>` : ''; };
+// the resistance profile: worked out from the setup, or for a machine, how you say yours feels
+const PROF_OPTS = [['flat', 'Even'], ['desc', 'Hardest at the start'], ['bell', 'Hardest in the middle'], ['asc', 'Hardest at the end'], ['custom', 'Draw my own'], ['', 'Not sure']];
+const PROF_START = [0.6, 1, 0.75, 0.9, 0.5]; // what "Draw my own" shows before you've drawn anything
+const profTop = v => ((1 - v * 0.9) * 100).toFixed(1); // same scale as the curve drawing
+const profHandles = pts => pts.map((v, i) => `<b class="prof-h" style="left:${i * 25}%;top:${profTop(v)}%"></b>`).join('');
+function profileHTML(exId, a, mv) {
+  const shape = a.shape ? SCI.SHAPES[a.shape] : a.adjustable ? SCI.SHAPES.machine : null;
+  if (!shape) return '';
+  const p = profOf(exId), edit = a.adjustable && a.profile === 'custom';
+  return `<div class="sci-prof"><p><b>Resistance profile: ${esc(shape[0])}${a.profile ? ' (your machine)' : ''}.</b> ${esc(shape[1])}</p>
+    ${a.curve ? `<div class="sci-curve-box${edit ? ' edit' : ''}"${edit ? ` data-ex="${esc(exId)}" role="group" aria-label="Drag the points to set how hard each part of the rep is"` : ''}>${SCI.curveSvg(a)}${mv && !edit ? '<i class="sci-cur" aria-hidden="true"><i class="sci-dot"></i></i>' : ''}${edit ? profHandles(p) : ''}</div><div class="sci-axis"><span>start · muscle long</span><span>end · muscle short</span></div>` : ''}
+    ${a.adjustable ? profPickHTML(exId, a) : ''}</div>`;
+}
+function profPickHTML(exId, a) {
+  const p = profOf(exId), cur = a.profile || '';
+  const mini = pts => `<svg viewBox="0 0 40 20" aria-hidden="true">${pts ? `<polyline points="${SCI.curveFrom(pts).map((v, i) => `${(i / 24 * 38 + 1).toFixed(1)},${(18 - v * 15).toFixed(1)}`).join(' ')}"/>` : '<text x="20" y="15" text-anchor="middle">?</text>'}</svg>`;
+  return `<div class="prof-pick"><p class="prof-q"><b>Machines differ.</b> Where does yours feel hardest?</p>
+    <div class="prof-opts">${PROF_OPTS.map(([v, l]) => `<button class="prof-opt ${cur === v ? 'on' : ''}" data-a="profSet" data-id="${esc(exId)}" data-v="${v}" aria-pressed="${cur === v}">${mini(v === 'custom' ? (cur === 'custom' ? p : PROF_START) : v ? SCI.PROFILES[v].pts : null)}<span>${l}</span></button>`).join('')}</div>
+    ${cur === 'custom' ? '<p class="prof-hint">Drag the five points on the curve to match your machine, from the start of the rep to the end.</p>' : ''}
+    <p class="muted small">How to tell: do a few slow reps with a moderate weight and notice where it feels heaviest and lightest. On a cam, the rep is heavier where the belt or chain leaves the cam far from its axle, and lighter where it leaves close to it.</p></div>`;
+}
+// drawing your own: drag a point up or down (the nearest one to where you touched)
+document.addEventListener('pointerdown', ev => {
+  const box = ev.target.closest && ev.target.closest('.sci-curve-box.edit');
+  if (!box || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  const exId = box.dataset.ex, cur = profOf(exId);
+  if (!Array.isArray(cur)) return;
+  ev.preventDefault();
+  const vals = cur.slice(), r0 = box.getBoundingClientRect();
+  const i = Math.round(Math.min(1, Math.max(0, (ev.clientX - r0.left) / r0.width)) * 4);
+  const handles = box.querySelectorAll('.prof-h');
+  box.classList.add('dragging'); handles[i] && handles[i].classList.add('on');
+  const move = e => {
+    const r = box.getBoundingClientRect();
+    vals[i] = Math.round(Math.min(1, Math.max(0.05, (1 - (e.clientY - r.top) / r.height) / 0.9)) * 100) / 100;
+    const svg = box.querySelector('svg.sci-curve');
+    if (svg) svg.outerHTML = SCI.curveSvg({ curve: SCI.curveFrom(vals) });
+    if (handles[i]) handles[i].style.top = profTop(vals[i]) + '%';
+  };
+  const end = () => {
+    box.removeEventListener('pointermove', move); box.removeEventListener('pointerup', end); box.removeEventListener('pointercancel', end);
+    const p = state.exPrefs[exId] = state.exPrefs[exId] || {};
+    p.profile = vals; save(); refreshAll();
+  };
+  try { box.setPointerCapture(ev.pointerId); } catch (e) { /* the box still gets the moves while the finger is over it */ }
+  box.addEventListener('pointermove', move); box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+  move(ev);
+});
+function profileSheet(exId) {
+  openSheet({
+    live: true,
+    render: () => {
+      const a = sciOf(exId);
+      return `${sheetHead('Resistance profile')}<div class="sheet-body pad prof-sheet"><p class="muted">${esc(getEx(exId).name)}${a && a.score != null ? ` · ${a.score}/10 for growth` : ''}</p>${a ? profileHTML(exId, a, false) : ''}${a && a.profWhy && a.profWhy.length ? `<p class="prof-why">${icon('info', 'inline')}Rating: ${a.profWhy.map(esc).join('; ')}.</p>` : ''}</div>`;
+    }
+  });
+}
 function scienceHTML(exId) {
   const ex = getEx(exId), a = sciOf(exId);
   if (!a || a.pattern === 'generic' && a.score == null) return '';
@@ -576,10 +635,11 @@ function scienceHTML(exId) {
     <div class="sci-h"><h3 class="sub-h">${icon('flask')}How it works</h3>${a.score != null ? `<span class="sci-score"><b>${a.score}</b><small>/10</small><span>${esc(SCI.verdict(a.score))}</span></span>` : ''}</div>
     <p class="sci-title">${esc(a.title)}</p>
     ${a.joints.length || a.movers ? `<dl class="sci-facts">${a.joints.length ? `<dt>Joint action</dt><dd>${esc(a.joints.join(' · '))}</dd>` : ''}${a.movers ? `<dt>Muscles</dt><dd>${esc(a.movers)}</dd>` : ''}</dl>` : ''}
-    ${a.scene ? `<figure class="sci-diag"${mv ? ` data-mv="sci" data-ex="${esc(exId)}"` : ''}>${mv ? '<span class="sci-phase" aria-hidden="true">Lift</span>' : ''}${SCI.diagram(a)}<figcaption>${mv ? '<span><i class="k seg"></i>moving part</span>' : '<span><i class="k seg"></i>where it’s hardest</span>'}${a.curve ? '<span><i class="k hard"></i>hardest point</span>' : ''}<span><i class="k ghost"></i>start and end</span>${a.scene.attach === 'cuff' ? '<span><i class="k cuff"></i>cuff on the wrist</span>' : ''}${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
-    ${shape ? `<div class="sci-prof"><p><b>Resistance profile: ${esc(shape[0])}.</b> ${esc(shape[1])}</p>${a.curve ? `<div class="sci-curve-box">${SCI.curveSvg(a)}${mv ? '<i class="sci-cur" aria-hidden="true"><i class="sci-dot"></i></i>' : ''}</div><div class="sci-axis"><span>start · muscle long</span><span>end · muscle short</span></div>` : ''}</div>` : ''}
+    ${a.scene ? `<figure class="sci-diag"${mv ? ` data-mv="sci" data-ex="${esc(exId)}"` : ''}>${mv ? '<span class="sci-phase" aria-hidden="true">Lift</span>' : ''}${SCI.diagram(a)}<figcaption>${mv ? '<span><i class="k seg"></i>moving part</span>' : '<span><i class="k seg"></i>where it’s hardest</span>'}${a.curve && a.shape !== 'flat' ? '<span><i class="k hard"></i>hardest point</span>' : ''}<span><i class="k ghost"></i>start and end</span>${a.scene.attach === 'cuff' ? '<span><i class="k cuff"></i>cuff on the wrist</span>' : ''}${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
+    ${profileHTML(exId, a, mv)}
     ${a.moment ? `<p class="sci-p"><b>Moment arm.</b> ${esc(a.moment)}</p>` : ''}
     ${a.r ? `<div class="sci-rates">${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(SCI.RATE_NAMES[k])}</span>${dots(v, SCI.RATE_MAX[k])}</div>`).join('')}</div>
+    ${a.profWhy && a.profWhy.length ? `<p class="prof-why">${icon('info', 'inline')}Your machine’s profile: ${a.profWhy.map(esc).join('; ')}.</p>` : ''}
     <p class="muted small">Ratings are rules of thumb from the mechanics above (how well the stretched position is loaded, stability, tension through the range, focus, progression). Where a study compared exercises directly, it is cited below and beats the rating.</p>` : ''}
     ${a.fibers ? `<p class="sci-p"><b>Fibers.</b> ${esc(a.fibers)}</p>` : ''}
     ${a.evidence.length ? `<div class="sci-ev"><b>What studies found</b>${a.evidence.map(([k, t]) => `<p>${esc(t)} <span class="muted">(${refLink(k)})</span></p>`).join('')}</div>` : ''}
@@ -2315,6 +2375,7 @@ function exMenu(i) {
     ['Notes', 'note', () => exNote(i), { sub: x.note || (state.exPrefs[x.exId] || {}).note || 'Today’s note, and a setup note kept for next time' }],
     [photos.has(x.exId) ? 'Change photo' : 'Add a photo of this machine', 'camera', () => pickPhoto(x.exId), { sub: 'Take one or pick from your library' }],
     hasReps(ex.k) ? ['Left and right…', 'side', () => uniSheet(i), { sub: x.uni ? (uniStyle(x) === 'one' ? 'Now: one row with reps for each side' : 'Now: a row for each side') : 'Now: both sides together' }] : null,
+    sciOf(x.exId) && sciOf(x.exId).adjustable ? ['Machine resistance profile…', 'chart', () => profileSheet(x.exId), { sub: sciOf(x.exId).profile ? `Now: ${sciOf(x.exId).profile === 'custom' ? 'drawn by you' : SCI.PROFILES[sciOf(x.exId).profile].name.toLowerCase()}` : 'Where your machine feels hardest; it changes the rating' }] : null,
     ['Reset progression for this exercise', 'reset', () => resetExercise(x.exId), { sub: exResetSince(x.exId) ? `Counting from ${fmtShort(exResetSince(x.exId))}. Only this exercise` : 'Fresh records and tips for this exercise only; history is kept' }],
     exResetSince(x.exId) ? ['Undo this exercise’s last reset', 'undo', () => { undoExReset(x.exId); toast('Last reset undone.'); }] : null,
     i < w.ex.length - 1 ? [ss && ss.k < ss.g.idx.length - 1 ? 'Unlink from next exercise' : 'Superset with next exercise', 'link', () => {
@@ -3563,6 +3624,13 @@ const ACT = {
   setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
   setUniStyle: b => { state.settings.uniStyle = b.dataset.v; for (const p of Object.values(state.exPrefs)) delete p.uniStyle; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
+  profSet: b => {
+    const id = b.dataset.id, v = b.dataset.v, p = state.exPrefs[id] = state.exPrefs[id] || {};
+    if (!v) delete p.profile;
+    else if (v !== 'custom') p.profile = v;
+    else if (sciOf(id).profile !== 'custom') { const a = sciOf(id); p.profile = a && a.curve ? [0, 6, 12, 18, 24].map(k => Math.round(Math.max(0.05, a.curve[k]) * 100) / 100) : PROF_START.slice(); }
+    save(); refreshAll();
+  },
   setMotion: b => { state.settings.motion = b.dataset.v === 'on'; save(); mvStopAll(); render(); renderWorkout(); },
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },

@@ -257,3 +257,8 @@
 [data-style="y2k"] .exd-art figcaption { background: linear-gradient(rgba(2, 4, 20, 0), rgba(2, 4, 20, .88) 45%); color: var(--cyan); font: 400 14px var(--lcd); }
 [data-style="y2k"] .exd-art figcaption a { color: var(--cyan); }
 [data-style="y2k"] .exd-step i { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+[data-style="y2k"] .prof-opt { background: #020414; border: 1px solid var(--line); color: var(--cyan); font: 400 10px/1.3 var(--pixel); letter-spacing: .04em; text-transform: uppercase; }
+[data-style="y2k"] .prof-opt.on { border-color: var(--magenta); color: var(--magenta); background: #14031C; box-shadow: 0 0 8px rgba(255, 45, 143, .45); }
+[data-style="y2k"] .prof-h { border-color: var(--magenta); background: #020414; box-shadow: 0 0 8px var(--magenta); }
+[data-style="y2k"] .prof-h.on { background: var(--magenta); }
+[data-style="y2k"] .prof-pick .prof-hint { color: var(--magenta); font-family: var(--lcd); font-size: 15px; }

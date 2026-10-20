@@ -59,7 +59,7 @@ window.LS_SCIENCE = (() => {
     ascending: ['Ascending', 'Easy at the start, where the muscle is longest, and hardest at the end, where it is shortest.'],
     bell: ['Bell-shaped', 'Hardest in the middle of the movement, lighter at both ends.'],
     flat: ['Fairly even', 'About the same effort all the way through.'],
-    machine: ['Set by the machine', 'The cam or lever decides where it is hardest. Most selectorised machines aim for a fairly even feel; notice where yours gets heavy.']
+    machine: ['Set by the machine', 'The cam or lever decides where it is hardest, and that differs from one machine to the next. Many aim for a fairly even feel.']
   };
 
   // ---------- scenes: side or front views, y up, upper arm/thigh ~1 unit ----------
@@ -281,7 +281,7 @@ window.LS_SCIENCE = (() => {
       tips: ['Let the shoulders rise fully at the top of each rep before pulling again.', 'Drive the elbows down toward your hips rather than pulling with the hands.']
     };
   });
-  add('row', (ex, n) => has(n, /row/) && !has(n, /upright/), (ex, n) => {
+  add('row', (ex, n) => has(n, /\brow/) && !has(n, /upright/), (ex, n) => { // \b: not "throw" or "narrow"
     const sup = /chest.?supported|seal|machine|lever|seated/.test(n) || machEq(ex), bent = /bent|pendlay|yates|t.?bar/.test(n) && !sup;
     return {
       title: 'Horizontal pull (row)', joints: ['Shoulder extension', 'Elbow flexion', 'Scapular retraction'],
@@ -384,7 +384,7 @@ window.LS_SCIENCE = (() => {
       evidence: [], tips: ['Push the hips back until you feel the hamstrings stretch, then stand up by driving the hips forward.']
     };
   });
-  add('crunch', (ex, n) => (has(n, /crunch|sit.?up/) || (ex.m === 'abs' && machEq(ex))) && !has(n, /roll.?out|ab roll|wheel/), (ex, n) => {
+  add('crunch', (ex, n) => (has(n, /crunch|sit.?up/) || (ex.m === 'abs' && machEq(ex) && !has(n, /leg raise|knee raise|captain|twist|rotat|throw/))) && !has(n, /roll.?out|ab roll|wheel/), (ex, n) => {
     const mach = machEq(ex), cable = cableEq(ex);
     return {
       title: 'Spinal flexion (crunch)', joints: ['Trunk flexion'], movers: 'Rectus abdominis, with the obliques.',
@@ -421,13 +421,51 @@ window.LS_SCIENCE = (() => {
     };
   }
 
+  // ---------- machines: cams differ from one machine to the next, so you can say how yours feels ----------
+  const PROFILES = {
+    flat: { name: 'Even', pts: [1, 1, 1, 1, 1] },
+    desc: { name: 'Hardest at the start', pts: [1, 0.92, 0.78, 0.62, 0.48] },
+    bell: { name: 'Hardest in the middle', pts: [0.55, 0.85, 1, 0.85, 0.55] },
+    asc: { name: 'Hardest at the end', pts: [0.48, 0.62, 0.78, 0.92, 1] }
+  };
+  // a smooth curve through five points (start … end) that never bulges past them (monotone cubic), sampled like curveOf
+  function curveFrom(pts) {
+    const n = pts.length - 1, h = 1 / n, d = [];
+    for (let i = 0; i < n; i++) d.push((pts[i + 1] - pts[i]) / h);
+    const m = pts.map((_, i) => i === 0 ? d[0] : i === n ? d[n - 1] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+    for (let i = 0; i < n; i++) {
+      if (d[i] === 0) { m[i] = m[i + 1] = 0; continue; }
+      const a = m[i] / d[i], b = m[i + 1] / d[i], k = a * a + b * b;
+      if (k > 9) { const t = 3 / Math.sqrt(k); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+    }
+    const out = [];
+    for (let j = 0; j <= 24; j++) {
+      const x = j / 24, i = Math.min(n - 1, Math.floor(x / h)), t = (x - i * h) / h;
+      const t2 = t * t, t3 = t2 * t;
+      out.push(Math.max(0, (2 * t3 - 3 * t2 + 1) * pts[i] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * pts[i + 1] + (t3 - t2) * h * m[i + 1]));
+    }
+    return out;
+  }
+  // resistance machines with a stack or plates (not assisted dip/chin machines, stations or cardio)
+  const adjustable = (ex, n, out) => ex.eq === 'machine' && !!out.r && !/assist|captain|chair|station|stretch|bike|cycle|trainer|treadmill|rower|elliptical|stepper|climber/.test(n);
+  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  // what your machine's profile means for the ratings: rules of thumb, like the rest
+  function profileRates(out, curve) {
+    const r = { ...out.r }, why = [], mx = Math.max(...curve) || 1, start = avg(curve.slice(0, 9)) / mx, low = Math.min(...curve) / mx, shape = shapeOf(curve);
+    if (shape === 'descending' && start >= 0.9 && r.L < RATE_MAX.L) { r.L++; why.push('+1 for loading the stretch, because it is hardest where the muscle is longest'); }
+    else if (start < 0.75 && r.L > 0) { r.L--; why.push('−1 for loading the stretch, because it is light where the muscle is longest'); }
+    if (low < 0.4 && r.P > 0) { r.P--; why.push('−1 for tension through the range, because part of the rep is close to unloaded'); }
+    return { r, why };
+  }
+
   const FIBERS = 'Taken within about 0 to 3 reps of failure, any exercise recruits essentially all motor units in the working muscle (the size principle: the biggest, fastest-growing units come in last, as the set gets hard). What differs between exercises is not "fiber recruitment" but which muscles and heads carry the tension, and at what length.';
   const RATE_NAMES = { L: 'Loads the stretch', S: 'Stable and controllable', P: 'Tension through the range', F: 'Hits the target, little extra fatigue', G: 'Easy to add load' };
   const RATE_MAX = { L: 3, S: 2, P: 2, F: 2, G: 1 };
   const cache = new Map();
-  function analyze(ex) {
+  // prof: for machines, how yours feels: a PROFILES key or five points from start to end
+  function analyze(ex, prof) {
     if (!ex) return null;
-    const key = ex.id + '|' + ex.name + '|' + ex.m + '|' + ex.eq;
+    const key = ex.id + '|' + ex.name + '|' + ex.m + '|' + ex.eq + '|' + (prof || '');
     if (cache.has(key)) return cache.get(key);
     const n = (ex.name || '').toLowerCase();
     const p = P.find(x => x.test(ex, n));
@@ -435,6 +473,15 @@ window.LS_SCIENCE = (() => {
     const curve = out.scene ? curveOf(out.scene) : null;
     out.curve = curve;
     out.shape = out.scene ? shapeOf(curve) : null;
+    out.adjustable = adjustable(ex, n, out);
+    const pts = !out.adjustable || !prof ? null : Array.isArray(prof) ? (prof.length === 5 && prof.every(v => typeof v === 'number' && v >= 0) ? prof : null) : PROFILES[prof] ? PROFILES[prof].pts : null;
+    if (pts) {
+      out.profile = Array.isArray(prof) ? 'custom' : prof;
+      out.curve = curveFrom(pts);
+      out.shape = shapeOf(out.curve);
+      const { r, why } = profileRates(out, out.curve);
+      out.r = r; out.profWhy = why;
+    }
     out.score = out.r ? Object.values(out.r).reduce((a, b) => a + b, 0) : null;
     out.fibers = out.r ? FIBERS : '';
     cache.set(key, out);
@@ -448,9 +495,9 @@ window.LS_SCIENCE = (() => {
   function frameOf(a) {
     if (frames.has(a)) return frames.get(a);
     const sc = a.scene, J = sc.joint, segAt = ang => at(J, ang, sc.seg), loadAt = ang => at(J, ang, sc.load);
-    // the position where it is hardest (for machines: the middle)
+    // the position where it is hardest (for machines and even profiles: the middle)
     let hard = (sc.a0 + sc.a1) / 2;
-    if (a.curve) { const k = a.curve.indexOf(Math.max(...a.curve)); hard = sc.a0 + (sc.a1 - sc.a0) * k / (a.curve.length - 1); }
+    if (a.curve && a.shape !== 'flat') { const k = a.curve.indexOf(Math.max(...a.curve)); hard = sc.a0 + (sc.a1 - sc.a0) * k / (a.curve.length - 1); }
     const pts = [];
     const line = (x1, y1, x2, y2) => { pts.push([x1, y1], [x2, y2]); };
     for (const b of sc.body || []) line(...b);
@@ -516,7 +563,7 @@ window.LS_SCIENCE = (() => {
     s += `<polyline class="sci-arc" points="${arc.join(' ')}"/>`;
     // start and end ghosts; the moving parts are drawn at the hardest position (and animated from there by the app)
     for (const [ang, cls] of [[sc.a0, 'sci-ghost start'], [sc.a1, 'sci-ghost end']]) { const e = segAt(ang); s += L(J[0], J[1], e[0], e[1], cls); }
-    if (a.curve) { const h = at(J, hard, R); s += `<circle class="sci-hard" cx="${X(h[0])}" cy="${Y(h[1])}" r="6"/>`; }
+    if (a.curve && a.shape !== 'flat') { const h = at(J, hard, R); s += `<circle class="sci-hard" cx="${X(h[0])}" cy="${Y(h[1])}" r="6"/>`; }
     s += `<g class="sci-live">${liveAt(a, hard)}</g>`;
     if (sc.force.type === 'cable') s += `<circle class="sci-pulley" cx="${X(sc.force.q[0])}" cy="${Y(sc.force.q[1])}" r="9"/>`;
     s += `<circle class="sci-joint" cx="${X(J[0])}" cy="${Y(J[1])}" r="7.5"/>`;
@@ -551,5 +598,5 @@ window.LS_SCIENCE = (() => {
     return `<svg class="sci-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="sci-curve-a" points="0,${H} ${pts.join(' ')} ${W},${H}"/><polyline class="sci-curve-l" points="${pts.join(' ')}"/></svg>`;
   }
 
-  return { analyze, diagram, live, effortAt, curveSvg, REFS, SHAPES, RATE_NAMES, RATE_MAX, verdict };
+  return { analyze, diagram, live, effortAt, curveSvg, curveFrom, PROFILES, REFS, SHAPES, RATE_NAMES, RATE_MAX, verdict };
 })();
