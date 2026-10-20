@@ -413,11 +413,24 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .badge.t-C { --pc: var(--p-c); --pt: #132000; }
 .badge.t-P { --pc: var(--p-p); --pt: #fff; }
 .badge.t-E { --pc: var(--p-e); --pt: #002131; }
+/* a one-side row keeps its side colour whatever its type (a dashed green L is a left warm-up);
+   the type goes in a small corner tag in the type's colour */
+.badge { --tc: var(--panel-3); --tt: var(--ink); }
+.badge.t-W { --tc: var(--warn); --tt: #1d1600; }
+.badge.t-T { --tc: var(--accent); --tt: #fff; }
+.badge.t-B { --tc: var(--p-b); --tt: #fff; }
+.badge.t-D { --tc: var(--p-d); --tt: #fff; }
+.badge.t-F { --tc: var(--bad); --tt: #fff; }
+.badge.t-A { --tc: var(--p-a); --tt: #1f1000; }
+.badge.t-RP { --tc: var(--p-rp); --tt: #fff; }
+.badge.t-M { --tc: var(--p-m); --tt: #002321; }
+.badge.t-C { --tc: var(--p-c); --tt: #132000; }
+.badge.t-P { --tc: var(--p-p); --tt: #fff; }
+.badge.t-E { --tc: var(--p-e); --tt: #002131; }
 .badge.side { font-size: 17px; }
 .badge.side-L { --pc: var(--side-l); --pt: #002a0b; }
 .badge.side-R { --pc: var(--side-r); --pt: #fff; }
-.badge.side.t-W { --pc: var(--warn); color: var(--warn); }
-.badge[data-tag]::after { content: attr(data-tag); position: absolute; right: -5px; top: -5px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--panel-3); color: var(--ink); font: 700 9px/16px var(--ui); text-align: center; }
+.badge[data-tag]::after { content: attr(data-tag); position: absolute; right: -6px; top: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--tc); color: var(--tt); box-shadow: 0 0 0 2px var(--row-bg, var(--panel)); font: 800 10px/17px var(--ui); text-align: center; }
 
 /* one-side sets: the left and right rows sit together in one block with a two-colour edge */
 .pair { position: relative; display: grid; gap: 4px; padding: 4px; border-radius: 20px; --row-bg: color-mix(in srgb, var(--panel-2) 70%, var(--panel)); background: var(--row-bg); }
@@ -522,6 +535,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .lines { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; }
 .lines li { display: flex; gap: 10px; align-items: center; font-size: 16px; flex-wrap: wrap; }
 .lt { min-width: 26px; font: 800 17px/1.2 var(--display); font-stretch: 104%; }
+.lt span { margin-left: 1px; }
 .lt-N, .lt-T, .lt-B { color: var(--accent); }
 .lt-W { color: var(--warn); }
 .lt-L { color: var(--side-l); }
@@ -676,8 +690,9 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .exd-sets i { font-style: normal; font-size: 11px; font-weight: 800; margin-right: 5px; }
 .exd-sets i.t-W { color: var(--warn); } .exd-sets i.t-D { color: var(--p-d); } .exd-sets i.t-F { color: var(--bad); }
 .exd-sets i.t-T, .exd-sets i.t-B { color: var(--accent); } .exd-sets i.t-A { color: var(--p-a); } .exd-sets i.t-P { color: var(--p-p); }
-.exd-sets i.side-L { color: var(--side-l); }
-.exd-sets i.side-R { color: var(--side-r); }
+.exd-sets .side-L { color: var(--side-l); }
+.exd-sets .side-R { color: var(--side-r); }
+.exd-sets i b { font-weight: inherit; }
 
 /* ---------- editors & tools ---------- */
 .tpl-ed .tex { background: var(--panel-2); border-radius: 20px; padding: 12px; margin-bottom: 12px; display: grid; gap: 8px; }

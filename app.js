@@ -611,21 +611,37 @@ const setWeight = s => s.side ? 0.5 : 1;
 function firstSide(x) { const s = x.sets.find(o => o.side); return s ? s.side : 'L'; }
 function isPairTail(sets, j) {
   const s = sets[j], p = sets[j - 1];
-  return !!(s && s.side && p && p.side && p.side !== s.side && p.t === s.t && (!s.pair || s.pair === p.pair));
+  if (!s || !s.side || !p || !p.side || p.side === s.side || p.t !== s.t) return false;
+  if (s.pair || p.pair) return s.pair === p.pair;
+  // template rows have no pair ids: pair neighbours from the start, the way pairUp does
+  let tail = false;
+  for (let n = 1; n <= j; n++) {
+    const a = sets[n], b = sets[n - 1];
+    tail = !tail && !!(a.side && b.side && a.side !== b.side && a.t === b.t && !a.pair && !b.pair);
+  }
+  return tail;
 }
 const liftSets = sets => sets.filter((s, j) => !isPairTail(sets, j));
-function pairUp(sets, first = 'L') {
+function pairUp(sets, first = 'L', sidedOnly = false) {
   const out = [];
   for (let i = 0; i < sets.length; i++) {
     const s = sets[i], n = sets[i + 1], p = uid();
-    if (s.side && n && n.side && n.side !== s.side && n.t === s.t) { out.push({ ...s, pair: p }, { ...n, pair: p }); i++; }
+    if (s.side && n && n.side && n.side !== s.side && n.t === s.t && (s.pair ?? null) === (n.pair ?? null)) { out.push({ ...s, pair: p }, { ...n, pair: p }); i++; }
     else if (s.side) {
       const c = { ...s, id: uid(), side: otherSide(s.side), pair: p, done: false };
       delete c.r; delete c.rir; delete c.at;
       out.push({ ...s, pair: p }, c);
-    } else out.push({ ...s, side: first, pair: p }, { ...s, id: uid(), side: otherSide(first), pair: p });
+    } else if (sidedOnly) out.push(s);
+    else out.push({ ...s, side: first, pair: p }, { ...s, id: uid(), side: otherSide(first), pair: p });
   }
   return out;
+}
+// left/right on the whole exercise splits every set; with it off, keep the sets that were made one-sided
+// on their own, unless left/right was on for the whole exercise before (then it was switched off since)
+function sidesFor(sets, uni, wasUni) {
+  if (uni) return pairUp(sets);
+  const paired = pairUp(sets, 'L', true);
+  return wasUni ? unpair(paired) : paired;
 }
 function unpair(sets) {
   const out = [], seen = new Set();
@@ -822,7 +838,12 @@ function setLabel(sets, j) {
 const badge = (t, label, attrs = '', side = '') => `<button class="badge t-${t}${side ? ' side side-' + side : ''}" ${side && t !== 'N' ? `data-tag="${SET_TYPES[t].short}"` : ''} ${attrs} aria-label="${esc((side ? sideName(side) + ' side, ' : '') + SET_TYPES[t].label)}">${esc(label)}</button>`;
 const fullLabel = (sets, j) => { const s = sets[j]; return s.side && s.t !== 'N' ? SET_TYPES[s.t].short + s.side : setLabel(sets, j); };
 // Lyfta-style one-line set: "W  72.5 kg · 4 reps", "R  45 kg · 5 reps · 1 RIR"
-function lineTag(sets, j) { const s = sets[j]; return `<span class="lt lt-${s.side && s.t === 'N' ? s.side : s.t}">${esc(fullLabel(sets, j))}</span>`; }
+function lineTag(sets, j) {
+  const s = sets[j];
+  // a one-side warm-up reads "WL": the W in the warm-up colour, the L in the left colour
+  if (s.side && s.t !== 'N') return `<span class="lt lt-${s.t}">${esc(SET_TYPES[s.t].short)}<span class="lt-${s.side}">${s.side}</span></span>`;
+  return `<span class="lt lt-${s.side || s.t}">${esc(fullLabel(sets, j))}</span>`;
+}
 function fmtLine(x, s, k) {
   k = k || getEx(x.exId).k;
   const parts = [];
@@ -1202,7 +1223,7 @@ function wexFromTemplate(tx) {
   return {
     id: uid(), exId: tx.exId, rest: tx.rest || prefs.rest || state.settings.rest,
     uni, ss: tx.ss || null, note: tx.note || '',
-    sets: (uni ? pairUp(sets) : unpair(sets)).map(s => ({ ...s, id: uid() }))
+    sets: sidesFor(sets, uni, tx.uni ?? sets.every(s => s.side)).map(s => ({ ...s, id: uid() }))
   };
 }
 function wexFresh(exId) {
@@ -1211,7 +1232,7 @@ function wexFresh(exId) {
   let sets = lp ? lp.x.sets.filter(s => s.done).map(s => s.side ? { t: s.t, side: s.side, pair: s.pair, done: false } : { t: s.t, done: false }) : [];
   if (!sets.length) sets = [0, 1, 2].map(() => ({ t: 'N', done: false }));
   const uni = hasReps(def.k) && !!(prefs.uni ?? def.uni);
-  return { id: uid(), exId, rest: prefs.rest || state.settings.rest, uni, ss: null, note: '', sets: (uni ? pairUp(sets) : unpair(sets)).map(s => ({ ...s, id: uid() })) };
+  return { id: uid(), exId, rest: prefs.rest || state.settings.rest, uni, ss: null, note: '', sets: sidesFor(sets, uni, !!(lp && lp.x.uni)).map(s => ({ ...s, id: uid() })) };
 }
 function beginWorkout(w) {
   const go2 = () => {
@@ -1737,6 +1758,30 @@ function addSet(i, type) {
   save();
   renderWorkout();
 }
+// one more warm-up, after the warm-ups already there; sided = a left row and a right row
+function addWarmSet(i, sided) {
+  const x = A().ex[i], warm = x.sets.filter(s => s.t === 'W');
+  const like = warm.filter(s => !!s.side === sided).pop() || warm[warm.length - 1];
+  const base = { t: 'W', tr: '', trir: null, done: false };
+  if (like) {
+    if (like.w != null || like.tw != null) base.tw = like.w ?? like.tw;
+    base.tr = like.r != null ? String(like.r) : like.tr || '';
+  }
+  const at = warm.length ? x.sets.indexOf(warm[warm.length - 1]) + 1 : 0;
+  const rows = sided ? pairUp([base], firstSide(x)) : [base];
+  x.sets.splice(at, 0, ...rows.map(o => ({ ...o, id: uid() })));
+  save(); renderWorkout();
+  toast(sided ? 'Added a warm-up, left and right.' : 'Added a warm-up set.');
+}
+function warmMenu(i) {
+  const x = A().ex[i], ex = getEx(x.exId), uni = !!x.uni, sides = hasReps(ex.k);
+  menuSheet(`Warm-ups · ${ex.name}`, [
+    ['Add a warm-up set', 'flame', () => addWarmSet(i, uni), { sub: uni ? 'Left and right' : 'Both sides together' }],
+    sides && !uni ? ['Add a one-side warm-up', 'side', () => addWarmSet(i, true), { sub: 'A left row and a right row' }] : null,
+    sides && uni ? ['Add a both-sides warm-up', 'side', () => addWarmSet(i, false), { sub: 'One row for both sides' }] : null,
+    ex.k === 'wr' ? ['Suggested warm-ups', 'flame', () => addWarmups(i), { sub: `About 50%, 70% and 85% of your first working weight${uni ? ', left and right' : ''}. Replaces warm-ups you haven’t logged.` }] : null
+  ]);
+}
 function addWarmups(i) {
   const w = A(), x = w.ex[i], ex = getEx(x.exId);
   if (ex.k !== 'wr') { addSet(i, 'W'); return; }
@@ -1831,6 +1876,9 @@ function setTypeSheet(i, j) {
     render: () => `${sheetHead(`${title} · ${esc(getEx(x.exId).name)}`)}<div class="sheet-body menu">
       ${TYPE_ORDER.map(t => `<button class="menu-item ${s.t === t ? 'on' : ''}" data-a="type" data-t="${t}"><span class="badge t-${t}">${t === 'N' ? (s.side || j + 1) : SET_TYPES[t].short}</span><span><b>${SET_TYPES[t].label}</b><small>${SET_TYPES[t].desc}</small></span>${s.t === t ? icon('check', 'tick') : ''}</button>`).join('')}
       <div class="menu-sep"></div>
+      ${hasReps(getEx(x.exId).k) ? (mate
+        ? `<button class="menu-item" data-a="join">${icon('side')}<span><b>Do both sides together</b><small>Joins the left and right rows into one set</small></span></button>`
+        : `<button class="menu-item" data-a="split">${icon('side')}<span><b>Do this set one side at a time</b><small>Splits it into a left row and a right row${s.t === 'W' ? ', for a one-arm or one-leg warm-up' : ''}</small></span></button>`) : ''}
       <button class="menu-item" data-a="dup">${icon('copy')}<span><b>${mate ? 'Duplicate this set, both sides' : 'Duplicate set'}</b></span></button>
       ${mate ? `<button class="menu-item" data-a="swap">${icon('swap')}<span><b>Do the ${sideName(otherSide(rows[0].side)).toLowerCase()} side first</b><small>Swaps the order of the two sides</small></span></button>` : ''}
       <button class="menu-item danger" data-a="del">${icon('trash')}<span><b>${mate ? 'Delete this set, both sides' : 'Delete set'}</b></span></button>
@@ -1842,6 +1890,8 @@ function setTypeSheet(i, j) {
         const copies = rows.map(o => { const c = clone(o); c.id = uid(); c.done = false; delete c.at; if (mate) c.pair = p; return c; });
         x.sets.splice(at, 0, ...copies); save(); closeSheet(def); renderWorkout();
       },
+      split: (b, def) => { x.sets.splice(x.sets.indexOf(s), 1, ...pairUp([s], firstSide(x))); save(); closeSheet(def); renderWorkout(); },
+      join: (b, def) => { x.sets.splice(x.sets.indexOf(rows[0]), 2, ...unpair(rows)); save(); closeSheet(def); renderWorkout(); },
       swap: (b, def) => { const a = x.sets.indexOf(rows[0]), c = x.sets.indexOf(rows[1]); [x.sets[a], x.sets[c]] = [x.sets[c], x.sets[a]]; save(); closeSheet(def); renderWorkout(); },
       del: (b, def) => {
         const before = x.sets.slice();
@@ -2202,6 +2252,9 @@ function refreshAll() {
 
 /* ============================== Template editor ============================== */
 
+// in a template: is left/right on for the whole exercise, and which side comes first
+const tplUni = x => hasReps(getEx(x.exId).k) && !!(x.uni ?? (state.exPrefs[x.exId] || {}).uni ?? getEx(x.exId).uni);
+const tplFirst = x => (x.sets.find(o => o.side) || {}).side || 'L';
 function templateEditor(tplId, opts = {}) {
   const orig = tplId ? tplById(tplId) : null;
   const d = orig ? clone(orig) : { id: uid(), name: opts.name || 'New template', note: '', ex: [], created: Date.now() };
@@ -2248,7 +2301,13 @@ function templateEditor(tplId, opts = {}) {
       tType: (b, def) => {
         const x = d.ex[+b.dataset.i], j = +b.dataset.j, s = x.sets[j];
         const rows = [s, isPairTail(x.sets, j) ? x.sets[j - 1] : isPairTail(x.sets, j + 1) ? x.sets[j + 1] : null].filter(Boolean);
-        menuSheet('Set type', TYPE_ORDER.map(t => [SET_TYPES[t].label, s.t === t ? 'check' : 'grip', () => { for (const o of rows) o.t = t; refreshSheet(def); }, { sub: SET_TYPES[t].desc }]));
+        const at = x.sets.indexOf(rows.length > 1 && x.sets.indexOf(rows[1]) < j ? rows[1] : s);
+        menuSheet('Set type', [
+          ...TYPE_ORDER.map(t => [SET_TYPES[t].label, s.t === t ? 'check' : 'grip', () => { for (const o of rows) o.t = t; refreshSheet(def); }, { sub: SET_TYPES[t].desc }]),
+          !hasReps(getEx(x.exId).k) ? null : rows.length > 1
+            ? ['Do both sides together', 'side', () => { const { side, ...one } = x.sets[at]; x.uni = tplUni(x); x.sets.splice(at, 2, one); refreshSheet(def); }, { sub: 'Joins the left and right rows into one set' }]
+            : ['Do this set one side at a time', 'side', () => { const f = tplFirst(x); x.uni = tplUni(x); x.sets.splice(at, 1, { ...s, side: f }, { ...s, side: otherSide(f) }); refreshSheet(def); }, { sub: 'Splits it into a left row and a right row' }]
+        ]);
       },
       tDel: (b, def) => {
         const x = d.ex[+b.dataset.i], j = +b.dataset.j;
@@ -2261,12 +2320,12 @@ function templateEditor(tplId, opts = {}) {
         const x = d.ex[+b.dataset.i], l = x.sets.filter(s => s.t !== 'W').pop();
         const s = { t: 'N', tr: l ? l.tr : '8-12', trir: l ? l.trir : 2 };
         if (l && l.tw != null) s.tw = l.tw;
-        const first = (x.sets.find(o => o.side) || {}).side;
+        const first = tplUni(x) && tplFirst(x);
         x.sets.push(...(first ? [{ ...s, side: first }, { ...s, side: otherSide(first) }] : [s]));
         refreshSheet(def);
       },
       tAddW: (b, def) => {
-        const x = d.ex[+b.dataset.i], k = x.sets.filter(s => s.t === 'W').length, first = (x.sets.find(o => o.side) || {}).side;
+        const x = d.ex[+b.dataset.i], k = x.sets.filter(s => s.t === 'W').length, first = tplUni(x) && tplFirst(x);
         const s = { t: 'W', tr: '', trir: null };
         x.sets.splice(k, 0, ...(first ? [{ ...s, side: first }, { ...s, side: otherSide(first) }] : [s]));
         refreshSheet(def);
@@ -2552,7 +2611,7 @@ function exerciseSheet(exId) {
           ${resets.length ? `<p class="muted small">Earlier resets: ${resets.map(r => esc(fmtDateY(r))).join(', ')}</p>` : ''}
         </div>
         <h3 class="sub-h">History</h3>
-        ${sessions.length ? `<div class="exd-hist">${sessions.slice(0, 40).map(({ w, xs }) => `<button class="exd-sess ${w.start < base ? 'archived' : ''}" data-a="openWorkout" data-id="${w.id}"><span class="exd-date"><b>${esc(fmtShort(w.start))}</b><small>${esc(w.name)}</small></span><span class="exd-sets">${xs.map(x => x.sets.filter(s => s.done).map(s => `<span class="${s.t === 'W' ? 'warm' : ''}">${s.side || s.t !== 'N' ? `<i class="${s.side ? 'side-' + s.side : 't-' + s.t}">${esc((s.t === 'N' ? '' : SET_TYPES[s.t].short) + (s.side || ''))}</i>` : ''}${esc(fmtSet(x, s, k))}</span>`).join('')).join('')}</span></button>`).join('')}</div>` : `<p class="muted">You haven’t logged this one yet.</p>`}
+        ${sessions.length ? `<div class="exd-hist">${sessions.slice(0, 40).map(({ w, xs }) => `<button class="exd-sess ${w.start < base ? 'archived' : ''}" data-a="openWorkout" data-id="${w.id}"><span class="exd-date"><b>${esc(fmtShort(w.start))}</b><small>${esc(w.name)}</small></span><span class="exd-sets">${xs.map(x => x.sets.filter(s => s.done).map(s => `<span class="${s.t === 'W' ? 'warm' : ''}">${s.side || s.t !== 'N' ? `<i class="${s.t === 'N' ? 'side-' + s.side : 't-' + s.t}">${s.t === 'N' ? '' : esc(SET_TYPES[s.t].short)}${s.side ? `<b class="side-${s.side}">${s.side}</b>` : ''}</i>` : ''}${esc(fmtSet(x, s, k))}</span>`).join('')).join('')}</span></button>`).join('')}</div>` : `<p class="muted">You haven’t logged this one yet.</p>`}
         ${ex.custom ? `<button class="btn wide danger ghost" data-a="delCustom">${icon('trash')}Delete exercise</button>` : ''}
       </div>`;
     },
@@ -2880,7 +2939,7 @@ const ACT = {
     for (const f of ['w', 'r', 'sec', 'dist']) { if (o[f] != null) s[f] = o[f]; else delete s[f]; }
     save(); renderWorkout();
   },
-  addWarm: b => addWarmups(+b.dataset.e),
+  addWarm: b => warmMenu(+b.dataset.e),
   plates: b => { const x = A().ex[+b.dataset.e]; const s = x.sets.find(o => !o.done && o.t !== 'W'); plateSheet(s && s.w != null ? s.w : (x.sets.filter(o => o.w != null).pop() || {}).w); },
   setType: b => setTypeSheet(+b.dataset.e, +b.dataset.s),
   toggleSet: b => toggleSet(+b.dataset.e, +b.dataset.s),
