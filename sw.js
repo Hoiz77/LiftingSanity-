@@ -1,6 +1,6 @@
 /* Lifting Sanity offline helper: keeps the app on the device so it opens at the gym without signal.
    Your workouts live in the app's own storage, not in this cache. */
-const CACHE = 'liftingsanity-v19';
+const CACHE = 'liftingsanity-v20';
 // exercise illustrations live in their own cache so app updates don't throw them away
 const ART = 'liftingsanity-art';
 const SHELL = ['./', 'index.html', 'app.js', 'exercises.js', 'library-extra.js', 'visuals.js', 'science.js', 'y2k.css', 'steps.json', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];

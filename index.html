@@ -499,7 +499,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .set-row.head span { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-row.head span:nth-child(2) { text-align: left; padding-left: 4px; }
 .set-row.done { background: color-mix(in srgb, var(--good) 13%, var(--row-bg)); }
-.set-row.warm .cell, .set-row.warm .last { color: var(--ink-2); }
+.set-row.warm .last, .set-row.warm.done .cell { color: var(--ink-2); }
 .set-row.shake { animation: shake .35s ease; }
 .row-wrap { position: relative; border-radius: 16px; overflow: hidden; }
 .row-del { position: absolute; top: 0; right: 0; bottom: 0; width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--bad); color: #fff; font: 600 13px var(--ui); visibility: hidden; }
@@ -1011,13 +1011,17 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 button.cell { display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
 button.cell .ph { color: var(--muted); font-weight: 500; }
 .cell.kp-on, .set-row.done .cell.kp-on { border-color: var(--accent); background: var(--panel-3); }
-/* empty (only a suggestion showing) vs filled, at a glance: an outline with a faint number, or a solid tile with a bright one */
+/* empty (only a suggestion showing) vs filled, at a glance: a faint outline with a faint number,
+   or a blue-tinted tile with a bright, bold number (what you typed) */
 .cell { font-weight: 700; }
-.cell.empty, input.cell:placeholder-shown { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-2); }
-.cell.empty .ph { color: var(--muted); opacity: .75; font-weight: 500; }
-input.cell::placeholder { font-weight: 500; }
+.cell:not(.empty), input.cell:not(:placeholder-shown) { background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); color: var(--ink); }
+.cell.empty, input.cell:placeholder-shown { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+.cell.empty .ph { color: var(--muted); opacity: .6; font-weight: 500; }
+input.cell::placeholder { font-weight: 500; opacity: .6; }
+.cell.kp-on:not(.empty) { background: color-mix(in srgb, var(--accent) 30%, var(--panel-2)); }
 .cell.empty.kp-on { background: transparent; box-shadow: none; }
-.set-row.done .cell.empty { box-shadow: none; }
+/* a checked set: everything is logged, so no tiles or outlines, just the numbers on the green row */
+.set-row.done .cell, .set-row.done .cell:not(.empty) { background: transparent; box-shadow: none; }
 .cell.kp-on::after { content: ""; width: 2px; height: 22px; margin-left: 2px; background: var(--accent); animation: blink 1s steps(1) infinite; flex-shrink: 0; }
 #keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--bar-bg); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
 .kp-head { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: 0 2px 8px; }
