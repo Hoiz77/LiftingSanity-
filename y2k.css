@@ -264,3 +264,5 @@
 [data-style="y2k"] .prof-pick .prof-hint { color: var(--magenta); font-family: var(--lcd); font-size: 15px; }
 [data-style="y2k"] .upnext { --y2k-pt: 0px; }
 [data-style="y2k"] .split-actions .btn { padding: 0 10px; letter-spacing: .04em; }
+[data-style="y2k"] .set-row.just::before { animation-name: sweepSq; }
+@keyframes sweepSq { 0% { clip-path: inset(0 100% 0 0); opacity: .5; } 55% { clip-path: inset(0); opacity: .35; } 100% { clip-path: inset(0); opacity: 0; } }

@@ -1924,7 +1924,7 @@ function renderWorkout(resetScroll) {
     $('.wo-h', el)._h = P.head; $('.wo-prog', el)._h = P.prog; $('.wo-nav', el)._h = P.nav;
     $$('.wo-main > .exc', el).forEach((c, n) => { c._h = P.cards[n]; });
   }
-  ui.flash = null;
+  ui.flash = null; ui.flashEx = null;
   el.hidden = false;
   document.body.classList.add('wo-open');
   const m2 = $('.wo-main', el);
@@ -1981,11 +1981,13 @@ function workoutParts(w) {
   const editing = w.mode === 'edit';
   const focus = state.settings.view === 'focus';
   const { done, total } = woTally(w);
+  // the sets-done count bumps when a check completes a set (both sides of a pair)
+  const bump = ui.flash && w.ex.some(x => { const s = x.sets.find(o => o.id === ui.flash), m = s && partnerOf(x, s); return s && s.t !== 'W' && s.done && (!m || m.done); });
   const num = editing && w.editOf ? sessionNumber(state.workouts.find(o => o.id === w.editOf)) : state.workouts.length + 1;
   const head = `<header class="wo-h">
     <button class="icon-btn" data-a="woMin" aria-label="Minimize workout">${icon('down')}</button>
     <div class="wo-title"><button class="wo-name" data-a="woRename">${esc(w.name)}</button>
-      <div class="wo-meta">${editing ? `<span>${esc(fmtDate(w.start))} · ${fmtDuration((w.end || w.start) - w.start)}</span>` : `<span class="clock" data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span>`}<span>Session #${num}</span><span><b>${done}</b>/${total} sets</span><span>${fmtVol(workoutVolume(w))}</span></div></div>
+      <div class="wo-meta">${editing ? `<span>${esc(fmtDate(w.start))} · ${fmtDuration((w.end || w.start) - w.start)}</span>` : `<span class="clock" data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span>`}<span>Session #${num}</span><span><b class="${bump ? 'bump' : ''}">${done}</b>/${total} sets</span><span>${fmtVol(workoutVolume(w))}</span></div></div>
     ${editing ? '' : `<button class="icon-btn" data-a="woRest" aria-label="Start a rest timer">${icon('timer')}</button>`}
     <button class="icon-btn" data-a="woMenu" aria-label="Workout options">${icon('dots')}</button>
     <button class="btn primary" data-a="woFinish">${editing ? 'Save' : 'Finish'}</button>
@@ -1996,7 +1998,7 @@ function workoutParts(w) {
   }).join('')}</div>`;
   const nav = `<nav class="wo-nav" aria-label="Exercises">${w.ex.map((x, i) => {
       const ss = ssInfo(w, i), { done: d, total: t } = setTally(x);
-      return `<button class="nav-ex ${i === w.cur ? 'cur' : ''} ${exComplete(x) ? 'complete' : ''} ${ss ? 'ss' : ''}" data-a="woGo" data-i="${i}">
+      return `<button class="nav-ex ${i === w.cur ? 'cur' : ''} ${exComplete(x) ? 'complete' : ''} ${ui.flashEx === x.id ? 'done-now' : ''} ${ss ? 'ss' : ''}" data-a="woGo" data-i="${i}">
         ${thumb(x.exId, 'sm nav-pic')}<span class="nav-txt"><span class="nav-name">${esc(getEx(x.exId).name)}</span><span class="nav-bar"><i style="width:${t ? Math.round(d / t * 100) : 0}%"></i></span></span><span class="nav-n">${exComplete(x) ? icon('check') : ss ? ss.label : `${d}/${t}`}</span></button>`;
     }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">Add exercise</span></button></nav>`;
   const cards = !w.ex.length ? [] : focus ? [exCardHTML(w, w.cur, true)] : w.ex.map((x, i) => exCardHTML(w, i, false));
@@ -2086,7 +2088,7 @@ function exCardHTML(w, i, focus) {
   const ss = ssInfo(w, i);
   const work = liftSets(x.sets).filter(s => s.t !== 'W');
   const target = work.length ? `${work.length} × ${(work[0].tr || '').replace('-', '–') || 'your reps'}${work[0].trir != null && effOn ? ` · ${effName()} ${effDisp(work[0].trir)}` : ''}` : '';
-  let h = `<article class="exc ${exComplete(x) ? 'complete' : ''}" data-e="${i}" id="exc-${i}">
+  let h = `<article class="exc ${exComplete(x) ? 'complete' : ''} ${ui.flashEx === x.id ? 'done-now' : ''}" data-e="${i}" id="exc-${i}">
     ${exHero(x.exId, i)}
     <div class="exc-h">
       <div class="exc-t"><p class="eyebrow">${focus ? `Exercise ${i + 1} of ${w.ex.length} · ` : ''}${esc(MUSCLES[ex.m])} · ${esc(EQUIP[ex.eq])}${ss ? ` · <span class="ss-tag">Superset ${ss.label}</span>` : ''}</p>
@@ -2161,7 +2163,7 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
   h += ui.delMode === x.id ? delBtn(i, j, n)
     : `<button class="check" data-a="toggleSet" data-e="${i}" data-s="${j}" aria-pressed="${!!s.done}" aria-label="${s.done ? 'Uncheck' : 'Check'} ${n}">${icon('check')}</button>`;
   h += `</div></div>`;
-  if (prs.length && s.done) h += `<div class="pr-row">${icon('trophy')}<span>New record: ${esc(prs.join(' · '))}</span></div>`;
+  if (prs.length && s.done) h += `<div class="pr-row ${ui.flash === s.id ? 'just' : ''}">${icon('trophy')}<span>New record: ${esc(prs.join(' · '))}</span></div>`;
   if (ui.effOpen === `${i}:${j}`) h += effPicker(i, j, s);
   return h;
 }
@@ -2247,7 +2249,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
     : `<button class="check" data-a="toggleBoth" data-e="${i}" data-s="${j}" aria-pressed="${done}" aria-label="${done ? 'Uncheck' : 'Check'} ${n}, both sides">${icon('check')}</button>`;
   h += `</div></div>`;
   const prs = [...(ctx.prs[j] || []), ...(ctx.prs[j + 1] || [])];
-  if (prs.length && done) h += `<div class="pr-row">${icon('trophy')}<span>New record: ${esc([...new Set(prs)].join(' · '))}</span></div>`;
+  if (prs.length && done) h += `<div class="pr-row ${ui.flash === a.id || ui.flash === b.id ? 'just' : ''}">${icon('trophy')}<span>New record: ${esc([...new Set(prs)].join(' · '))}</span></div>`;
   if (ui.effOpen === `${i}:${j}`) h += effPicker(i, p, sp, q, sq);
   return h;
 }
@@ -2269,6 +2271,7 @@ function toggleBoth(i, j, viaPad) {
     if (row) { row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); }
     return;
   }
+  keepShownEffort(a, k);
   a.done = true; a.at = Date.now();
   toggleSet(i, j + 1, viaPad);
 }
@@ -2344,6 +2347,21 @@ function woGo(i, smooth) {
     }
   }
 }
+// the target RIR shown in a set is logged with it when you check it, like the weight and reps shown
+function keepShownEffort(s, k) {
+  if (s.rir == null && s.trir != null && s.t !== 'W' && hasReps(k) && state.settings.effort !== 'off') s.rir = s.trir;
+}
+// a light tick when a set is done: vibration where the browser has it; on iPhone (no vibration API)
+// Safari gives a haptic tap when a switch control is toggled, so one is toggled out of sight
+function haptic() {
+  try {
+    if (navigator.vibrate) { navigator.vibrate(12); return; }
+    if (!/iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return;
+    const l = document.createElement('label'), c = document.createElement('input');
+    c.type = 'checkbox'; c.setAttribute('switch', ''); l.ariaHidden = 'true'; l.style.display = 'none';
+    l.append(c); document.head.append(l); l.click(); l.remove();
+  } catch (e) { /* no haptics here */ }
+}
 function hasValue(k, x, s) {
   if (hasReps(k)) return s.r > 0;
   if (k === 'wdist') return s.dist > 0;
@@ -2356,6 +2374,7 @@ function toggleSet(i, j, viaPad) {
   if (s.done) { s.done = false; delete s.at; ui.kp = null; save(); renderWorkout(); return; }
   const ph = placeholder(x, j, exCtx(w, x));
   for (const f of ['w', 'r', 'sec', 'dist']) if (s[f] == null && ph[f] != null) s[f] = ph[f];
+  keepShownEffort(s, k);
   if (!hasValue(k, x, s)) {
     toast(hasReps(k) ? 'Type how many reps you did first.' : 'Type the time or distance first.');
     const row = $(`#workout .exc[data-e="${i}"] .set-row[data-s="${j}"]`);
@@ -2365,9 +2384,10 @@ function toggleSet(i, j, viaPad) {
   s.done = true;
   s.at = Date.now();
   delete s.lr;
-  ui.flash = s.id; // the row just checked gets a short pop
+  ui.flash = s.id; // the row just checked gets its animation
+  if (exComplete(x)) ui.flashEx = x.id; // and the whole exercise when this was its last set
   ui.kp = null;
-  if (navigator.vibrate) navigator.vibrate(15);
+  haptic();
   // first side of a left/right set: no rest yet, straight on to the other side
   const mate = partnerOf(x, s);
   if (mate && !mate.done) {

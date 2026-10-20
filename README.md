@@ -36,6 +36,7 @@ A lifting log for iPad and iPhone. Log every set, follow a split, rest between s
 These rules are used everywhere the app counts or compares sets (workout header, exercise strip, summary, records, charts, weight tips and the plan review). Run `LiftingSanity.selfCheck()` in the browser console to check them against the app's own code; it uses made-up sets and never touches your saved workouts.
 
 - **Working sets.** Warm-ups never count. A left + right pair is one set, not two. Each row of a drop set, rest-pause or myo-rep set counts as its own set. In progress counts (the header, the exercise strip, the finish prompt) a pair is done once both sides are. For weekly volume, a pair with only one side done counts as half a set, and helper muscles get half a set.
+- **Checking a set logs what's shown.** The grey suggestions in a set (weight, reps and the target RIR) become the logged values when you tap ✓, unless you typed something else.
 - **Volume.** Weight × reps for every checked working set; for left/right sets, each side's weight × reps (both limbs did the work).
 - **Estimated 1RM.** Epley (weight × (1 + reps / 30)), and only from sets of 1 to 12 reps with a weight above zero. Higher-rep sets still count for volume, heaviest weight and most reps; they just don't feed the 1RM estimate, which gets unreliable past about 12 reps. Nothing is deleted or rewritten.
 - **Records.** Warm-ups, partials and eccentric-only sets are never records. Est. 1RM and heaviest-weight records follow the rule above.
