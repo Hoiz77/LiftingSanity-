@@ -31,6 +31,21 @@ A lifting log for iPad and iPhone. Log every set, follow a split, rest between s
 - **Review my plan.** The **Review** button on your split checks it against the training literature: weekly sets per muscle (helper muscles count half), how often each muscle is trained, effort (reps in reserve), exercise choice (overhead vs pushdown triceps work, seated vs lying leg curls, standing vs seated calf raises, lengthened partials), rest times, session length and push/pull balance, with links to the studies.
 - **Two styles.** Settings → Style: **Clean** (default) or **Y2K**: cobalt and chrome, pixel and LCD type, bevelled windows, an LCD rest timer, EQ-style bars and a live HUD.
 
+## How the numbers are worked out
+
+These rules are used everywhere the app counts or compares sets (workout header, exercise strip, summary, records, charts, weight tips and the plan review). Run `LiftingSanity.selfCheck()` in the browser console to check them against the app's own code; it uses made-up sets and never touches your saved workouts.
+
+- **Working sets.** Warm-ups never count. A left + right pair is one set, not two. Each row of a drop set, rest-pause or myo-rep set counts as its own set. In progress counts (the header, the exercise strip, the finish prompt) a pair is done once both sides are. For weekly volume, a pair with only one side done counts as half a set, and helper muscles get half a set.
+- **Volume.** Weight × reps for every checked working set; for left/right sets, each side's weight × reps (both limbs did the work).
+- **Estimated 1RM.** Epley (weight × (1 + reps / 30)), and only from sets of 1 to 12 reps with a weight above zero. Higher-rep sets still count for volume, heaviest weight and most reps; they just don't feed the 1RM estimate, which gets unreliable past about 12 reps. Nothing is deleted or rewritten.
+- **Records.** Warm-ups, partials and eccentric-only sets are never records. Est. 1RM and heaviest-weight records follow the rule above.
+- **Weight tips.** "Try X today" only comes from sessions since the exercise's last reset (or the current block), never from before it.
+- **Left/right on and off.** Switching never invents or doubles a set. Sets you already checked stay exactly as you did them. A planned left/right pair becomes one set using the first side's numbers (never mixing the two sides), and switching back gives the same two sides again. In one-row left/right, if the two sides were logged with different weights, both are shown and checking the set doesn't overwrite either.
+- **kg and lb.** Weights are stored in kg and converted only for display, so switching units back and forth never changes what's stored.
+- **Saving.** Changes are saved within a second, and straight away when the app goes to the background or is closed. If the device can't save (storage full), you're told.
+- **Backups.** A backup holds everything: workouts, templates, splits, settings and style, exercise setups and notes, machine profiles, resets and your photos. Restoring checks the whole file first; a damaged backup changes nothing. A restore replaces everything, photos included.
+- **Ratings.** Each exercise's rating out of 10 is a rule of thumb from its mechanics (how well it loads the stretched position, stability, tension through the range, focus, how easy it is to add load). Where a study compared exercises directly, it's shown under "What studies found". In the plan review, each point is marked as coming from studies (with links) or as a rule of thumb.
+
 ## Turn on GitHub Pages (once)
 
 1. Open https://github.com/Hoiz77/LiftingSanity-/settings/pages (this is **Settings → Pages** in the repository).

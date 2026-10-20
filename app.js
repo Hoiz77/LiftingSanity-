@@ -158,7 +158,10 @@ function relDay(ts) {
   return fmtDateY(ts);
 }
 function toLocalInput(ts) { const d = new Date(ts); return new Date(ts - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
-const e1rm = (w, r) => r <= 0 || !w ? 0 : (r === 1 ? w : w * (1 + r / 30));
+// estimated 1RM (Epley), only from sets of 1 to 12 reps with a positive weight: higher-rep sets still count as
+// training, records for weight, reps and volume, they just don't feed this estimate (it gets unreliable past ~12)
+const E1RM_MAX_REPS = 12;
+const e1rm = (w, r) => !(w > 0) || !(r >= 1) || r > E1RM_MAX_REPS ? 0 : (r === 1 ? w : w * (1 + r / 30));
 
 /* ============================== Icons ============================== */
 
@@ -413,23 +416,27 @@ function openPhotoDB() {
     } catch (e) { res(null); }
   });
 }
+// a backup waits for this, so it never goes out without your photos
+let photosLoaded = false;
 async function loadPhotos() {
   photoDB = await openPhotoDB();
-  if (!photoDB) return;
+  if (!photoDB) { photosLoaded = true; return; }
   try {
     const rq = photoDB.transaction('photos').objectStore('photos').openCursor();
     rq.onsuccess = () => {
       const c = rq.result;
-      if (c) { photos.set(c.key, c.value); c.continue(); } else if (photos.size) refreshAll();
+      if (c) { photos.set(c.key, c.value); c.continue(); } else { photosLoaded = true; if (photos.size) refreshAll(); }
     };
-  } catch (e) { /* no saved photos */ }
+    rq.onerror = () => { photosLoaded = true; };
+  } catch (e) { photosLoaded = true; /* no saved photos */ }
 }
 function storePhoto(id, url) {
   if (url) photos.set(id, url); else photos.delete(id);
   if (!photoDB) return;
   try {
-    const st = photoDB.transaction('photos', 'readwrite').objectStore('photos');
+    const tx = photoDB.transaction('photos', 'readwrite'), st = tx.objectStore('photos');
     if (url) st.put(url, id); else st.delete(id);
+    tx.onerror = tx.onabort = () => toast('Couldn’t keep a photo on this device. The storage may be full.');
   } catch (e) { toast('Couldn’t keep the photo on this device.'); }
 }
 function shrinkImage(file, max = 560) {
@@ -645,7 +652,7 @@ function scienceHTML(exId) {
     ${a.evidence.length ? `<div class="sci-ev"><b>What studies found</b>${a.evidence.map(([k, t]) => `<p>${esc(t)} <span class="muted">(${refLink(k)})</span></p>`).join('')}</div>` : ''}
     ${a.tips.length ? `<ul class="sci-tips">${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
     ${a.score != null && total > 1 ? `<p class="sci-rank">Ranks <b>#${rank}</b> of ${total} for ${esc(MUSCLES[ex.m].toLowerCase())} in this library.</p>` : ''}
-    ${better.length ? `<div class="sci-alt"><b>Higher-rated for ${esc(MUSCLES[ex.m].toLowerCase())}</b>${better.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'sm')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(sciOf(e.id).title)}</small></span>${scorePill(e.id)}</button>`).join('')}</div>` : ''}
+    ${better.length ? `<div class="sci-alt"><b>Higher-rated for ${esc(MUSCLES[ex.m].toLowerCase())}</b><p class="muted small">Worth a try if they suit your joints, your gym and your progress; a lower rating doesn’t mean this exercise is a bad choice.</p>${better.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'sm')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(sciOf(e.id).title)}</small></span>${scorePill(e.id)}</button>`).join('')}</div>` : ''}
   </section>`;
 }
 // sorted once and kept until your own exercises change; the search text for each is worked out once too
@@ -876,6 +883,12 @@ function isPairTail(sets, j) {
   return tail;
 }
 const liftSets = sets => sets.filter((s, j) => !isPairTail(sets, j));
+// switching left/right off and back on never invents or doubles a set:
+// - a set already done stays exactly as it was done (both sides at once, or each side)
+// - a planned left/right pair becomes one set with the first side's numbers (never mixing the two sides),
+//   and remembers both sides, so switching back gives the same two rows unless the set was changed meanwhile
+const LR_KEEP = ['t', 'w', 'r', 'sec', 'dist', 'rir', 'tw', 'tr', 'trir', 'done'];
+const lrKey = s => JSON.stringify(LR_KEEP.map(f => s[f] ?? null));
 function pairUp(sets, first = 'L', sidedOnly = false) {
   const out = [];
   for (let i = 0; i < sets.length; i++) {
@@ -885,8 +898,9 @@ function pairUp(sets, first = 'L', sidedOnly = false) {
       const c = { ...s, id: uid(), side: otherSide(s.side), pair: p, done: false };
       delete c.r; delete c.rir; delete c.at;
       out.push({ ...s, pair: p }, c);
-    } else if (sidedOnly) out.push(s);
-    else out.push({ ...s, side: first, pair: p }, { ...s, id: uid(), side: otherSide(first), pair: p });
+    } else if (sidedOnly || s.done) out.push(s);
+    else if (s.lr && s.lr.v === lrKey(s) && s.lr.rows.length === 2) out.push(...s.lr.rows.map(o => ({ ...o, id: uid(), pair: p, done: false })));
+    else { const { lr, ...b } = s; out.push({ ...b, side: first, pair: p }, { ...b, id: uid(), side: otherSide(first), pair: p }); }
   }
   return out;
 }
@@ -904,15 +918,14 @@ function unpair(sets) {
     if (s.pair && seen.has(s.pair)) continue;
     if (s.pair) seen.add(s.pair);
     const both = s.pair ? sets.filter(o => o.pair === s.pair) : [s];
-    const m = { ...s };
-    delete m.side; delete m.pair;
-    for (const f of ['w', 'r', 'sec', 'dist']) {
-      const v = both.map(o => o[f]).filter(v => v != null);
-      if (v.length) m[f] = Math.max(...v); else delete m[f];
+    if (both.some(o => o.done)) { out.push(...both); continue; } // done work is kept as it was done
+    const m = { ...both[0] };
+    delete m.side; delete m.pair; delete m.at; delete m.lr;
+    m.done = false;
+    if (both.length === 2) {
+      m.lr = { rows: both.map(o => { const c = { side: o.side }; for (const f of LR_KEEP) if (o[f] != null) c[f] = o[f]; c.done = false; return c; }) };
+      m.lr.v = lrKey(m);
     }
-    const rirs = both.map(o => o.rir).filter(v => v != null);
-    if (rirs.length) m.rir = Math.min(...rirs);
-    m.done = both.every(o => o.done);
     out.push(m);
   }
   return out;
@@ -923,8 +936,8 @@ function setUni(x, on) {
 }
 // templates keep pairs as two neighbouring rows without ids
 function tplSides(sets, on) {
-  if (on) return pairUp(sets).map(({ id, pair, done, ...s }) => s);
-  return liftSets(sets).map(({ side, pair, ...s }) => s);
+  if (on) return pairUp(sets).map(({ id, pair, done, lr, ...s }) => s);
+  return liftSets(sets).map(({ side, pair, lr, ...s }) => s);
 }
 function setVolume(x, s) {
   if (!s.done || s.t === 'W') return 0;
@@ -932,6 +945,18 @@ function setVolume(x, s) {
   return k === 'wr' || k === 'bw' ? (s.w || 0) * totalReps(x, s) : 0;
 }
 const workoutVolume = w => sum(w.ex, x => sum(x.sets, s => setVolume(x, s)));
+// working sets as you'd count them: warm-ups don't count, a left + right pair is one set, done once both sides are
+function setTally(x) {
+  let done = 0, total = 0;
+  for (const s of liftSets(x.sets)) {
+    if (s.t === 'W') continue;
+    total++;
+    const m = partnerOf(x, s);
+    if (s.done && (!m || m.done)) done++;
+  }
+  return { done, total };
+}
+const woTally = w => w.ex.reduce((a, x) => { const t = setTally(x); return { done: a.done + t.done, total: a.total + t.total }; }, { done: 0, total: 0 });
 const workingSets = w => +trimNum(sum(w.ex, x => sum(x.sets, s => s.done && s.t !== 'W' ? setWeight(s) : 0)), 1);
 function emptyRec() { return { e1rm: 0, w: 0, vol: 0, reps: 0, sec: 0, dist: 0, sessions: 0, repMax: {} }; }
 function addToRec(rec, x, s, k) {
@@ -1185,7 +1210,7 @@ function renderMini() {
   if (!w || !ui.woHidden) { el.hidden = true; document.body.classList.remove('has-mini'); return; }
   el.hidden = false;
   document.body.classList.add('has-mini');
-  const done = sum(w.ex, x => x.sets.filter(s => s.done && s.t !== 'W').length), total = sum(w.ex, x => x.sets.filter(s => s.t !== 'W').length);
+  const { done, total } = woTally(w);
   el.innerHTML = `<button class="mini-btn" data-a="resume"><span class="live-dot"></span><span class="mini-name">${esc(w.mode === 'edit' ? 'Editing ' + w.name : w.name)}</span><span class="mini-meta">${w.mode === 'edit' ? '' : `<span data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span> · `}${done}/${total} sets</span><span class="mini-go">Resume ${icon('up')}</span></button>`;
 }
 
@@ -1499,7 +1524,8 @@ function planReview(split) {
     render: () => {
       const st = planStats(split, perWeek);
       const out = { good: [], tip: [], fix: [] };
-      const say = (kind, text, refs = []) => out[kind].push(`<li class="${kind}">${icon(kind === 'good' ? 'check' : kind === 'tip' ? 'info' : 'x')}<p>${text}${refs.length ? ` <span class="refs">${refs.map(refLink).join(' · ')}</span>` : ''}</p></li>`);
+      // each point says what it rests on: studies (linked) or a rule of thumb from mechanics and common practice
+      const say = (kind, text, refs = []) => out[kind].push(`<li class="${kind}">${icon(kind === 'good' ? 'check' : kind === 'tip' ? 'info' : 'x')}<p>${text}<span class="refs">${refs.length ? `<i class="basis">Studies</i>${refs.map(refLink).join(' · ')}` : '<i class="basis thumb">Rule of thumb</i>'}</span></p></li>`);
       const name = m => esc(MUSCLES[m].toLowerCase());
       const best = m => { const b = bestFor(m, 1)[0]; return b ? `<button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button>` : ''; };
       // volume
@@ -1565,7 +1591,7 @@ function planReview(split) {
         <p class="muted small">Working sets only. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far (${refLink('pelland2026')}). Shaded band: 10 to 20 sets.</p>
         <h3 class="sub-h">Your exercises, rated</h3>
         <div class="card list-card">${st.ex.map(o => `<button class="ex-row" data-a="openEx" data-id="${o.e.id}">${thumb(o.e.id, 'sm')}<span class="ex-txt"><b>${esc(o.e.name)}</b><small>${o.a ? esc(o.a.title) : ''}</small></span>${scorePill(o.e.id)}</button>`).join('')}</div>
-        <p class="muted small">This review uses rules of thumb plus the studies linked above. It can’t see how you recover, your injuries or your goals; treat it as suggestions.</p>
+        <p class="muted small">Each point says whether it comes from studies (linked) or is a rule of thumb from the mechanics. A higher-rated exercise isn’t automatically better for you: how your joints feel, your equipment, fatigue, the order you do things in and whether you can keep progressing it all matter. The review can’t see those, so treat it as suggestions.</p>
       </div>`;
     },
     actions: { pw: (b, def) => { perWeek = +b.dataset.v; refreshSheet(def); } }
@@ -1715,14 +1741,16 @@ function cleanForSave(w) {
   for (const x of w.ex) x.sets = x.sets.filter(s => s.done);
   w.ex = w.ex.filter(x => x.sets.length);
   delete w.cur; delete w.mode; delete w.editOf;
-  for (const x of w.ex) for (const s of x.sets) { delete s.prs; }
+  for (const x of w.ex) for (const s of x.sets) { delete s.prs; delete s.lr; }
   return w;
 }
 function finishPrompt() {
   const w = A();
-  const total = sum(w.ex, x => x.sets.length), done = sum(w.ex, x => x.sets.filter(s => s.done).length);
+  // counted like everywhere else (a left + right pair is one set), warm-ups included here
+  const all = w.ex.flatMap(x => liftSets(x.sets).map(s => [x, s]));
+  const total = all.length, done = all.filter(([x, s]) => { const m = partnerOf(x, s); return s.done && (!m || m.done); }).length;
   const editing = w.mode === 'edit';
-  if (!done) {
+  if (!w.ex.some(x => x.sets.some(s => s.done))) {
     confirmSheet({
       title: editing ? 'No sets are checked' : 'Nothing logged yet',
       text: editing ? 'Check the sets you did, or this workout will be deleted when you save.' : 'Check off at least one set, or discard this workout.',
@@ -1920,7 +1948,7 @@ document.addEventListener('scroll', ev => { if (ev.target.classList && ev.target
 function workoutHTML(w) {
   const editing = w.mode === 'edit';
   const focus = state.settings.view === 'focus';
-  const done = sum(w.ex, x => x.sets.filter(s => s.done && s.t !== 'W').length), total = sum(w.ex, x => x.sets.filter(s => s.t !== 'W').length);
+  const { done, total } = woTally(w);
   const num = editing && w.editOf ? sessionNumber(state.workouts.find(o => o.id === w.editOf)) : state.workouts.length + 1;
   let h = `<div class="wo ${focus ? 'focus' : 'list'}">
   <header class="wo-h">
@@ -1937,7 +1965,7 @@ function workoutHTML(w) {
   }).join('')}</div>
   <div class="wo-body">
     <nav class="wo-nav" aria-label="Exercises">${w.ex.map((x, i) => {
-      const ss = ssInfo(w, i), d = x.sets.filter(s => s.done && s.t !== 'W').length, t = x.sets.filter(s => s.t !== 'W').length;
+      const ss = ssInfo(w, i), { done: d, total: t } = setTally(x);
       return `<button class="nav-ex ${i === w.cur ? 'cur' : ''} ${exComplete(x) ? 'complete' : ''} ${ss ? 'ss' : ''}" data-a="woGo" data-i="${i}">
         ${thumb(x.exId, 'sm nav-pic')}<span class="nav-txt"><span class="nav-name">${esc(getEx(x.exId).name)}</span><span class="nav-bar"><i style="width:${t ? Math.round(d / t * 100) : 0}%"></i></span></span><span class="nav-n">${exComplete(x) ? icon('check') : ss ? ss.label : `${d}/${t}`}</span></button>`;
     }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">Add exercise</span></button></nav>
@@ -1968,7 +1996,7 @@ function exCtx(w, x) {
 }
 function suggestion(x, lp) {
   const k = getEx(x.exId).k;
-  if (!lp || k !== 'wr') return null;
+  if (!lp || lp.archived || k !== 'wr') return null; // nothing from before a reset or a new block
   const range = x.sets.map(s => s.tr).find(tr => /^\d+\s*[-–]\s*\d+$/.test(tr || ''));
   if (!range) return null;
   const [lo, hi] = range.split(/[-–]/).map(Number);
@@ -2173,7 +2201,9 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   h += `<button class="badge t-${a.t} ${a.t === 'N' ? 'lr' : ''}" data-a="setType" data-e="${i}" data-s="${j}" aria-label="Set ${esc(oneLabel(x.sets, j))}, left and right. Change type">${esc(oneLabel(x.sets, j))}</button>`;
   h += `<div class="prev">${up ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="Same as the set above, ${esc(up)}">${icon('same')}<span>${esc(up)}</span></button>` : ''}`
     + (last ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="Use last time, ${esc(last)}">${up ? '' : '<i>Last</i>'}${esc(last)}</button>` : up ? '' : '<span class="none">—</span>') + `</div>`;
-  if (hasWeight(k)) h += inp(j, 'w', a.w != null ? dispW(a.w) : '', pha.w != null ? dispW(pha.w) : '', 'decimal', `Weight, ${n}`);
+  // one weight for both sides; if they were logged with different weights, show both (typing a new one sets both)
+  const diffW = sp.w != null && sq.w != null && Math.abs(sp.w - sq.w) > 1e-9;
+  if (hasWeight(k)) h += inp(j, 'w', diffW ? `${dispW(sp.w)}/${dispW(sq.w)}` : a.w != null ? dispW(a.w) : b.w != null ? dispW(b.w) : '', pha.w != null ? dispW(pha.w) : '', 'decimal', diffW ? `Weight, ${n}: ${sideName(f1)} ${dispW(sp.w)}, ${sideName(otherSide(f1))} ${dispW(sq.w)}` : `Weight, ${n}`, diffW ? 'two-w' : '');
   h += inp(p, 'r', sp.r ?? '', php.r ?? '', 'numeric', `${sideName(f1)} reps, ${n}`, 'side-' + f1 + (sp.done ? ' got' : ''));
   h += inp(q, 'r', sq.r ?? '', phq.r ?? '', 'numeric', `${sideName(otherSide(f1))} reps, ${n}`, 'side-' + otherSide(f1) + (sq.done ? ' got' : ''));
   // effort for each side, stacked in the side colours (first side on top)
@@ -2198,7 +2228,7 @@ function toggleBoth(i, j, viaPad) {
   if (a.done || b.done) { for (const o of [a, b]) { o.done = false; delete o.at; } ui.kp = null; save(); renderWorkout(); return; }
   const ctx = exCtx(w, x);
   for (const [o, jj] of [[a, j], [b, j + 1]]) { const ph = placeholder(x, jj, ctx); for (const f of ['w', 'r', 'sec', 'dist']) if (o[f] == null && ph[f] != null) o[f] = ph[f]; }
-  if (a.w != null) b.w = a.w;
+  if (a.w != null && b.w == null) b.w = a.w; // sides logged with different weights keep them
   if (!hasValue(k, x, a) || !hasValue(k, x, b)) {
     toast('Type the reps for both sides first.');
     const row = $(`#workout .exc[data-e="${i}"] .set-row[data-s="${j}"]`);
@@ -2300,6 +2330,7 @@ function toggleSet(i, j, viaPad) {
   }
   s.done = true;
   s.at = Date.now();
+  delete s.lr;
   ui.kp = null;
   if (navigator.vibrate) navigator.vibrate(15);
   // first side of a left/right set: no rest yet, straight on to the other side
@@ -2409,10 +2440,11 @@ function woSetField(i, j, f, v) {
   const x = w.ex[i], s = x && x.sets[j];
   if (!s) return;
   const k = getEx(x.exId).k;
-  if (f === 'w') s.w = toKg(parseNum(v));
-  else if (f === 'sec') s.sec = parseTime(v);
-  else if (f === 'dist') s.dist = toMeters(parseNum(v), k);
-  else { const n = parseInt(v, 10); s[f] = isFinite(n) ? n : null; }
+  const pos = n => n != null && isFinite(n) && n >= 0 ? n : null; // no negative weights, reps, times or distances
+  if (f === 'w') s.w = toKg(pos(parseNum(v)));
+  else if (f === 'sec') s.sec = pos(parseTime(v));
+  else if (f === 'dist') s.dist = toMeters(pos(parseNum(v)), k);
+  else { const n = parseInt(v, 10); s[f] = pos(isFinite(n) ? n : null); }
   if (s[f] == null) delete s[f];
   const m = f === 'w' && isCompact(x) ? partnerOf(x, s) : null;
   if (m) { if (s.w == null) delete m.w; else m.w = s.w; }
@@ -2429,6 +2461,7 @@ function uniSheet(i) {
     if (v === 'off') { setUni(x, false); p.uni = false; }
     else { if (!x.uni) setUni(x, true); p.uni = true; p.uniStyle = v; }
     ui.kp = null; save(); renderWorkout();
+    if (v === 'off' ? x.sets.some(o => o.side && o.done) : x.sets.some(o => !o.side && o.done && hasReps(getEx(x.exId).k))) toast('Sets you already checked stay the way you did them.');
   };
   const opt = (v, ic, label, sub) => [label, cur === v ? 'check' : ic, () => pick(v), { sub }];
   menuSheet(`Left and right · ${ex.name}`, [
@@ -2503,8 +2536,8 @@ function setTypeSheet(i, j) {
         const copies = rows.map(o => { const c = clone(o); c.id = uid(); c.done = false; delete c.at; if (mate) c.pair = p; return c; });
         x.sets.splice(at, 0, ...copies); save(); closeSheet(def); renderWorkout();
       },
-      split: (b, def) => { x.sets.splice(x.sets.indexOf(s), 1, ...pairUp([s], firstSide(x))); save(); closeSheet(def); renderWorkout(); },
-      join: (b, def) => { x.sets.splice(x.sets.indexOf(rows[0]), 2, ...unpair(rows)); save(); closeSheet(def); renderWorkout(); },
+      split: (b, def) => { if (s.done) { toast('This set is checked. Uncheck it first to split it into left and right.'); return; } x.sets.splice(x.sets.indexOf(s), 1, ...pairUp([s], firstSide(x))); save(); closeSheet(def); renderWorkout(); },
+      join: (b, def) => { if (rows.some(o => o.done)) { toast('Uncheck both sides first to join them into one set.'); return; } x.sets.splice(x.sets.indexOf(rows[0]), 2, ...unpair(rows)); save(); closeSheet(def); renderWorkout(); },
       swap: (b, def) => { const a = x.sets.indexOf(rows[0]), c = x.sets.indexOf(rows[1]); [x.sets[a], x.sets[c]] = [x.sets[c], x.sets[a]]; save(); closeSheet(def); renderWorkout(); },
       del: (b, def) => {
         const before = x.sets.slice();
@@ -3224,6 +3257,7 @@ function exerciseSheet(exId) {
           <a class="btn sm ghost" href="${yt}" target="_blank" rel="noopener">${icon('external')}Watch how it’s done</a></div>
         ${hasArchived || resets.length || state.blocks.length > 1 ? `<div class="seg" role="group" aria-label="Time range"><button class="${st.range === 'block' ? 'on' : ''}" data-a="range" data-v="block">Since last reset</button><button class="${st.range === 'all' ? 'on' : ''}" data-a="range" data-v="all">All time</button></div>` : ''}
         <div class="tiles">${tiles.map(([l, v]) => `<div class="tile"><span>${l}</span><b>${esc(String(v))}</b></div>`).join('')}</div>
+        ${k === 'wr' && !rec.e1rm && rec.reps > E1RM_MAX_REPS ? `<p class="muted small">Est. 1RM is worked out from sets of ${E1RM_MAX_REPS} reps or fewer; higher-rep sets still count for everything else.</p>` : ''}
         <div class="card chart-card"><div class="chart-top"><h3>${esc(metrics.find(m => m[0] === st.metric)[1])}</h3>${metrics.length > 1 ? `<div class="seg sm">${metrics.map(([id, l]) => `<button class="${st.metric === id ? 'on' : ''}" data-a="metric" data-v="${id}">${esc(l)}</button>`).join('')}</div>` : ''}</div>
           ${chartSlot({ type: 'line', points: pts, marks, h: 220, fmt: v => fmtMetric(st.metric, v, k), tick: v => st.metric === 'sec' ? fmtClock(v) : st.metric === 'dist' ? dispDist(v, k) : compact(U() === 'lb' && st.metric !== 'reps' ? v * KG_LB : v), aria: `${ex.name} progress`, empty: st.range === 'block' && hasArchived ? 'Nothing since your last reset yet. Switch to All time to see earlier sessions.' : 'Log this exercise to see your progress here.' })}
           ${st.range === 'all' && hasArchived ? '<p class="muted small">Faded points are from before a reset.</p>' : ''}</div>
@@ -3420,6 +3454,7 @@ function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
 }
 async function exportFile() {
+  if (!photosLoaded) { toast('Your photos are still loading. Try again in a second.'); return; }
   const name = `lifting-sanity-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const blob = new Blob([exportData()], { type: 'application/json' });
   // inside claude.ai the page can't download on its own, so the viewer saves through the host
@@ -3441,23 +3476,41 @@ async function exportFile() {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   toast('Backup saved.');
 }
+// the shape a backup must have before anything on the device is touched
+function backupProblem(d) {
+  const arr = v => Array.isArray(v), obj = v => v && typeof v === 'object' && !Array.isArray(v);
+  if (!obj(d) || !arr(d.workouts)) return 'it has no workouts list';
+  for (const w of d.workouts) if (!obj(w) || !arr(w.ex) || !isFinite(w.start) || w.ex.some(x => !obj(x) || typeof x.exId !== 'string' || !arr(x.sets) || x.sets.some(s => !obj(s)))) return 'a workout in it is damaged';
+  for (const k of ['templates', 'splits', 'custom']) if (d[k] != null && !arr(d[k])) return `its ${k} are damaged`;
+  if ((d.templates || []).some(t => !obj(t) || !arr(t.ex))) return 'a template in it is damaged';
+  for (const k of ['settings', 'exPrefs', 'exResets']) if (d[k] != null && !obj(d[k])) return `its ${k === 'exPrefs' ? 'exercise settings' : k === 'exResets' ? 'resets' : k} are damaged`;
+  return '';
+}
 function importText(text) {
   let obj;
   try { obj = JSON.parse(text); } catch (e) { toast('That isn’t a Lifting Sanity backup. The text isn’t valid JSON.'); return; }
   const data = obj && obj.app === 'liftingsanity' ? obj.data : null;
-  if (!data || !Array.isArray(data.workouts)) { toast('That file isn’t a Lifting Sanity backup.'); return; }
+  if (!data) { toast('That file isn’t a Lifting Sanity backup.'); return; }
+  // check and convert a copy first: a damaged backup changes nothing
+  let next = null, problem = backupProblem(data);
+  if (!problem) try { next = migrate(JSON.parse(JSON.stringify(data))); } catch (e) { problem = 'it couldn’t be read'; }
+  if (problem) { toast(`This backup can’t be restored: ${problem}. Nothing was changed.`); return; }
+  const pics = obj.photos && typeof obj.photos === 'object' ? Object.entries(obj.photos).filter(([id, url]) => typeof url === 'string' && url.startsWith('data:image/')) : [];
   confirmSheet({
     title: 'Restore this backup?',
-    text: `It has <b>${data.workouts.length}</b> workouts and <b>${(data.templates || []).length}</b> templates${obj.exported ? `, saved ${esc(fmtDateY(obj.exported))}` : ''}. Everything on this device is replaced.`,
+    text: `It has <b>${next.workouts.length}</b> workouts, <b>${next.templates.length}</b> templates${pics.length ? ` and <b>${pics.length}</b> photo${pics.length === 1 ? '' : 's'}` : ''}${obj.exported ? `, saved ${esc(fmtDateY(obj.exported))}` : ''}. Everything on this device is replaced.`,
     ok: 'Restore', danger: true,
     onOk: () => {
       try { localStorage.setItem(KEY + ':before-restore', JSON.stringify(state)); } catch (e) { /* storage full */ }
-      state = migrate(data);
+      state = next;
       state.active = null;
       ensureSplits();
-      if (obj.photos) for (const [id, url] of Object.entries(obj.photos)) if (typeof url === 'string' && url.startsWith('data:image/')) storePhoto(id, url);
-      rebuildCustom(); applyTheme(); save(true); renderWorkout(); render();
-      toast('Backup restored.');
+      // photos too: the backup's photos replace the ones on the device (none are left over from before)
+      const keep = new Set(pics.map(([id]) => id));
+      for (const id of [...photos.keys()]) if (!keep.has(id)) storePhoto(id, null);
+      for (const [id, url] of pics) storePhoto(id, url);
+      rebuildCustom(); applyTheme(); save(true); renderWorkout(); renderRest(); render();
+      toast(storageOK ? 'Backup restored.' : 'Backup loaded, but this device couldn’t save it. Free some space and restore again.');
     }
   });
 }
@@ -3728,6 +3781,7 @@ const ACT = {
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
   exportFile: () => exportFile(),
   exportCopy: () => {
+    if (!photosLoaded) { toast('Your photos are still loading. Try again in a second.'); return; }
     const text = exportData();
     const done = () => toast('Backup copied. Paste it into Notes or Files to keep it.');
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => showCopyBox(text)); else showCopyBox(text);
@@ -3938,5 +3992,63 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) 
   navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => setTimeout(warmArt, 3000)).catch(() => {});
 }
 
-window.LiftingSanity = { get state() { return state; }, save: () => save(true) };
+/* ----- self-check: run LiftingSanity.selfCheck() in the browser console. It runs the app's own calculation functions on
+   made-up sets (your saved workouts are never touched) and lists what passed. ----- */
+function selfCheck() {
+  const out = [], check = (name, fn) => { try { const r = fn(); out.push({ check: name, passed: r === true, detail: r === true ? '' : String(r) }); } catch (e) { out.push({ check: name, passed: false, detail: String(e) }); } };
+  const side = (side, w, r, done, rir) => ({ id: uid(), t: 'N', side, pair: 'p1', w, r, done, ...(rir != null ? { rir } : {}) });
+  const ex = (sets, uni = true) => ({ exId: 'barbell-curl', uni, sets: clone(sets) });
+  const vals = sets => JSON.stringify(sets.map(o => [o.side || '', o.w ?? null, o.r ?? null, o.rir ?? null, !!o.done]));
+  check('Left/right off never mixes the two sides into a set nobody did', () => {
+    const x = ex([side('L', 25, 8, false), side('R', 20, 12, false)]); setUni(x, false);
+    return x.sets.length === 1 && x.sets[0].w === 25 && x.sets[0].r === 8 || vals(x.sets);
+  });
+  check('Switching left/right back on restores both sides exactly', () => {
+    const x = ex([side('L', 25, 8, false, 2), side('R', 20, 12, false, 1)]), before = vals(x.sets);
+    for (let n = 0; n < 20; n++) { setUni(x, false); setUni(x, true); }
+    return vals(x.sets) === before || vals(x.sets);
+  });
+  check('Done left/right sets stay exactly as done when switching off', () => {
+    const x = ex([side('L', 25, 8, true), side('R', 20, 12, true)]), before = vals(x.sets); setUni(x, false);
+    return vals(x.sets) === before || vals(x.sets);
+  });
+  check('A set done with both sides at once is never doubled when switching on', () => {
+    const x = ex([{ id: uid(), t: 'N', w: 20, r: 10, done: true }], false), vol = sum(x.sets, o => setVolume(x, o)); setUni(x, true);
+    return x.sets.length === 1 && sum(x.sets, o => setVolume(x, o)) === vol || vals(x.sets);
+  });
+  check('A left + right pair counts as one set; half-done pairs are not done', () => {
+    const t1 = setTally(ex([side('L', 20, 8, true), side('R', 20, 8, true)])), t2 = setTally(ex([side('L', 20, 8, true), side('R', 20, 8, false)]));
+    return t1.done === 1 && t1.total === 1 && t2.done === 0 && t2.total === 1 || JSON.stringify([t1, t2]);
+  });
+  check('Warm-ups never count as working sets, records or 1RM', () => {
+    const x = ex([{ id: uid(), t: 'W', w: 200, r: 1, done: true }, { id: uid(), t: 'N', w: 50, r: 5, done: true }], false), rec = emptyRec();
+    for (const o of x.sets) addToRec(rec, x, o, 'wr');
+    const w = { ex: [x] };
+    return setTally(x).total === 1 && workingSets(w) === 1 && rec.w === 50 && Math.abs(rec.e1rm - e1rm(50, 5)) < 1e-9 || JSON.stringify(rec);
+  });
+  check('Plan and summary volume count a pair as one set per muscle', () => {
+    const m = muscleSets([{ ex: [ex([side('L', 20, 8, true), side('R', 20, 8, true)])] }]);
+    return m.length && m[0][0] === 'biceps' && m[0][1] === 1 || JSON.stringify(m);
+  });
+  check('Est. 1RM only from 1–12 reps with a real weight', () => {
+    const ok = e1rm(100, 1) === 100 && Math.abs(e1rm(100, 10) - 133.333) < 0.01 && e1rm(100, 12) > 0 && e1rm(100, 13) === 0 && e1rm(0, 5) === 0 && e1rm(-5, 5) === 0 && e1rm(100, 0) === 0 && e1rm(100, NaN) === 0;
+    return ok || [e1rm(100, 13), e1rm(-5, 5), e1rm(100, 0)].join(',');
+  });
+  check('kg ↔ lb only changes what is shown, never what is stored', () => {
+    const was = state.settings.unit;
+    try {
+      state.settings.unit = 'lb'; const lb = dispW(100), typed = toKg(225), back = dispW(typed);
+      state.settings.unit = 'kg'; const kg = dispW(100);
+      let x = 100; for (let n = 0; n < 100; n++) { state.settings.unit = n % 2 ? 'kg' : 'lb'; dispW(x); }
+      return lb === '220.5' && kg === '100' && back === '225' && x === 100 || [lb, kg, back].join(' / ');
+    } finally { state.settings.unit = was; }
+  });
+  check('A damaged backup is refused before anything changes', () => {
+    const bad = backupProblem({ workouts: [{ start: 1, ex: 'oops' }] }), good = backupProblem(clone({ ...state, active: null }));
+    return !!bad && !good || `bad: "${bad}", current data: "${good}"`;
+  });
+  console.table(out);
+  return out;
+}
+window.LiftingSanity = { get state() { return state; }, save: () => save(true), selfCheck };
 })();
