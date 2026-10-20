@@ -197,6 +197,8 @@ const ICONS = {
   side: 'M8 4v16M16 4v16M3 12h5M16 12h5',
   layout: 'M4 5h16v14H4zM10 5v14',
   rows: 'M4 6h16M4 12h16M4 18h16',
+  flask: 'M9 3h6M10 3v6l-5.4 9.5A2 2 0 0 0 6.3 21.5h11.4a2 2 0 0 0 1.7-3L14 9V3M7.2 15h9.6',
+  pin: 'M9 4h6M10 4v6l-3 4h10l-3-4V4M12 14v6',
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   share: 'M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8',
   info: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 11v6M12 7.5h.01',
@@ -276,12 +278,19 @@ function figure(view, ex, crop) {
 const VIS = window.LS_VISUALS || { base: '', map: {} };
 const artFailed = new Set();
 // picture URLs for an exercise: [start, finish], or one for a held position; null when there is none
+const artRaw = exId => { const r = VIS.map[exId]; return Array.isArray(r) ? r[0] : r; };
 function artOf(exId) {
-  const v = VIS.map[exId];
+  const v = artRaw(exId);
   if (!v || artFailed.has(exId)) return null;
+  if (v.startsWith('ek:')) return v.slice(3).split(' ').map(n => VIS.ek + n + '.svg');
   const names = v[0] === '=' ? [v.slice(1)] : v.includes(' ') ? v.split(' ') : [v + '-start', v + '-peak'];
   return names.map(n => VIS.base + n + '.webp');
 }
+// a picture that shows a close variation rather than the exact exercise says how it differs
+const artNote = exId => { const r = VIS.map[exId]; return Array.isArray(r) ? r[1] : ''; };
+// Everkinetic line drawings sit on white; the tile colour shows through (CSS multiply)
+const artKind = exId => { const v = artRaw(exId); return v && v.startsWith('ek:') ? ' ek' : ''; };
+const artCredit = exId => artKind(exId) ? '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>, CC BY-SA 4.0' : '<a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a>';
 // start and finish shown in turn, like a two-frame animation
 const artFrames = (exId, art, alt) => art.map((u, i) => `<img class="${art.length > 1 ? 'f' + i : ''}" src="${u}" alt="${i ? '' : esc(alt)}" loading="lazy" decoding="async" data-art="${esc(exId)}">`).join('');
 // the small square picture shown beside an exercise: your photo, the illustration, or the muscle map
@@ -289,7 +298,7 @@ function thumb(exId, size = '') {
   const url = photos.get(exId);
   if (url) return `<span class="thumb ${size} photo"><img src="${url}" alt="" loading="lazy"></span>`;
   const art = artOf(exId);
-  if (art) return `<span class="thumb ${size} art${size.includes('lg') && art.length > 1 ? ' moving' : ''}">${size.includes('lg') ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
+  if (art) return `<span class="thumb ${size} art${artKind(exId)}${size.includes('lg') && art.length > 1 ? ' moving' : ''}">${size.includes('lg') ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
   return mapThumb(exId, size);
 }
 function mapThumb(exId, size = '') {
@@ -449,6 +458,43 @@ function rebuildCustom() { customMap = new Map(state.custom.map(c => [c.id, c]))
 function getEx(id) {
   return LIB_MAP.get(id) || customMap.get(id) || { id, name: 'Deleted exercise', m: 'fullbody', eq: 'other', k: 'wr', sec: [], uni: false };
 }
+/* ----- exercise science (science.js): mechanics, ratings, studies ----- */
+const SCI = window.LS_SCIENCE;
+const sciOf = id => SCI ? SCI.analyze(getEx(id)) : null;
+const scoreOf = id => { const a = sciOf(id); return a ? a.score : null; };
+const scorePill = id => { const v = scoreOf(id); return v == null ? '' : `<span class="score ${v >= 9 ? 'hi' : v >= 7 ? 'good' : v >= 5 ? 'ok' : 'lo'}" title="Growth rating ${v}/10">${v}</span>`; };
+// the best-rated exercises for a muscle, best first; ones with pictures win ties
+function bestFor(m, n = 3, not = null, min = 0) {
+  const used = new Set(state.workouts.flatMap(w => w.ex.map(x => x.exId)));
+  return allExercises().filter(e => e.m === m && e.id !== not && (scoreOf(e.id) || 0) > min)
+    .sort((a, b) => (scoreOf(b.id) - scoreOf(a.id)) || (!!artOf(b.id) - !!artOf(a.id)) || (used.has(b.id) - used.has(a.id)))
+    .slice(0, n);
+}
+const refLink = k => { const r = SCI && SCI.REFS[k]; return r ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a>` : ''; };
+function scienceHTML(exId) {
+  const ex = getEx(exId), a = sciOf(exId);
+  if (!a || a.pattern === 'generic' && a.score == null) return '';
+  const shape = a.shape ? SCI.SHAPES[a.shape] : null;
+  const dots = (v, max) => `<span class="dots">${Array.from({ length: max }, (_, i) => `<i class="${i < v ? 'on' : ''}"></i>`).join('')}</span>`;
+  const better = a.score != null ? bestFor(ex.m, 3, exId, a.score) : [];
+  const rank = a.score != null ? allExercises().filter(e => e.m === ex.m && scoreOf(e.id) != null && scoreOf(e.id) > a.score).length + 1 : 0;
+  const total = allExercises().filter(e => e.m === ex.m && scoreOf(e.id) != null).length;
+  return `<section class="sci">
+    <div class="sci-h"><h3 class="sub-h">${icon('flask')}How it works</h3>${a.score != null ? `<span class="sci-score"><b>${a.score}</b><small>/10</small><span>${esc(SCI.verdict(a.score))}</span></span>` : ''}</div>
+    <p class="sci-title">${esc(a.title)}</p>
+    ${a.joints.length || a.movers ? `<dl class="sci-facts">${a.joints.length ? `<dt>Joint action</dt><dd>${esc(a.joints.join(' · '))}</dd>` : ''}${a.movers ? `<dt>Muscles</dt><dd>${esc(a.movers)}</dd>` : ''}</dl>` : ''}
+    ${a.scene ? `<figure class="sci-diag">${SCI.diagram(a)}<figcaption><span><i class="k seg"></i>where it’s hardest</span><span><i class="k ghost"></i>start and end</span>${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
+    ${shape ? `<div class="sci-prof"><p><b>Resistance profile: ${esc(shape[0])}.</b> ${esc(shape[1])}</p>${a.curve ? `${SCI.curveSvg(a)}<div class="sci-axis"><span>start · muscle long</span><span>end · muscle short</span></div>` : ''}</div>` : ''}
+    ${a.moment ? `<p class="sci-p"><b>Moment arm.</b> ${esc(a.moment)}</p>` : ''}
+    ${a.r ? `<div class="sci-rates">${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(SCI.RATE_NAMES[k])}</span>${dots(v, SCI.RATE_MAX[k])}</div>`).join('')}</div>
+    <p class="muted small">Ratings are rules of thumb from the mechanics above (how well the stretched position is loaded, stability, tension through the range, focus, progression). Where a study compared exercises directly, it is cited below and beats the rating.</p>` : ''}
+    ${a.fibers ? `<p class="sci-p"><b>Fibers.</b> ${esc(a.fibers)}</p>` : ''}
+    ${a.evidence.length ? `<div class="sci-ev"><b>What studies found</b>${a.evidence.map(([k, t]) => `<p>${esc(t)} <span class="muted">(${refLink(k)})</span></p>`).join('')}</div>` : ''}
+    ${a.tips.length ? `<ul class="sci-tips">${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+    ${a.score != null && total > 1 ? `<p class="sci-rank">Ranks <b>#${rank}</b> of ${total} for ${esc(MUSCLES[ex.m].toLowerCase())} in this library.</p>` : ''}
+    ${better.length ? `<div class="sci-alt"><b>Higher-rated for ${esc(MUSCLES[ex.m].toLowerCase())}</b>${better.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'sm')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(sciOf(e.id).title)}</small></span>${scorePill(e.id)}</button>`).join('')}</div>` : ''}
+  </section>`;
+}
 // sorted once and kept until your own exercises change; the search text for each is worked out once too
 const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 let allCache = null;
@@ -463,7 +509,7 @@ const hasReps = k => k === 'wr' || k === 'bw' || k === 'aw';
 const hasTime = k => k === 'dur' || k === 'wdur' || k === 'dist';
 const hasDist = k => k === 'dist' || k === 'wdist';
 function weightLabel(k) { return k === 'bw' ? '+' + U() : k === 'aw' ? '−' + U() : U(); }
-function filterExercises({ q = '', g = 'all', m = 'all', eq = 'all' }) {
+function filterExercises({ q = '', g = 'all', m = 'all', eq = 'all', sort = 'az' }) {
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
   const gm = g === 'all' ? null : new Set((GROUPS.find(x => x[0] === g) || [0, 0, []])[2]);
   const list = allExercises().filter(e => {
@@ -479,6 +525,7 @@ function filterExercises({ q = '', g = 'all', m = 'all', eq = 'all' }) {
     const q0 = q.toLowerCase().trim();
     list.sort((a, b) => hayOf(b).startsWith(q0) - hayOf(a).startsWith(q0));
   }
+  if (sort === 'score') list.sort((a, b) => (scoreOf(b.id) ?? -1) - (scoreOf(a.id) ?? -1));
   return list;
 }
 function recentExercises(n = 12) {
@@ -625,6 +672,26 @@ function baselineAt(exId, ts) {
   return b;
 }
 const baseline = exId => baselineAt(exId, Infinity);
+// the latest reset of one exercise that is newer than the current block, or 0
+function exResetSince(exId) { const r = state.exResets[exId] || []; const t = r.length ? Math.max(...r) : 0; return t > curBlock().start ? t : 0; }
+// one exercise's progression starts fresh: records, charts and weight tips count from now; nothing is deleted
+function resetExercise(exId, done) {
+  const ex = getEx(exId);
+  confirmSheet({
+    title: `Reset ${ex.name}?`,
+    text: 'Records, charts and “try more weight” tips for this exercise start fresh from today. Other exercises are not touched. Nothing is deleted: earlier sessions stay in History and in the All time view, and you can undo this.',
+    ok: 'Reset this exercise', onOk: () => {
+      (state.exResets[exId] = state.exResets[exId] || []).push(Date.now());
+      save(); refreshAll(); if (done) done();
+      toast(`${ex.name}: fresh start. Earlier sessions are kept.`, { label: 'Undo', fn: () => { undoExReset(exId); if (done) done(); } });
+    }
+  });
+}
+function undoExReset(exId) {
+  const r = state.exResets[exId];
+  if (r && r.length) { r.pop(); if (!r.length) delete state.exResets[exId]; }
+  save(); refreshAll();
+}
 function blockRange(b) {
   const i = state.blocks.indexOf(b);
   return [b.start, i < state.blocks.length - 1 ? state.blocks[i + 1].start : Infinity];
@@ -897,6 +964,49 @@ function applyTheme() {
   const t = state.settings.theme;
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
+  const y2k = state.settings.style === 'y2k';
+  document.documentElement.dataset.style = y2k ? 'y2k' : 'clean';
+  // the Y2K sheet only takes part in styling while it's chosen, so the clean look pays nothing for it
+  const sheet = $('#y2kcss');
+  if (sheet) sheet.media = y2k ? 'all' : 'not all';
+  if (y2k) startY2k();
+}
+/* ----- Y2K style extras: its fonts, a number-grid backdrop and the HUD strip (styles live in y2k.css) ----- */
+let hudTimer = null;
+function startY2k() {
+  if (!$('link[data-y2kfont]')) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.dataset.y2kfont = '';
+    l.href = 'https://fonts.googleapis.com/css2?family=DotGothic16&family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Silkscreen:wght@400;700&family=VT323&display=swap';
+    document.head.append(l);
+  }
+  if (!document.documentElement.style.getPropertyValue('--numgrid')) {
+    let seed = 11, txt = '';
+    const rnd = () => (seed = seed * 16807 % 2147483647) % 10;
+    for (let r = 0; r < 14; r++) { let line = ''; for (let c = 0; c < 22; c++) line += rnd(); txt += `<text x="0" y="${r * 20 + 14}">${line}</text>`; }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280"><g fill="#1F3BFF" fill-opacity=".12" font-family="monospace" font-size="12.5" letter-spacing="0">${txt}</g></svg>`;
+    document.documentElement.style.setProperty('--numgrid', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+  }
+  renderHud();
+  clearInterval(hudTimer);
+  hudTimer = setInterval(() => { if (state.settings.style === 'y2k' && !document.hidden) tickHud(); else if (state.settings.style !== 'y2k') clearInterval(hudTimer); }, 1000);
+}
+function renderHud() {
+  const el = $('#hud');
+  if (!el) return;
+  const sp = state.splits.find(x => x.id === state.activeSplit), st = sp ? splitToday(sp) : null;
+  const next = st && sp.days[st.idx] && !isRest(sp.days[st.idx]) ? (tplById(sp.days[st.idx]) || {}).name : 'REST';
+  const log = [`sessions_logged: ${state.workouts.length}`, `streak: ${streakWeeks()}wk`, `next: ${(next || '').toUpperCase()}`, `library: ${LIB.length} entries`, `cache: ok`, `rest_timer: ${state.rest ? 'running' : 'idle'}`, `block: ${curBlock().name.toUpperCase()}`];
+  el.innerHTML = `<span>LS-OS v1.3</span><b>SYS:OK</b><span class="hud-jp">稼働中</span><span data-hud="t"></span><span class="hud-w" data-hud="w"></span><span class="hud-log"><span>${log.map(esc).map(x => '&gt; ' + x).join('&nbsp;&nbsp;&nbsp;')}</span></span>`;
+  tickHud();
+}
+function tickHud() {
+  const t = $('[data-hud="t"]'), w = $('[data-hud="w"]');
+  if (!t) return;
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  setText(t, `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`);
+  const zone = tz => { try { return d.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (e) { return '--:--'; } };
+  if (w) setText(w, `UTC ${zone('UTC')} · TYO ${zone('Asia/Tokyo')} · NYC ${zone('America/New_York')}`);
 }
 function renderTabs() {
   $('#tabs').innerHTML = `<div class="brand" aria-hidden="true">${plateMark()}</div>` + TABS.map(([id, label, ic]) =>
@@ -908,6 +1018,7 @@ function plateMark() {
 const VIEWS = {};
 function render() {
   charts.clear();
+  document.body.dataset.tab = ui.tab;
   renderTabs();
   $('#view').innerHTML = VIEWS[ui.tab]();
   renderMini();
@@ -1187,7 +1298,7 @@ function splitCard(split) {
   const strip = t ? t.ex.filter(x => artOf(x.exId) || photos.get(x.exId)).slice(0, 4) : [];
   return `<section class="split">
     <div class="split-h"><div><p class="eyebrow">Your split · ${trainDays} training day${trainDays === 1 ? '' : 's'}${restDays ? ` + ${restDays} rest` : ''}</p><h2>${esc(split.name)}</h2></div>
-      <div class="split-actions"><button class="btn sm" data-a="splitSwitch">${icon('swap')}Change</button><button class="btn sm" data-a="splitEdit" data-id="${split.id}">${icon('edit')}Edit</button></div></div>
+      <div class="split-actions"><button class="btn sm review-btn" data-a="planReview" data-id="${split.id}">${icon('flask')}Review</button><button class="btn sm" data-a="splitSwitch">${icon('swap')}Change</button><button class="btn sm" data-a="splitEdit" data-id="${split.id}">${icon('edit')}Edit</button></div></div>
     ${t ? `<div class="upnext ${st.state === 'due' ? '' : 'resting'}">
       ${strip.length >= 3 ? `<div class="strip" aria-hidden="true">${strip.map(x => thumb(x.exId, 'tile')).join('')}</div>` : ''}
       <div class="upnext-b">${head}
@@ -1201,6 +1312,110 @@ function splitCard(split) {
       : `<button class="day ${i === pos ? 'is-next' : ''}" data-a="dayPreview" data-split="${split.id}" data-day="${i}">
       <span class="day-n">Day ${i + 1}${i === pos ? ' · next' : ''}</span><b>${esc(d.name)}</b><span class="muted">${(() => { const l = tplLastDone(d.id); return l ? relDay(l.start) : 'not done yet'; })()}</span></button>`).join('')}</div>
   </section>`;
+}
+/* ----- review the plan against the training literature ----- */
+const MAJOR = ['chest', 'lats', 'upperback', 'frontdelts', 'sidedelts', 'reardelts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs'];
+const COMPOUND = new Set(['pressHorizontal', 'pressVertical', 'row', 'pullVertical', 'squat', 'hinge']);
+function planStats(split, perWeek) {
+  const tpls = split.days.filter(d => !isRest(d)).map(tplById).filter(Boolean);
+  const each = tpls.length ? perWeek / tpls.length : 0; // how often each training day comes round in a week
+  const sets = {}, days = {}, ex = [];
+  for (const t of tpls) {
+    const hit = new Set();
+    for (const x of t.ex) {
+      const e = getEx(x.exId), n = liftSets(x.sets).filter(s => s.t !== 'W').length, a = sciOf(x.exId);
+      ex.push({ t, x, e, n, a });
+      sets[e.m] = (sets[e.m] || 0) + n * each;
+      for (const m of e.sec) sets[m] = (sets[m] || 0) + 0.5 * n * each;
+      if (n) hit.add(e.m);
+    }
+    for (const m of hit) days[m] = (days[m] || 0) + each;
+  }
+  return { tpls, sets, days, ex, each };
+}
+function guessPerWeek(split) {
+  const train = split.days.filter(d => !isRest(d)).length;
+  if (split.days.some(isRest)) return Math.round(train * 7 / split.days.length * 10) / 10;
+  const recent = state.workouts.filter(w => w.start > Date.now() - 28 * DAY).length / 4;
+  return recent >= 1 ? Math.round(recent) : Math.min(train, 4);
+}
+function planReview(split) {
+  let perWeek = guessPerWeek(split);
+  openSheet({
+    full: true,
+    render: () => {
+      const st = planStats(split, perWeek);
+      const out = { good: [], tip: [], fix: [] };
+      const say = (kind, text, refs = []) => out[kind].push(`<li class="${kind}">${icon(kind === 'good' ? 'check' : kind === 'tip' ? 'info' : 'x')}<p>${text}${refs.length ? ` <span class="refs">${refs.map(refLink).join(' · ')}</span>` : ''}</p></li>`);
+      const name = m => esc(MUSCLES[m].toLowerCase());
+      const best = m => { const b = bestFor(m, 1)[0]; return b ? `<button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button>` : ''; };
+      // volume
+      const trained = MAJOR.filter(m => (st.sets[m] || 0) > 0);
+      const low = MAJOR.filter(m => (st.sets[m] || 0) > 0 && st.sets[m] < 10), none = MAJOR.filter(m => !(st.sets[m] > 0));
+      const inRange = trained.filter(m => st.sets[m] >= 10 && st.sets[m] <= 20), high = trained.filter(m => st.sets[m] > 20);
+      if (inRange.length) say('good', `${inRange.length} muscle group${inRange.length === 1 ? ' gets' : 's get'} 10 to 20 weekly sets: ${inRange.map(name).join(', ')}.`, ['schoenfeld2017']);
+      if (low.length) say('tip', `Under 10 weekly sets: ${low.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`).join(', ')}. That still builds muscle, but more sets would likely build more. Adding one working set to the exercise for that muscle adds about ${trimNum(st.each, 1)} sets a week.`, ['schoenfeld2017', 'pelland2026']);
+      if (high.length) say('good', `Over 20 weekly sets: ${high.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`).join(', ')}. More can still help as long as you recover and keep the effort high, with diminishing returns.`, ['pelland2026']);
+      for (const m of none) say('fix', `No work for the ${name(m)}. A highly rated option: ${best(m)}.`);
+      // frequency
+      const helperOnly = trained.filter(m => !st.days[m]);
+      if (helperOnly.length) say('tip', `Only worked as a helper (no exercise targets it): ${helperOnly.map(m => `${name(m)} (${trimNum(st.sets[m], 1)} half-sets a week)`).join(', ')}. A direct exercise would grow it more, for example ${helperOnly.map(best).filter(Boolean).slice(0, 2).join(' or ')}.`, ['pelland2026']);
+      const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
+      if (once.length) say('tip', `Trained directly about once a week: ${once.map(name).join(', ')}. Spreading the same sets over two sessions tends to help a little, though weekly sets matter more than frequency.`, ['schoenfeld2016f', 'pelland2026']);
+      else if (trained.length) say('good', `Every trained muscle gets direct work about ${trimNum(Math.min(...trained.map(m => st.days[m] || 0)), 1)} times a week or more.`, ['schoenfeld2016f']);
+      // effort
+      const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
+      if (rirs.length) {
+        const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length;
+        if (avg <= 3) say('good', `Working sets aim for about ${trimNum(avg, 1)} reps in reserve. Close to failure is where growth is best; going all the way to failure on every set is optional.`, ['robinson2024', 'refalo2023']);
+        else say('tip', `Working sets aim for about ${trimNum(avg, 1)} reps in reserve. Growth tends to improve as sets end closer to failure; try 0 to 3.`, ['robinson2024']);
+      } else say('tip', 'No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.', ['robinson2024']);
+      // exercise selection
+      const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
+      const names = re => st.ex.filter(o => re.test(o.e.name.toLowerCase())).map(o => esc(o.e.name));
+      if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', `Triceps only get pushdowns (${names(/push ?down|press ?down/).join(', ')}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try ${best('triceps')}.`, ['maeo2023']);
+      if (pats.has('triOverhead')) say('good', 'Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.', ['maeo2023']);
+      const curls = st.ex.filter(o => o.a && o.a.pattern === 'legCurl');
+      if (curls.some(o => /seated/.test(o.e.name.toLowerCase()))) say('good', 'Seated leg curls: the version that grew the hamstrings more than lying curls.', ['maeo2021']);
+      else if (curls.length) say('tip', 'Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).', ['maeo2021']);
+      const calves = st.ex.filter(o => o.a && o.a.pattern === 'calf');
+      if (calves.length && calves.every(o => /seated|squat calf/.test(o.e.name.toLowerCase()))) say('tip', `Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as ${best('calves')}, and spend time in the stretched bottom position.`, ['kinoshita2023', 'kassiano2023']);
+      if (pats.has('legExt')) say('tip', 'Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.', ['pedrosa2022']);
+      if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', 'Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.', ['plotkin2023']);
+      if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', `Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: ${best('quads')}.`, ['plotkin2023']);
+      const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
+      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', `${esc(o.e.name)} rates ${o.a.score}/10 (${esc(o.a.title.toLowerCase())}). A higher-rated swap for the ${name(o.e.m)}: <button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button> (${scoreOf(b.id)}/10).`); }
+      const strong = st.ex.filter(o => o.a && o.a.score >= 9);
+      if (strong.length) say('good', `${strong.length} of your ${st.ex.length} exercises rate 9 or 10 out of 10 for growth: ${strong.slice(0, 6).map(o => esc(o.e.name)).join(', ')}${strong.length > 6 ? '…' : ''}.`);
+      // rest
+      const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
+      if (shortRest.length) say('tip', `Rest under 2 minutes on big lifts: ${shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`).join(', ')}. Longer rests (about 3 minutes) gave more growth in trained men.`, ['schoenfeld2016r']);
+      else if (st.ex.length) say('good', 'Rest times give the big lifts at least 2 minutes.', ['schoenfeld2016r']);
+      // session length
+      for (const t of st.tpls) { const min = estMinutes(t); if (min > 75) say('tip', `${esc(t.name)} takes about ${min} minutes. Effort tends to drop late in long sessions; pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.`); }
+      // balance
+      const sum_ = ms => ms.reduce((a, m) => a + (st.sets[m] || 0), 0);
+      const push = sum_(['chest', 'frontdelts', 'triceps']), pull = sum_(['lats', 'upperback', 'reardelts', 'biceps']);
+      if (push && pull) { const r = push / pull; if (r > 1.5 || r < 0.67) say('tip', `Pushing and pulling are uneven: about ${trimNum(push, 0)} pushing sets for ${trimNum(pull, 0)} pulling sets a week. Closer to 1:1 is a common target for balanced shoulders.`); else say('good', `Pushing and pulling are balanced (${trimNum(push, 0)} vs ${trimNum(pull, 0)} weekly sets).`); }
+      const muscles = Object.entries(st.sets).filter(([m, v]) => v > 0 && MUSCLES[m]).sort((a, b) => b[1] - a[1]);
+      const maxV = Math.max(22, ...muscles.map(([, v]) => v));
+      return `${sheetHead('Plan review')}
+      <div class="sheet-body pad review">
+        <p class="eyebrow accent">${icon('flask', 'inline')} Based on the training literature</p>
+        <h2 class="big-title">${esc(split.name)}</h2>
+        <div class="review-week"><span>Sessions a week</span><div class="seg sm">${[2, 3, 3.5, 4, 5, 6].map(v => `<button class="${perWeek === v ? 'on' : ''}" data-a="pw" data-v="${v}">${v}</button>`).join('')}</div></div>
+        <p class="muted small">${split.days.some(isRest) ? `Worked out from your rotation (${split.days.filter(d => !isRest(d)).length} training day${split.days.filter(d => !isRest(d)).length === 1 ? '' : 's'} in a ${split.days.length}-day cycle).` : 'Worked out from your last four weeks.'} Change it if you train more or less often.</p>
+        <ul class="review-list">${out.fix.join('')}${out.tip.join('')}${out.good.join('')}</ul>
+        <h3 class="sub-h">Weekly sets per muscle</h3>
+        <div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
+        <p class="muted small">Working sets only. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far (${refLink('pelland2026')}). Shaded band: 10 to 20 sets.</p>
+        <h3 class="sub-h">Your exercises, rated</h3>
+        <div class="card list-card">${st.ex.map(o => `<button class="ex-row" data-a="openEx" data-id="${o.e.id}">${thumb(o.e.id, 'sm')}<span class="ex-txt"><b>${esc(o.e.name)}</b><small>${o.a ? esc(o.a.title) : ''}</small></span>${scorePill(o.e.id)}</button>`).join('')}</div>
+        <p class="muted small">This review uses rules of thumb plus the studies linked above. It can’t see how you recover, your injuries or your goals; treat it as suggestions.</p>
+      </div>`;
+    },
+    actions: { pw: (b, def) => { perWeek = +b.dataset.v; refreshSheet(def); } }
+  });
 }
 function templatesSection(split) {
   const inSplit = new Set(split ? split.days : []);
@@ -1271,7 +1486,7 @@ function wexFromTemplate(tx) {
   });
   return {
     id: uid(), exId: tx.exId, rest: tx.rest || prefs.rest || state.settings.rest,
-    uni, ss: tx.ss || null, note: tx.note || '',
+    uni, ss: tx.ss || null, note: '',
     sets: sidesFor(sets, uni, tx.uni ?? sets.every(s => s.side)).map(s => ({ ...s, id: uid() }))
   };
 }
@@ -1421,12 +1636,14 @@ function summarySheet(id, fresh) {
       </div>
       ${w.prs.length ? `<h3 class="sub-h">${icon('trophy')}New records</h3><ul class="pr-list">${w.prs.map(p => `<li><b>${esc(getEx(p.exId).name)}</b><span>${esc(p.kind)}</span><span class="num">${esc(fmtSet({ uni: p.uni, exId: p.exId }, p.set))}</span></li>`).join('')}</ul>` : ''}
       ${ms.length ? `<h3 class="sub-h">Sets per muscle</h3><div class="msets">${ms.slice(0, 8).map(([m, c]) => `<span class="pill">${esc(MUSCLES[m])} <b>${trimNum(c, 1)}</b></span>`).join('')}</div>` : ''}
+      <label class="field wnote"><span>${icon('note')} How did it go?</span><textarea data-f="wnote" rows="2" placeholder="Energy, sleep, anything to remember">${esc(w.note || '')}</textarea></label>
       <div class="row-btns">
         ${w.tplId && tplById(w.tplId) ? `<button class="btn" data-a="updTpl">Update “${esc(tplById(w.tplId).name)}” to match</button>` : ''}
         <button class="btn" data-a="saveTpl">Save as new template</button>
         <button class="btn primary" data-a="sheetClose">Done</button>
       </div>
     </div>`,
+    onInput: el => { if (el.dataset.f === 'wnote') { w.note = el.value; save(); } },
     actions: {
       saveTpl: () => templateFromWorkout(w),
       updTpl: (b, def) => {
@@ -1441,7 +1658,7 @@ function tplExFromWorkout(w, oldTpl) {
   return w.ex.map(x => {
     const old = oldTpl ? oldTpl.ex.find(o => o.exId === x.exId) : null;
     return {
-      exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: x.note || '',
+      exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: old ? old.note || '' : '',
       sets: x.sets.map((s, j) => {
         const os = old ? old.sets[j] : null;
         const t = { t: s.t, tr: s.tr || (os && os.tr) || (hasReps(getEx(x.exId).k) && s.t !== 'W' ? String(recReps(x, s) || '') : ''), trir: s.trir ?? (os ? os.trir : null) };
@@ -1624,12 +1841,12 @@ function exCardHTML(w, i, focus) {
     <div class="exc-h">
       <div class="exc-t"><p class="eyebrow">${focus ? `Exercise ${i + 1} of ${w.ex.length} · ` : ''}${esc(MUSCLES[ex.m])} · ${esc(EQUIP[ex.eq])}${ss ? ` · <span class="ss-tag">Superset ${ss.label}</span>` : ''}</p>
         <h2><button class="exc-name" data-a="exInfo" data-e="${i}">${esc(ex.name)}</button></h2>
-        <p class="exc-sub">${target ? `<span>${esc(target)}</span>` : ''}<button class="chip" data-a="exRest" data-e="${i}">${icon('timer')}Rest ${fmtRest(x.rest || state.settings.rest)}</button>${hasReps(k) && (x.uni || ex.uni) ? `<button class="chip ${x.uni ? 'on' : ''}" data-a="exUni" data-e="${i}">${icon('side')}${x.uni ? (uniStyle(x) === 'one' ? 'Left and right, one row' : 'Left and right') : 'Both sides together'}</button>` : ''}</p></div>
+        <p class="exc-sub">${target ? `<span>${esc(target)}</span>` : ''}<button class="chip ${x.note || (state.exPrefs[x.exId] || {}).note ? 'on' : ''}" data-a="noteOpen" data-e="${i}">${icon('note')}Note</button><button class="chip" data-a="exRest" data-e="${i}">${icon('timer')}Rest ${fmtRest(x.rest || state.settings.rest)}</button>${exResetSince(x.exId) ? `<button class="chip fresh" data-a="exInfo" data-e="${i}">${icon('reset')}Fresh since ${esc(fmtShort(exResetSince(x.exId)))}</button>` : ''}${hasReps(k) && (x.uni || ex.uni) ? `<button class="chip ${x.uni ? 'on' : ''}" data-a="exUni" data-e="${i}">${icon('side')}${x.uni ? (uniStyle(x) === 'one' ? 'Left and right, one row' : 'Left and right') : 'Both sides together'}</button>` : ''}</p></div>
       <button class="icon-btn" data-a="exMenu" data-e="${i}" aria-label="Options for ${esc(ex.name)}">${icon('dots')}</button>
     </div>`;
-  if (x.note) h += `<button class="exc-note" data-a="exNote" data-e="${i}">${icon('note')}<span>${esc(x.note)}</span></button>`;
+  h += notesHTML(i, x, ctx);
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>Last time you hit ${ctx.suggest.hi}+ reps on every set. Try <b>${esc(fmtW(ctx.suggest.w))}</b> today.</span></p>`;
-  else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>“Previous” is from before your reset (${esc(fmtShort(ctx.lp.w.start))}). Records for this block start fresh.</span></p>`;
+  else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>“Previous” is from before your reset (${esc(fmtShort(ctx.lp.w.start))}). Records for ${exResetSince(x.exId) ? 'this exercise' : 'this block'} start fresh.</span></p>`;
   const two = isCompact(x), f1 = firstSide(x), del = ui.delMode === x.id;
   h += `<div class="sets ${del ? 'deleting' : ''}" style="--cols:${setCols(k, effOn, two)}"><div class="set-row head"><span>Set</span><span>Previous</span>`;
   if (hasWeight(k)) h += `<span>${esc(weightLabel(k))}</span>`;
@@ -1665,7 +1882,8 @@ function exHero(exId, i) {
   const inner = photo ? `<img class="own" src="${photo}" alt="Your photo of ${esc(ex.name)}">`
     : art ? art.map((u, n) => `<img src="${u}" alt="${n ? '' : esc(ex.name)}" decoding="async" data-art="${esc(exId)}">`).join(art.length > 1 ? icon('right', 'arr') : '')
     : heroMaps(ex);
-  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' : 'maps'}" data-a="exInfo" data-e="${i}" aria-label="How to do ${esc(ex.name)}">${inner}${art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
+  const note = !photo && art ? artNote(exId) : '';
+  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}" data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="How to do ${esc(ex.name)}">${inner}${note ? `<span class="hero-note">Similar picture: ${esc(note.charAt(0).toLowerCase() + note.slice(1))}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} ${scoreOf(exId)}/10 · how it works</span>` : art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
 }
 const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, 'full')}${figure('back', ex, 'full')}</span>`;
 function setRowHTML(i, x, j, k, ctx, effOn, two) {
@@ -1693,6 +1911,26 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
   if (prs.length && s.done) h += `<div class="pr-row">${icon('trophy')}<span>New record: ${esc(prs.join(' · '))}</span></div>`;
   if (ui.effOpen === `${i}:${j}`) h += effPicker(i, j, s);
   return h;
+}
+// notes on an exercise: a setup note kept for next time (seat, pins, grip) and today's note. Written right on the card
+const NOTE_CHIPS = ['Felt strong', 'Felt weak', 'Easy', 'Hard', 'Form slipped', 'Pain / discomfort', 'Changed the setup', 'Slow lowering', 'Paused reps', 'Partials at the end'];
+function notesHTML(i, x, ctx) {
+  const setup = (state.exPrefs[x.exId] || {}).note || '', last = !x.note && ctx.lp && ctx.lp.x.note ? ctx.lp.x.note : '';
+  if (ui.noteOpen === x.id) return `<div class="note-ed">
+    <label class="note-f"><span>${icon('note')}Today</span><textarea data-note="today" data-e="${i}" rows="2" placeholder="How did it feel? Pain, tempo, form…">${esc(x.note || '')}</textarea></label>
+    <div class="chips wrap note-chips">${NOTE_CHIPS.map(c => `<button class="chip ${(x.note || '').includes(c) ? 'on' : ''}" data-a="noteChip" data-e="${i}" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <label class="note-f"><span>${icon('pin')}Setup · shown every time you do this exercise</span><input data-note="setup" data-e="${i}" value="${esc(setup)}" placeholder="Seat 4, pad 2, wide grip…" autocomplete="off"></label>
+    ${last ? `<p class="muted small">Last time: ${esc(last)}</p>` : ''}
+    <div class="row-btns"><button class="btn sm primary" data-a="noteDone">Done</button></div></div>`;
+  if (!setup && !x.note && !last) return '';
+  return `<button class="exc-notes" data-a="noteOpen" data-e="${i}">${setup ? `<span class="nl setup">${icon('pin')}<span>${esc(setup)}</span></span>` : ''}${x.note ? `<span class="nl">${icon('note')}<span>${esc(x.note)}</span></span>` : ''}${last ? `<span class="nl last">${icon('undo')}<span>Last time: ${esc(last)}</span></span>` : ''}</button>`;
+}
+function noteInput(el) {
+  const x = A() && A().ex[+el.dataset.e];
+  if (!x) return;
+  if (el.dataset.note === 'setup') { const p = state.exPrefs[x.exId] = state.exPrefs[x.exId] || {}; p.note = el.value.trim() ? el.value : ''; if (!p.note) delete p.note; }
+  else x.note = el.value;
+  save();
 }
 const delBtn = (i, j, n) => `<button class="check del" data-a="rowDel" data-e="${i}" data-s="${j}" aria-label="Delete ${esc(n)}">${icon('trash')}</button>`;
 // a left/right pair in one row: one weight, reps for each side, one effort, one check (the earlier style)
@@ -1801,6 +2039,7 @@ function woGo(i, smooth) {
   ui.effOpen = null;
   ui.kp = null;
   ui.delMode = null;
+  ui.noteOpen = null;
   save();
   if (state.settings.view === 'focus') {
     renderWorkout(true);
@@ -1930,7 +2169,7 @@ function addWarmups(i) {
   save(); renderWorkout();
   toast(`Added ${made.length} warm-up sets up to ${fmtW(target)}.`);
 }
-function woInput(el) { woSetField(+el.dataset.e, +el.dataset.s, el.dataset.f, el.value); }
+function woInput(el) { if (el.dataset.note) noteInput(el); else woSetField(+el.dataset.e, +el.dataset.s, el.dataset.f, el.value); }
 function woSetField(i, j, f, v) {
   const w = A();
   if (!w) return;
@@ -1976,9 +2215,11 @@ function exMenu(i) {
       for (const s of x.sets) if (!s.done) { delete s.w; delete s.r; delete s.sec; delete s.dist; delete s.tw; }
       save(); renderWorkout();
     } })],
-    ['Notes', 'note', () => exNote(i), { sub: x.note || 'Seat height, grip, cues…' }],
+    ['Notes', 'note', () => exNote(i), { sub: x.note || (state.exPrefs[x.exId] || {}).note || 'Today’s note, and a setup note kept for next time' }],
     [photos.has(x.exId) ? 'Change photo' : 'Add a photo of this machine', 'camera', () => pickPhoto(x.exId), { sub: 'Take one or pick from your library' }],
-    hasReps(ex.k) ? [x.uni ? 'Log both sides together' : 'Log left and right separately', 'side', () => ACT.exUni({ dataset: { e: i } }), { sub: 'For one-arm or one-leg sets' }] : null,
+    hasReps(ex.k) ? ['Left and right…', 'side', () => uniSheet(i), { sub: x.uni ? (uniStyle(x) === 'one' ? 'Now: one row with reps for each side' : 'Now: a row for each side') : 'Now: both sides together' }] : null,
+    ['Reset progression for this exercise', 'reset', () => resetExercise(x.exId), { sub: exResetSince(x.exId) ? `Counting from ${fmtShort(exResetSince(x.exId))}. Only this exercise` : 'Fresh records and tips for this exercise only; history is kept' }],
+    exResetSince(x.exId) ? ['Undo this exercise’s last reset', 'undo', () => { undoExReset(x.exId); toast('Last reset undone.'); }] : null,
     i < w.ex.length - 1 ? [ss && ss.k < ss.g.idx.length - 1 ? 'Unlink from next exercise' : 'Superset with next exercise', 'link', () => {
       const nx = w.ex[i + 1];
       if (ss && ss.k < ss.g.idx.length - 1) { nx.ss = null; if (ss.k === 0) x.ss = null; }
@@ -1999,13 +2240,9 @@ function exMenu(i) {
 }
 function exNote(i) {
   const x = A().ex[i];
-  inputSheet({ title: 'Exercise notes', label: getEx(x.exId).name, value: x.note || '', multiline: true, placeholder: 'Seat height, grip, cues…',
-    onOk: v => {
-      x.note = v;
-      const p = state.exPrefs[x.exId] = state.exPrefs[x.exId] || {};
-      p.note = v;
-      save(); renderWorkout();
-    } });
+  ui.noteOpen = x.id; ui.kp = null; renderWorkout();
+  const t = $('#workout textarea[data-note="today"]');
+  if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
 }
 function setTypeSheet(i, j) {
   const x = A().ex[i], s = x.sets[j], mate = partnerOf(x, s);
@@ -2097,9 +2334,7 @@ function addExercisesToWorkout() {
       const w = A();
       const first = w.ex.length;
       for (const id of ids) {
-        const x = wexFresh(id);
-        if (state.exPrefs[id] && state.exPrefs[id].note) x.note = state.exPrefs[id].note;
-        w.ex.push(x);
+        w.ex.push(wexFresh(id));
       }
       w.cur = first;
       save(); renderWorkout(true);
@@ -2305,7 +2540,8 @@ function filterBar(f, prefix) {
     <label class="search">${icon('search')}<input id="${prefix}Q" data-f="${prefix}q" value="${esc(f.q)}" placeholder="Search ${(LIB.length + state.custom.length).toLocaleString()} exercises" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" type="search"></label>
     <div class="chips" role="group" aria-label="Muscle group"><button class="chip ${f.g === 'all' ? 'on' : ''}" data-a="${prefix}G" data-v="all">All</button>${GROUPS.map(([id, label]) => `<button class="chip ${f.g === id ? 'on' : ''}" data-a="${prefix}G" data-v="${id}">${label}</button>`).join('')}</div>
     ${g && g[2].length > 1 ? `<div class="chips sub" role="group" aria-label="Muscle"><button class="chip ${f.m === 'all' ? 'on' : ''}" data-a="${prefix}M" data-v="all">All ${esc(g[1].toLowerCase())}</button>${g[2].map(m => `<button class="chip ${f.m === m ? 'on' : ''}" data-a="${prefix}M" data-v="${m}">${esc(MUSCLES[m])}</button>`).join('')}</div>` : ''}
-    <label class="select-wrap"><span class="sr">Equipment</span><select data-f="${prefix}eq"><option value="all">Any equipment</option>${Object.entries(EQUIP).map(([k, v]) => `<option value="${k}" ${f.eq === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+    <div class="filter-row"><label class="select-wrap"><span class="sr">Equipment</span><select data-f="${prefix}eq"><option value="all">Any equipment</option>${Object.entries(EQUIP).map(([k, v]) => `<option value="${k}" ${f.eq === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+    <div class="seg sm" role="group" aria-label="Order"><button class="${f.sort !== 'score' ? 'on' : ''}" data-a="${prefix}S" data-v="az">A–Z</button><button class="${f.sort === 'score' ? 'on' : ''}" data-a="${prefix}S" data-v="score">${icon('flask', 'inline')} Best for growth</button></div></div>
   </div>`;
 }
 function pickExercises({ title, single = false, onPick }) {
@@ -2317,7 +2553,7 @@ function pickExercises({ title, single = false, onPick }) {
     const recent = !f.q && f.g === 'all' && f.eq === 'all' ? recentExercises(8) : [];
     const row = e => {
       const on = sel.includes(e.id);
-      return `<button class="ex-row ${on ? 'on' : ''}" data-a="tog" data-id="${e.id}" aria-pressed="${on}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}</small></span>${single ? '' : `<span class="tickbox">${on ? sel.indexOf(e.id) + 1 : ''}</span>`}</button>`;
+      return `<button class="ex-row ${on ? 'on' : ''}" data-a="tog" data-id="${e.id}" aria-pressed="${on}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}</small></span>${scorePill(e.id)}${single ? '' : `<span class="tickbox">${on ? sel.indexOf(e.id) + 1 : ''}</span>`}</button>`;
     };
     return `${recent.length ? `<p class="eyebrow list-h">Recently used</p>${recent.map(id => row(getEx(id))).join('')}<p class="eyebrow list-h">All exercises</p>` : ''}
       ${list.map(row).join('') || `<p class="muted pad">No exercises match. Try fewer words, or create it.</p>`}${moreButton(list.length, all.length, 'more')}
@@ -2343,6 +2579,7 @@ function pickExercises({ title, single = false, onPick }) {
       more: (b, def) => { limit += PAGE; $('#pkList', def.el).innerHTML = listHTML(); },
       pkG: (b, def) => { f.g = b.dataset.v; f.m = 'all'; refreshSheet(def); },
       pkM: (b, def) => { f.m = b.dataset.v; refreshSheet(def); },
+      pkS: (b, def) => { f.sort = b.dataset.v; limit = PAGE; refreshSheet(def); },
       create: (b, def) => customExerciseSheet(null, f.q, id => {
         if (single) { closeSheet(def); onPick([id]); } else { sel.push(id); refreshSheet(def); }
       })
@@ -2700,7 +2937,7 @@ function moreButton(shown, total, action) {
 function libRows(list) {
   const used = {};
   for (const w of state.workouts) for (const x of w.ex) used[x.exId] = w.start;
-  return list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}</small></span>${used[e.id] ? `<span class="muted small">${esc(relDay(used[e.id]))}</span>` : ''}${icon('right', 'chev')}</button>`).join('');
+  return list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · one side' : ''}${e.custom ? ' · yours' : ''}${used[e.id] ? ` · ${esc(relDay(used[e.id]))}` : ''}</small></span>${scorePill(e.id)}${icon('right', 'chev')}</button>`).join('');
 }
 function libListHTML() {
   const all = filterExercises(ui.lib), list = all.slice(0, ui.libLimit || PAGE);
@@ -2741,12 +2978,13 @@ function exerciseSheet(exId) {
       return `${sheetHead(esc(ex.name), ex.custom ? `<button class="btn sm" data-a="editCustom">${icon('edit')}Edit</button>` : '')}
       <div class="sheet-body pad exd">
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="Your photo of ${esc(ex.name)}">` : ''}
-          ${art ? `<figure class="exd-art ${art.length > 1 ? 'moving' : ''}">${artFrames(exId, art, ex.name)}${art.length > 1 ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>Illustration: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a></figcaption></figure>` : ''}
+          ${art ? `<figure class="exd-art ${art.length > 1 ? 'moving' : ''}${artKind(exId)}">${artFrames(exId, art, ex.name)}${art.length > 1 ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} Similar picture. ${esc(artNote(exId))}.</b>` : ''}<span>Illustration: ${artCredit(exId)}</span></figcaption></figure>` : ''}
           <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>Front</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>Back</figcaption></figure></div></div>
         <div class="exd-legend"><span><i class="dot hit"></i>Main: ${esc(MUSCLES[ex.m])}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>Also: ${esc(ex.sec.map(m => MUSCLES[m]).join(', '))}</span>` : ''}
           <button class="btn sm" data-a="photo">${icon('camera')}${photo ? 'Change photo' : 'Add your own photo'}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">Remove photo</button>` : ''}</div>
         ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}How to do it<span class="muted">${steps.length} steps</span>${icon('down', 'chev')}</summary>
           <ol class="steps">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol><p class="muted small">Instructions from the open <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT).</p></details>` : ''}
+        ${scienceHTML(exId)}
         <div class="exd-tags"><span class="pill">${esc(MUSCLES[ex.m])}</span>${ex.sec.map(m => `<span class="pill quiet">${esc(MUSCLES[m])}</span>`).join('')}<span class="pill quiet">${esc(EQUIP[ex.eq])}</span><span class="pill quiet">${esc(KINDS[k])}</span>
           <a class="btn sm ghost" href="${yt}" target="_blank" rel="noopener">${icon('external')}Watch how it’s done</a></div>
         ${hasArchived || resets.length || state.blocks.length > 1 ? `<div class="seg" role="group" aria-label="Time range"><button class="${st.range === 'block' ? 'on' : ''}" data-a="range" data-v="block">Since last reset</button><button class="${st.range === 'all' ? 'on' : ''}" data-a="range" data-v="all">All time</button></div>` : ''}
@@ -2759,7 +2997,7 @@ function exerciseSheet(exId) {
         <div class="card list-card">
           <div class="set-item"><div><b>Rest timer</b><p class="muted">Used when you add it to a workout.</p></div><button class="btn sm" data-a="rest">${fmtRest(prefs.rest || state.settings.rest)}</button></div>
           ${hasReps(k) ? `<div class="set-item"><div><b>One side at a time</b><p class="muted">Log left and right reps separately.</p></div>${toggle(prefs.uni ?? ex.uni, 'uni')}</div>` : ''}
-          <div class="set-item"><div><b>Notes</b><p class="muted">${esc(prefs.note || 'Seat height, grip, cues…')}</p></div><button class="btn sm" data-a="note">${prefs.note ? 'Edit' : 'Add'}</button></div>
+          <div class="set-item"><div><b>Setup note</b><p class="muted">${esc(prefs.note || 'Seat height, pins, grip, cues. Shown every time you do this exercise.')}</p></div><button class="btn sm" data-a="note">${prefs.note ? 'Edit' : 'Add'}</button></div>
         </div>
         <h3 class="sub-h">${icon('reset')}Progression</h3>
         <div class="card pad reset-card">
@@ -2768,7 +3006,7 @@ function exerciseSheet(exId) {
           ${resets.length ? `<p class="muted small">Earlier resets: ${resets.map(r => esc(fmtDateY(r))).join(', ')}</p>` : ''}
         </div>
         <h3 class="sub-h">History</h3>
-        ${sessions.length ? `<div class="exd-hist">${sessions.slice(0, 40).map(({ w, xs }) => `<button class="exd-sess ${w.start < base ? 'archived' : ''}" data-a="openWorkout" data-id="${w.id}"><span class="exd-date"><b>${esc(fmtShort(w.start))}</b><small>${esc(w.name)}</small></span><span class="exd-sets">${xs.map(x => x.sets.filter(s => s.done).map(s => `<span class="${s.t === 'W' ? 'warm' : ''}">${s.side || s.t !== 'N' ? `<i class="${s.t === 'N' ? 'side-' + s.side : 't-' + s.t}">${s.t === 'N' ? '' : esc(SET_TYPES[s.t].short)}${s.side ? `<b class="side-${s.side}">${s.side}</b>` : ''}</i>` : ''}${esc(fmtSet(x, s, k))}</span>`).join('')).join('')}</span></button>`).join('')}</div>` : `<p class="muted">You haven’t logged this one yet.</p>`}
+        ${sessions.length ? `<div class="exd-hist">${sessions.slice(0, 40).map(({ w, xs }) => `<button class="exd-sess ${w.start < base ? 'archived' : ''}" data-a="openWorkout" data-id="${w.id}"><span class="exd-date"><b>${esc(fmtShort(w.start))}</b><small>${esc(w.name)}</small>${xs.filter(x => x.note).map(x => `<small class="exd-note">${icon('note')}${esc(x.note)}</small>`).join('')}</span><span class="exd-sets">${xs.map(x => x.sets.filter(s => s.done).map(s => `<span class="${s.t === 'W' ? 'warm' : ''}">${s.side || s.t !== 'N' ? `<i class="${s.t === 'N' ? 'side-' + s.side : 't-' + s.t}">${s.t === 'N' ? '' : esc(SET_TYPES[s.t].short)}${s.side ? `<b class="side-${s.side}">${s.side}</b>` : ''}</i>` : ''}${esc(fmtSet(x, s, k))}</span>`).join('')).join('')}</span></button>`).join('')}</div>` : `<p class="muted">You haven’t logged this one yet.</p>`}
         ${ex.custom ? `<button class="btn wide danger ghost" data-a="delCustom">${icon('trash')}Delete exercise</button>` : ''}
       </div>`;
     },
@@ -2780,13 +3018,9 @@ function exerciseSheet(exId) {
       metric: (b, def) => { st.metric = b.dataset.v; refreshSheet(def); },
       rest: (b, def) => restChooser({ title: 'Rest timer', current: (state.exPrefs[exId] || {}).rest || state.settings.rest, onPick: v => { (state.exPrefs[exId] = state.exPrefs[exId] || {}).rest = v; save(); refreshSheet(def); } }),
       uni: (b, def) => { const p = state.exPrefs[exId] = state.exPrefs[exId] || {}; p.uni = !(p.uni ?? getEx(exId).uni); save(); refreshSheet(def); },
-      note: (b, def) => inputSheet({ title: 'Exercise notes', label: getEx(exId).name, value: (state.exPrefs[exId] || {}).note || '', multiline: true, onOk: v => { (state.exPrefs[exId] = state.exPrefs[exId] || {}).note = v; save(); refreshSheet(def); } }),
-      reset: (b, def) => confirmSheet({
-        title: `Reset ${getEx(exId).name}?`,
-        text: 'Records, charts and “try more weight” tips for this exercise start fresh from today. Nothing is deleted: earlier sessions stay in History and in the All time view, and you can undo this.',
-        ok: 'Reset exercise', onOk: () => { (state.exResets[exId] = state.exResets[exId] || []).push(Date.now()); save(); refreshSheet(def); render(); toast('Reset. Earlier sessions are kept.'); }
-      }),
-      undoReset: (b, def) => { const r = state.exResets[exId]; if (r && r.length) { r.pop(); if (!r.length) delete state.exResets[exId]; } save(); refreshSheet(def); render(); toast('Last reset undone.'); },
+      note: (b, def) => inputSheet({ title: 'Setup note', label: getEx(exId).name, value: (state.exPrefs[exId] || {}).note || '', multiline: true, onOk: v => { (state.exPrefs[exId] = state.exPrefs[exId] || {}).note = v; save(); refreshSheet(def); } }),
+      reset: (b, def) => resetExercise(exId, () => refreshSheet(def)),
+      undoReset: (b, def) => { undoExReset(exId); refreshSheet(def); toast('Last reset undone.'); },
       editCustom: (b, def) => customExerciseSheet(exId, null, () => refreshSheet(def)),
       delCustom: (b, def) => {
         const n = state.workouts.filter(w => w.ex.some(x => x.exId === exId)).length + state.templates.filter(t => t.ex.some(x => x.exId === exId)).length;
@@ -2812,7 +3046,7 @@ VIEWS.progress = function () {
   h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">Current block</p><h2><button class="link-h" data-a="blockRename">${esc(b.name)}${icon('edit')}</button></h2>
       <p class="muted">${b.start ? `Since ${esc(fmtDateY(b.start))} · ` : ''}${inBlock.length} session${inBlock.length === 1 ? '' : 's'} · ${fmtVol(sum(inBlock, workoutVolume))} lifted</p></div>
       <div class="block-btns"><button class="btn" data-a="blockReset">${icon('reset')}Reset progression</button>${archived.length ? `<button class="btn ghost" data-a="blockUndo">${icon('undo')}Undo reset</button>` : ''}</div></div>
-    <p class="small muted">Starting a new block gives you fresh records and charts, for a new program, after a break or after an injury. Everything from earlier blocks stays saved below and in History.</p></section>`;
+    <p class="small muted">Starting a new block gives you fresh records and charts for everything, for a new program, after a break or after an injury. To start just one exercise fresh, tap ${icon('reset', 'inline')} next to it under Your lifts, or use its ⋯ menu in a workout. Everything stays saved below and in History.</p></section>`;
   h += `<div class="tiles four">
     <div class="tile"><span>This week</span><b>${thisWeek.length}</b><small>session${thisWeek.length === 1 ? '' : 's'}</small></div>
     <div class="tile"><span>Week streak</span><b>${streakWeeks()}</b><small>weeks in a row</small></div>
@@ -2866,8 +3100,10 @@ function liftsSection(from, to, title) {
     const best = ptsAll.length ? Math.max(...ptsAll.map(p => p.y)) : 0;
     const diff = first && last ? last.y - first.y : 0;
     const dtxt = ptsAll.length > 1 && Math.abs(diff) > 1e-6 ? `${diff > 0 ? '+' : '−'}${fmtMetric(m, Math.abs(diff), ex.k)}` : '';
-    return `<button class="lift" data-a="openEx" data-id="${id}"><span class="lift-n"><b>${esc(ex.name)}</b><small>${count[id]} session${count[id] === 1 ? '' : 's'} · ${esc(metricsFor(ex.k)[0][1])}</small></span>${sparkline(ptsAll.map(p => p.y))}<span class="lift-v"><b>${esc(best ? fmtMetric(m, best, ex.k) : '—')}</b>${dtxt ? `<small class="${diff > 0 ? 'up' : 'down'}">${esc(dtxt)}</small>` : ''}</span></button>`;
-  }).join('')}</div></section>`;
+    const fresh = exResetSince(id);
+    return `<div class="lift-row"><button class="lift" data-a="openEx" data-id="${id}"><span class="lift-n"><b>${esc(ex.name)}</b><small>${fresh ? `Fresh since ${esc(fmtShort(fresh))} · ` : ''}${count[id]} session${count[id] === 1 ? '' : 's'} · ${esc(metricsFor(ex.k)[0][1])}</small></span>${sparkline(ptsAll.map(p => p.y))}<span class="lift-v"><b>${esc(best ? fmtMetric(m, best, ex.k) : '—')}</b>${dtxt ? `<small class="${diff > 0 ? 'up' : 'down'}">${esc(dtxt)}</small>` : ''}</span></button>`
+      + `<button class="icon-btn lift-reset ${fresh ? 'on' : ''}" data-a="liftReset" data-id="${id}" aria-label="Reset progression for ${esc(ex.name)}">${icon('reset')}</button></div>`;
+  }).join('')}</div><button class="btn wide reset-any" data-a="resetAny">${icon('reset')}Reset one exercise…</button></section>`;
 }
 function blockResetSheet() {
   const n = state.blocks.length + 1;
@@ -2929,6 +3165,7 @@ VIEWS.settings = function () {
   </div>
   <h2 class="section-h">Look</h2><div class="card list-card">
     ${row('Theme', '', seg('setTheme', s.theme, [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]))}
+    ${row('Style', 'Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.', seg('setStyle', s.style || 'clean', [['clean', 'Clean'], ['y2k', 'Y2K']]))}
   </div>
   <h2 class="section-h">Your data</h2><div class="card list-card">
     ${row('Back up', 'Save everything to a file in Files or iCloud Drive. Do this now and then.', `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}Save file</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}Copy</button></div>`)}
@@ -2941,7 +3178,7 @@ VIEWS.settings = function () {
     <p class="muted small">Your workouts are stored on this device only. Safari can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.</p>
   </div>
   <p class="muted small center">Lifting Sanity 1.3 · ${LIB.length} exercises · ${storageOK ? 'saving to this device' : 'storage blocked'}</p>
-  <p class="muted small center credits">Illustrations: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a> · Instructions: <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT)</p>`;
+  <p class="muted small center credits">Illustrations: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a> and <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (Greg Priday, CC BY-SA 4.0) · Instructions: <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT)</p>`;
 };
 function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
@@ -3083,6 +3320,13 @@ const ACT = {
     } });
   },
   exUni: b => uniSheet(+b.dataset.e),
+  noteOpen: b => exNote(+b.dataset.e),
+  noteDone: () => { ui.noteOpen = null; renderWorkout(); },
+  noteChip: b => {
+    const x = A().ex[+b.dataset.e], c = b.dataset.v, parts = (x.note || '').split(/\s*[,·]\s*/).filter(Boolean);
+    x.note = (parts.includes(c) ? parts.filter(p => p !== c) : [...parts, c]).join(', ');
+    save(); renderWorkout();
+  },
   addSet: b => addSet(+b.dataset.e),
   toggleBoth: b => toggleBoth(+b.dataset.e, +b.dataset.s),
   delMode: b => { const x = A().ex[+b.dataset.e]; ui.delMode = ui.delMode === x.id ? null : x.id; ui.kp = null; ui.effOpen = null; renderWorkout(); },
@@ -3180,6 +3424,7 @@ const ACT = {
   // library
   libG: b => { ui.lib.g = b.dataset.v; ui.lib.m = 'all'; ui.libLimit = PAGE; render(); },
   libM: b => { ui.lib.m = b.dataset.v; ui.libLimit = PAGE; render(); },
+  libS: b => { ui.lib.sort = b.dataset.v; ui.libLimit = PAGE; render(); },
   histMore: () => { const y = scrollY; ui.histLimit = (ui.histLimit || HIST_PAGE) + HIST_PAGE; render(); scrollTo(0, y); },
   libMore: b => {
     const from = ui.libLimit || PAGE, all = filterExercises(ui.lib);
@@ -3188,6 +3433,9 @@ const ACT = {
   },
   libNew: () => customExerciseSheet(null, ui.lib.q, id => exerciseSheet(id)),
   openEx: b => exerciseSheet(b.dataset.id),
+  planReview: b => { const sp = state.splits.find(s => s.id === b.dataset.id); if (sp) planReview(sp); },
+  liftReset: b => { const id = b.dataset.id; if (exResetSince(id)) menuSheet(getEx(id).name, [['Reset again from today', 'reset', () => resetExercise(id)], ['Undo the last reset', 'undo', () => { undoExReset(id); toast('Last reset undone.'); }]]); else resetExercise(id); },
+  resetAny: () => pickExercises({ single: true, title: 'Reset which exercise?', onPick: ([id]) => resetExercise(id) }),
   // progress
   blockReset: () => blockResetSheet(),
   shareWeek: async () => {
@@ -3217,6 +3465,7 @@ const ACT = {
   setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
   setUniStyle: b => { state.settings.uniStyle = b.dataset.v; for (const p of Object.values(state.exPrefs)) delete p.uniStyle; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
+  setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
   exportFile: () => exportFile(),
