@@ -2146,7 +2146,7 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
   const s = x.sets[j], ph = placeholder(x, j, ctx), prev = ctx.prevSets[j], prs = ctx.prs[j] || [];
   const pad = useKeypad();
   const inp = (f, val, pv, mode, aria) => pad
-    ? `<button class="cell" data-a="kp" data-f="${f}" data-e="${i}" data-s="${j}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
+    ? `<button class="cell${val === '' ? ' empty' : ''}" data-a="kp" data-f="${f}" data-e="${i}" data-s="${j}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
     : `<input class="cell" data-f="${f}" data-e="${i}" data-s="${j}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
   const n = s.side ? `${sideName(s.side).toLowerCase()} side` : `set ${j + 1}`;
   const above = s.done ? null : setAbove(x, j);
@@ -2157,10 +2157,10 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
   h += `<div class="prev">${above ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="Same as the set above, ${esc(fmtSet(x, above, k, false))}">${icon('same')}<span>${esc(fmtSet(x, above, k, false))}</span></button>` : ''}`
     + (prev ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="Use last time, ${esc(fmtSet(ctx.lp.x, prev, k))}">${above ? '' : '<i>Last</i>'}${esc(fmtSet(ctx.lp.x, prev, k))}</button>` : above ? '' : '<span class="none">—</span>') + `</div>`;
   if (hasWeight(k)) h += inp('w', s.w != null ? dispW(s.w) : '', ph.w != null ? dispW(ph.w) : '', 'decimal', `Weight, ${n}`);
-  if (hasReps(k)) h += two ? inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`).replace('class="cell"', 'class="cell span2"') : inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`);
+  if (hasReps(k)) h += two ? inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`).replace('class="cell', 'class="cell span2') : inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`);
   if (hasDist(k)) h += inp('dist', s.dist != null ? dispDist(s.dist, k) : '', ph.dist != null ? dispDist(ph.dist, k) : '', 'decimal', `Distance, ${n}`);
   if (hasTime(k)) h += inp('sec', s.sec != null ? fmtClock(s.sec) : '', ph.sec != null ? fmtClock(ph.sec) : '0:00', 'numeric', `Time, ${n}`);
-  if (effOn) h += `<button class="cell eff ${s.rir != null ? 'has' : ''}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()}, ${n}">${s.rir != null ? esc(effDisp(s.rir)) : s.trir != null ? `<span class="ph">${esc(effDisp(s.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
+  if (effOn) h += `<button class="cell eff ${s.rir != null ? 'has' : 'empty'}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()}, ${n}">${s.rir != null ? esc(effDisp(s.rir)) : s.trir != null ? `<span class="ph">${esc(effDisp(s.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
   h += ui.delMode === x.id ? delBtn(i, j, n)
     : `<button class="check" data-a="toggleSet" data-e="${i}" data-s="${j}" aria-pressed="${!!s.done}" aria-label="${s.done ? 'Uncheck' : 'Check'} ${n}">${icon('check')}</button>`;
   h += `</div></div>`;
@@ -2225,7 +2225,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   const pad = useKeypad(), pha = placeholder(x, j, ctx), php = placeholder(x, p, ctx), phq = placeholder(x, q, ctx);
   const n = `set ${oneLabel(x.sets, j)}`;
   const inp = (jj, f, val, pv, mode, aria, cls = '') => pad
-    ? `<button class="cell ${cls}" data-a="kp" data-f="${f}" data-e="${i}" data-s="${jj}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
+    ? `<button class="cell ${cls}${val === '' ? ' empty' : ''}" data-a="kp" data-f="${f}" data-e="${i}" data-s="${jj}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
     : `<input class="cell ${cls}" data-f="${f}" data-e="${i}" data-s="${jj}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
   const prevA = ctx.prevSets[p], prevB = ctx.prevSets[q];
   const lw = prevA && prevA.w != null && hasWeight(k) ? dispW(prevA.w) + ' × ' : '';
@@ -2245,7 +2245,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   h += inp(q, 'r', sq.r ?? '', phq.r ?? '', 'numeric', `${sideName(otherSide(f1))} reps, ${n}`, 'side-' + otherSide(f1) + (sq.done ? ' got' : ''));
   // effort for each side, stacked in the side colours (first side on top)
   const ev = o => o.rir != null ? esc(effDisp(o.rir)) : `<span class="ph">${o.trir != null ? esc(effDisp(o.trir)) : '–'}</span>`;
-  if (effOn) h += `<button class="cell eff sides ${sp.rir != null || sq.rir != null ? 'has' : ''}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()} for each side, ${n}: ${sideName(f1)} ${sp.rir != null ? effDisp(sp.rir) : 'not set'}, ${sideName(otherSide(f1))} ${sq.rir != null ? effDisp(sq.rir) : 'not set'}"><span class="side-${f1}">${ev(sp)}</span><span class="side-${otherSide(f1)}">${ev(sq)}</span></button>`;
+  if (effOn) h += `<button class="cell eff sides ${sp.rir != null || sq.rir != null ? 'has' : 'empty'}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()} for each side, ${n}: ${sideName(f1)} ${sp.rir != null ? effDisp(sp.rir) : 'not set'}, ${sideName(otherSide(f1))} ${sq.rir != null ? effDisp(sq.rir) : 'not set'}"><span class="side-${f1}">${ev(sp)}</span><span class="side-${otherSide(f1)}">${ev(sq)}</span></button>`;
   h += ui.delMode === x.id ? delBtn(i, j, n)
     : `<button class="check" data-a="toggleBoth" data-e="${i}" data-s="${j}" aria-pressed="${done}" aria-label="${done ? 'Uncheck' : 'Check'} ${n}, both sides">${icon('check')}</button>`;
   h += `</div></div>`;
@@ -2735,7 +2735,7 @@ function kpCurrent() {
   if (v == null) return '';
   return f === 'w' ? dispW(v) : f === 'sec' ? fmtClock(v) : f === 'dist' ? dispDist(v, fld.k) : String(v);
 }
-function kpShow(buf) { const c = kpCell(); if (c) c.innerHTML = buf ? esc(buf) : `<span class="ph">${esc(c.dataset.ph || '')}</span>`; }
+function kpShow(buf) { const c = kpCell(); if (c) { c.innerHTML = buf ? esc(buf) : `<span class="ph">${esc(c.dataset.ph || '')}</span>`; c.classList.toggle('empty', !buf); } }
 function kpSet(buf) { ui.kp.buf = buf; woSetField(ui.kp.e, ui.kp.s, ui.kp.f, buf); kpShow(buf); }
 function kpClose() { ui.kp = null; renderWorkout(); }
 const KP_NAMES = { w: 'Weight', r: 'Reps', sec: 'Time', dist: 'Distance' };

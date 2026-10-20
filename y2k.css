@@ -266,3 +266,5 @@
 [data-style="y2k"] .split-actions .btn { padding: 0 10px; letter-spacing: .04em; }
 [data-style="y2k"] .set-row.just::before { animation-name: sweepSq; }
 @keyframes sweepSq { 0% { clip-path: inset(0 100% 0 0); opacity: .5; } 55% { clip-path: inset(0); opacity: .35; } 100% { clip-path: inset(0); opacity: 0; } }
+[data-style="y2k"] .cell.empty, [data-style="y2k"] input.cell:placeholder-shown { background: transparent; border-style: dashed; box-shadow: none; }
+[data-style="y2k"] .cell.empty .ph { opacity: .8; }

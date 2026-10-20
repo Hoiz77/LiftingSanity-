@@ -1011,6 +1011,13 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 button.cell { display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
 button.cell .ph { color: var(--muted); font-weight: 500; }
 .cell.kp-on, .set-row.done .cell.kp-on { border-color: var(--accent); background: var(--panel-3); }
+/* empty (only a suggestion showing) vs filled, at a glance: an outline with a faint number, or a solid tile with a bright one */
+.cell { font-weight: 700; }
+.cell.empty, input.cell:placeholder-shown { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.cell.empty .ph { color: var(--muted); opacity: .75; font-weight: 500; }
+input.cell::placeholder { font-weight: 500; }
+.cell.empty.kp-on { background: transparent; box-shadow: none; }
+.set-row.done .cell.empty { box-shadow: none; }
 .cell.kp-on::after { content: ""; width: 2px; height: 22px; margin-left: 2px; background: var(--accent); animation: blink 1s steps(1) infinite; flex-shrink: 0; }
 #keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--bar-bg); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
 .kp-head { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: 0 2px 8px; }
