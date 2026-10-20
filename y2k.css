@@ -84,7 +84,7 @@
 [data-style="y2k"] .tile b { font-size: 34px; color: var(--cyan); text-shadow: 0 0 8px rgba(25, 240, 255, .6); }
 
 /* ---------- windows: bevelled panels with a title bar and tiny buttons ---------- */
-[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .note-ed, .notice, .term, .sheet, .review-list li, .tile) {
+[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .exc-setup, .note-ed, .notice, .term, .sheet, .review-list li, .tile) {
   border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi); box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .08), 4px 4px 0 rgba(0, 0, 0, .55); background-color: var(--panel); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term, .sheet) { position: relative; padding-top: calc(var(--y2k-pt, 16px) + 22px); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term)::before {
@@ -262,3 +262,5 @@
 [data-style="y2k"] .prof-h { border-color: var(--magenta); background: #020414; box-shadow: 0 0 8px var(--magenta); }
 [data-style="y2k"] .prof-h.on { background: var(--magenta); }
 [data-style="y2k"] .prof-pick .prof-hint { color: var(--magenta); font-family: var(--lcd); font-size: 15px; }
+[data-style="y2k"] .upnext { --y2k-pt: 0px; }
+[data-style="y2k"] .split-actions .btn { padding: 0 10px; letter-spacing: .04em; }
