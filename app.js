@@ -293,12 +293,104 @@ const artKind = exId => { const v = artRaw(exId); return v && v.startsWith('ek:'
 const artCredit = exId => artKind(exId) ? '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>, CC BY-SA 4.0' : '<a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a>';
 // start and finish shown in turn, like a two-frame animation
 const artFrames = (exId, art, alt) => art.map((u, i) => `<img class="${art.length > 1 ? 'f' + i : ''}" src="${u}" alt="${i ? '' : esc(alt)}" loading="lazy" decoding="async" data-art="${esc(exId)}">`).join('');
+
+/* ----- movement: pictures and diagrams go through one rep on the page's clock, so they move together and carry on through redraws ----- */
+const REP = 4000; // one rep: lift 1.2 s, squeeze 0.4 s, lower 1.9 s, pause in the stretch 0.5 s
+const REP_KEYS = [[0, 0], [0.3, 1], [0.4, 1], [0.875, 0], [1, 0]]; // [time through the rep, position: 0 start … 1 end]
+const smooth = x => x * x * (3 - 2 * x);
+function repPos(t) {
+  for (let i = 1; i < REP_KEYS.length; i++) {
+    const [t1, p1] = REP_KEYS[i];
+    if (t <= t1) { const [t0, p0] = REP_KEYS[i - 1]; return p0 + (p1 - p0) * smooth((t - t0) / (t1 - t0)); }
+  }
+  return 0;
+}
+const repPhase = t => t < 0.3 ? 'Lift' : t < 0.4 ? 'Squeeze' : t < 0.875 ? 'Lower slowly' : 'Stretch';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const motionOn = () => state.settings.motion !== false && !reduceMotion.matches && !!Element.prototype.animate;
+// the finish picture takes over as the movement passes halfway, and hands back on the way down
+const PIC = Array.from({ length: 41 }, (_, i) => Math.min(1, Math.max(0, (repPos(i / 40) - 0.3) / 0.4)));
+const fadeKeys = (lo, hi, back) => PIC.map((o, i) => ({ offset: i / 40, opacity: lo + (hi - lo) * (back ? 1 - o : o) }));
+const MV_KEYS = { f0: fadeKeys(0, 1, true), f1: fadeKeys(0, 1), b0: fadeKeys(0.25, 1, true), b1: fadeKeys(0.25, 1) };
+function mvAnim(el, kind) {
+  if (el._mv && el._mv.playState === 'running' && el._mvKind === kind) return;
+  if (el._mv) el._mv.cancel();
+  el._mv = el.animate(MV_KEYS[kind], { duration: REP, iterations: Infinity });
+  el._mv.startTime = 0; // started at the page's time origin: every picture and diagram is at the same point of the rep
+  el._mvKind = kind;
+}
+const mvFigs = new Map(); // diagrams on screen → what they need each frame
+let mvRaf = 0;
+function mvStart(box) {
+  if (!motionOn()) return;
+  if (box.dataset.mv === 'sci') {
+    if (mvFigs.has(box)) return;
+    const a = sciOf(box.dataset.ex), live = box.querySelector('.sci-live'), sec = box.closest('.sci');
+    if (!a || !a.scene || !live) return;
+    mvFigs.set(box, { a, live, phase: box.querySelector('.sci-phase'), cur: sec && sec.querySelector('.sci-cur'), dot: sec && sec.querySelector('.sci-dot'), p: -1, ph: '' });
+    if (!mvRaf) mvRaf = requestAnimationFrame(mvLoop);
+    return;
+  }
+  const f0 = box.querySelector('img.f0'), f1 = box.querySelector('img.f1');
+  if (!f0 || !f1) return;
+  mvAnim(f0, 'f0'); mvAnim(f1, 'f1');
+  const bars = box.querySelectorAll('.exd-step i');
+  if (bars.length === 2) { mvAnim(bars[0], 'b0'); mvAnim(bars[1], 'b1'); }
+}
+function mvStop(box) {
+  if (box.dataset.mv === 'sci') { mvFigs.delete(box); return; }
+  for (const el of box.querySelectorAll('img.f0, img.f1, .exd-step i')) if (el._mv) { el._mv.cancel(); el._mv = null; }
+}
+function mvStopAll() {
+  for (const box of document.querySelectorAll('[data-mv]')) mvStop(box);
+  mvFigs.clear();
+}
+function mvLoop(ts) {
+  mvRaf = 0;
+  const t = (ts % REP) / REP, p = repPos(t), ph = repPhase(t);
+  for (const [fig, d] of mvFigs) {
+    if (!fig.isConnected) { mvFigs.delete(fig); continue; }
+    if (d.phase && d.ph !== ph) { d.ph = ph; d.phase.textContent = ph; }
+    if (Math.abs(p - d.p) < 0.001) continue; // holding still at the top or bottom
+    d.p = p;
+    d.live.innerHTML = SCI.live(d.a, p);
+    const v = SCI.effortAt(d.a, p);
+    if (d.cur && d.dot && v != null) { d.cur.style.transform = `translateX(${(p * 100).toFixed(2)}%)`; d.dot.style.transform = `translateY(${((1 - v * 0.9) * 100).toFixed(1)}%)`; }
+  }
+  if (mvFigs.size) mvRaf = requestAnimationFrame(mvLoop);
+}
+// only what is on screen moves; anything new on the page is picked up after each redraw
+const mvSeen = new WeakSet(), mvShown = new WeakSet();
+const mvIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
+  for (const e of es) {
+    const box = e.target;
+    if (!box.isConnected) { mvIO.unobserve(box); mvShown.delete(box); mvStop(box); }
+    else if (e.isIntersecting) { mvShown.add(box); mvStart(box); }
+    else { mvShown.delete(box); mvStop(box); }
+  }
+}, { rootMargin: '60px' }) : null;
+let mvQueued = false;
+function mvScan() {
+  mvQueued = false;
+  if (!motionOn()) return;
+  for (const box of document.querySelectorAll('[data-mv]')) {
+    if (!mvSeen.has(box)) { mvSeen.add(box); if (mvIO) mvIO.observe(box); else mvStart(box); }
+    else if (mvShown.has(box)) mvStart(box); // pictures moved into a redrawn card keep going
+  }
+}
+function mvWatch() {
+  new MutationObserver(() => { if (!mvQueued) { mvQueued = true; requestAnimationFrame(mvScan); } }).observe(document.body, { childList: true, subtree: true });
+  const changed = () => { mvStopAll(); render(); renderWorkout(); };
+  if (reduceMotion.addEventListener) reduceMotion.addEventListener('change', changed); else if (reduceMotion.addListener) reduceMotion.addListener(changed);
+  mvScan();
+}
 // the small square picture shown beside an exercise: your photo, the illustration, or the muscle map
 function thumb(exId, size = '') {
   const url = photos.get(exId);
   if (url) return `<span class="thumb ${size} photo"><img src="${url}" alt="" loading="lazy"></span>`;
   const art = artOf(exId);
-  if (art) return `<span class="thumb ${size} art${artKind(exId)}${size.includes('lg') && art.length > 1 ? ' moving' : ''}">${size.includes('lg') ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
+  const mv = art && size.includes('lg') && art.length > 1 && motionOn();
+  if (art) return `<span class="thumb ${size} art${artKind(exId)}${mv ? ' moving' : ''}"${mv ? ' data-mv="pic"' : ''}>${mv ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
   return mapThumb(exId, size);
 }
 function mapThumb(exId, size = '') {
@@ -479,12 +571,13 @@ function scienceHTML(exId) {
   const better = a.score != null ? bestFor(ex.m, 3, exId, a.score) : [];
   const rank = a.score != null ? allExercises().filter(e => e.m === ex.m && scoreOf(e.id) != null && scoreOf(e.id) > a.score).length + 1 : 0;
   const total = allExercises().filter(e => e.m === ex.m && scoreOf(e.id) != null).length;
+  const mv = !!a.scene && motionOn();
   return `<section class="sci">
     <div class="sci-h"><h3 class="sub-h">${icon('flask')}How it works</h3>${a.score != null ? `<span class="sci-score"><b>${a.score}</b><small>/10</small><span>${esc(SCI.verdict(a.score))}</span></span>` : ''}</div>
     <p class="sci-title">${esc(a.title)}</p>
     ${a.joints.length || a.movers ? `<dl class="sci-facts">${a.joints.length ? `<dt>Joint action</dt><dd>${esc(a.joints.join(' · '))}</dd>` : ''}${a.movers ? `<dt>Muscles</dt><dd>${esc(a.movers)}</dd>` : ''}</dl>` : ''}
-    ${a.scene ? `<figure class="sci-diag">${SCI.diagram(a)}<figcaption><span><i class="k seg"></i>where it’s hardest</span><span><i class="k ghost"></i>start and end</span>${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
-    ${shape ? `<div class="sci-prof"><p><b>Resistance profile: ${esc(shape[0])}.</b> ${esc(shape[1])}</p>${a.curve ? `${SCI.curveSvg(a)}<div class="sci-axis"><span>start · muscle long</span><span>end · muscle short</span></div>` : ''}</div>` : ''}
+    ${a.scene ? `<figure class="sci-diag"${mv ? ` data-mv="sci" data-ex="${esc(exId)}"` : ''}>${mv ? '<span class="sci-phase" aria-hidden="true">Lift</span>' : ''}${SCI.diagram(a)}<figcaption>${mv ? '<span><i class="k seg"></i>moving part</span>' : '<span><i class="k seg"></i>where it’s hardest</span>'}${a.curve ? '<span><i class="k hard"></i>hardest point</span>' : ''}<span><i class="k ghost"></i>start and end</span>${a.scene.attach === 'cuff' ? '<span><i class="k cuff"></i>cuff on the wrist</span>' : ''}${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
+    ${shape ? `<div class="sci-prof"><p><b>Resistance profile: ${esc(shape[0])}.</b> ${esc(shape[1])}</p>${a.curve ? `<div class="sci-curve-box">${SCI.curveSvg(a)}${mv ? '<i class="sci-cur" aria-hidden="true"><i class="sci-dot"></i></i>' : ''}</div><div class="sci-axis"><span>start · muscle long</span><span>end · muscle short</span></div>` : ''}</div>` : ''}
     ${a.moment ? `<p class="sci-p"><b>Moment arm.</b> ${esc(a.moment)}</p>` : ''}
     ${a.r ? `<div class="sci-rates">${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(SCI.RATE_NAMES[k])}</span>${dots(v, SCI.RATE_MAX[k])}</div>`).join('')}</div>
     <p class="muted small">Ratings are rules of thumb from the mechanics above (how well the stretched position is loaded, stability, tension through the range, focus, progression). Where a study compared exercises directly, it is cited below and beats the rating.</p>` : ''}
@@ -1880,11 +1973,14 @@ function exCardHTML(w, i, focus) {
 // the picture across the top of an exercise: your photo, the start and finish illustrations, or the muscle map
 function exHero(exId, i) {
   const ex = getEx(exId), photo = photos.get(exId), art = artOf(exId);
+  // moving: start and finish in one place, one fading into the other through the rep; still: side by side
+  const mv = !photo && art && art.length > 1 && motionOn();
   const inner = photo ? `<img class="own" src="${photo}" alt="Your photo of ${esc(ex.name)}">`
+    : mv ? `<span class="hero-pic">${art.map((u, n) => `<img class="f${n}" src="${u}" alt="${n ? '' : esc(ex.name)}" decoding="async" data-art="${esc(exId)}">`).join('')}</span>`
     : art ? art.map((u, n) => `<img src="${u}" alt="${n ? '' : esc(ex.name)}" decoding="async" data-art="${esc(exId)}">`).join(art.length > 1 ? icon('right', 'arr') : '')
     : heroMaps(ex);
   const note = !photo && art ? artNote(exId) : '';
-  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}" data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="How to do ${esc(ex.name)}">${inner}${note ? `<span class="hero-note">Similar picture: ${esc(note.charAt(0).toLowerCase() + note.slice(1))}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} ${scoreOf(exId)}/10 · how it works</span>` : art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
+  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}"${mv ? ' data-mv="pic"' : ''} data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="How to do ${esc(ex.name)}">${inner}${note ? `<span class="hero-note">Similar picture: ${esc(note.charAt(0).toLowerCase() + note.slice(1))}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} ${scoreOf(exId)}/10 · how it works</span>` : art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
 }
 const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, 'full')}${figure('back', ex, 'full')}</span>`;
 function setRowHTML(i, x, j, k, ctx, effOn, two) {
@@ -2979,7 +3075,7 @@ function exerciseSheet(exId) {
       return `${sheetHead(esc(ex.name), ex.custom ? `<button class="btn sm" data-a="editCustom">${icon('edit')}Edit</button>` : '')}
       <div class="sheet-body pad exd">
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="Your photo of ${esc(ex.name)}">` : ''}
-          ${art ? `<figure class="exd-art ${art.length > 1 ? 'moving' : ''}${artKind(exId)}">${artFrames(exId, art, ex.name)}${art.length > 1 ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} Similar picture. ${esc(artNote(exId))}.</b>` : ''}<span>Illustration: ${artCredit(exId)}</span></figcaption></figure>` : ''}
+          ${art ? `<figure class="exd-art ${art.length > 1 ? motionOn() ? 'moving' : 'still' : ''}${artKind(exId)}"${art.length > 1 && motionOn() ? ' data-mv="pic"' : ''}>${artFrames(exId, art, ex.name)}${art.length > 1 && motionOn() ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} Similar picture. ${esc(artNote(exId))}.</b>` : ''}<span>Illustration: ${artCredit(exId)}</span></figcaption></figure>` : ''}
           <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>Front</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>Back</figcaption></figure></div></div>
         <div class="exd-legend"><span><i class="dot hit"></i>Main: ${esc(MUSCLES[ex.m])}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>Also: ${esc(ex.sec.map(m => MUSCLES[m]).join(', '))}</span>` : ''}
           <button class="btn sm" data-a="photo">${icon('camera')}${photo ? 'Change photo' : 'Add your own photo'}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">Remove photo</button>` : ''}</div>
@@ -3167,6 +3263,7 @@ VIEWS.settings = function () {
   <h2 class="section-h">Look</h2><div class="card list-card">
     ${row('Theme', '', seg('setTheme', s.theme, [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]))}
     ${row('Style', 'Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.', seg('setStyle', s.style || 'clean', [['clean', 'Clean'], ['y2k', 'Y2K']]))}
+    ${row('Movement animations', `Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.${reduceMotion.matches ? ' Reduce Motion is on in your device settings, so they stay still.' : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', 'On'], ['off', 'Off']]))}
   </div>
   <h2 class="section-h">Your data</h2><div class="card list-card">
     ${row('Back up', 'Save everything to a file in Files or iCloud Drive. Do this now and then.', `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}Save file</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}Copy</button></div>`)}
@@ -3466,6 +3563,7 @@ const ACT = {
   setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
   setUniStyle: b => { state.settings.uniStyle = b.dataset.v; for (const p of Object.values(state.exPrefs)) delete p.uniStyle; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
+  setMotion: b => { state.settings.motion = b.dataset.v === 'on'; save(); mvStopAll(); render(); renderWorkout(); },
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
@@ -3522,7 +3620,7 @@ document.addEventListener('error', ev => {
   const exId = img.dataset.art, box = img.closest('.thumb, .exd-art, .exc-hero');
   artFailed.add(exId);
   if (!box) return;
-  if (box.classList.contains('exc-hero')) { box.className = 'exc-hero maps'; box.innerHTML = heroMaps(getEx(exId)); }
+  if (box.classList.contains('exc-hero')) { box.className = 'exc-hero maps'; box.removeAttribute('data-mv'); box.innerHTML = heroMaps(getEx(exId)); }
   else if (box.classList.contains('thumb')) box.outerHTML = mapThumb(exId, [...box.classList].filter(c => !['thumb', 'art', 'moving'].includes(c)).join(' '));
   else box.remove();
 }, true);
@@ -3671,6 +3769,7 @@ applyTheme();
 render();
 if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
+mvWatch();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) {
   // a new version installs in the background; offer to switch to it (the saved copy keeps opening instantly until then)

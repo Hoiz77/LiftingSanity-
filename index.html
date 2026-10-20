@@ -121,10 +121,8 @@ p { margin: 0; }
 .ek img { mix-blend-mode: multiply; }
 .thumb.art.ek img { transform: scale(1.05); object-fit: contain; }
 .thumb.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.18); transform-origin: 50% 56%; }
-/* start and finish shown in turn, like a two-frame animation */
-.moving img.f1 { animation: frame 2.4s steps(1) infinite; }
-.moving img.f0 { animation: frame 2.4s steps(1) infinite reverse; }
-@keyframes frame { 0% { opacity: 0; } 50% { opacity: 1; } }
+/* start and finish in one place; the app fades one into the other through each rep (start shows until it does) */
+.moving img.f1, .hero-pic img.f1 { opacity: 0; }
 .thumb.xs { width: 28px; height: 28px; border-radius: 8px; }
 .thumb.sm { width: 40px; height: 40px; border-radius: 10px; }
 .thumb.md { width: 48px; height: 48px; }
@@ -412,6 +410,8 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .exc { --pt: 18px; --px: 14px; max-width: 800px; margin: 0 auto; background: var(--panel); border-radius: 26px; padding: var(--pt) var(--px) 16px; display: grid; gap: 14px; box-shadow: var(--hi); overflow: hidden; }
 .exc-hero { position: relative; display: flex; align-items: center; justify-content: center; height: 176px; margin: calc(-1 * var(--pt)) calc(-1 * var(--px)) 0; background: #d7f0fc; overflow: hidden; }
 .exc-hero img { height: 100%; width: auto; aspect-ratio: 1; object-fit: cover; }
+.exc-hero .hero-pic { position: relative; flex: none; height: 100%; aspect-ratio: 1; }
+.exc-hero .hero-pic img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .exc-hero .arr { width: 22px; height: 22px; margin: 0 -8px; color: #5d8aa3; stroke-width: 2.6; flex-shrink: 0; z-index: 1; }
 .exc-hero.photo { background: var(--panel-2); }
 .exc-hero img.own { width: 100%; aspect-ratio: auto; }
@@ -762,11 +762,15 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .exd-hero { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .exd-art { position: relative; margin: 0; flex: 1 1 100%; aspect-ratio: 4 / 3; border-radius: 24px; overflow: hidden; background: #d7f0fc; }
 .exd-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.exd-art figcaption { position: absolute; left: 12px; bottom: 10px; font: 500 11px var(--ui); color: #3d5a6b; }
+.exd-art figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 12px 9px; background: linear-gradient(rgba(215, 240, 252, 0), rgba(215, 240, 252, .94) 45%); font: 500 11px var(--ui); color: #3d5a6b; }
+.exd-art.moving figcaption { padding-right: 64px; }
 .exd-art figcaption a { color: inherit; }
 .exd-step { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 5px; }
-.exd-step i { width: 18px; height: 5px; border-radius: 3px; background: #0a84ff; opacity: .25; animation: frame 2.4s steps(1) infinite reverse; }
-.exd-step i + i { animation-direction: normal; }
+.exd-step i { width: 18px; height: 5px; border-radius: 3px; background: #0a84ff; opacity: .25; }
+.exd-step i:first-child { opacity: 1; }
+/* animations off: start and finish side by side */
+.exd-art.still { display: flex; }
+.exd-art.still img { position: static; width: 50%; height: 100%; }
 .exd-photo { width: min(240px, 100%); aspect-ratio: 1; object-fit: cover; border-radius: 22px; background: var(--panel-2); }
 .exd-map { --fig: #dde2e8; --fig-m: #c6ccd5; --hit: #ff3b30; --hit-2: #ffa29c; flex: 1 1 240px; display: flex; justify-content: center; gap: 12px; padding: 14px 16px; border-radius: 22px; background: #f4f5f7; }
 .exd-map figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
@@ -789,7 +793,7 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .sci-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 15px; }
 .sci-facts dt { color: var(--muted); font: 600 12px/1.6 var(--ui); letter-spacing: .06em; text-transform: uppercase; }
 .sci-facts dd { margin: 0; color: var(--ink-2); line-height: 1.45; }
-.sci-diag { margin: 0; padding: 10px 10px 8px; border-radius: 18px; background: var(--panel); display: grid; gap: 6px; }
+.sci-diag { position: relative; margin: 0; padding: 10px 10px 8px; border-radius: 18px; background: var(--panel); display: grid; gap: 6px; }
 .sci-fig { width: 100%; max-height: 260px; display: block; }
 .sci-fig line, .sci-fig polyline, .sci-fig path, .sci-fig circle, .sci-fig rect { vector-effect: non-scaling-stroke; fill: none; stroke-linecap: round; }
 .sci-fig .sci-body { stroke: var(--line-2); stroke-width: 9px; }
@@ -823,6 +827,14 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 .sci-diag .k.ghost { border-color: var(--ink-2); border-top-style: dotted; opacity: .5; }
 .sci-diag .k.force { border-color: var(--bad); }
 .sci-diag .k.arm { border-color: var(--warn); border-top-style: dashed; }
+.sci-diag .k.cuff { width: 10px; border-top-width: 8px; border-color: var(--warn); }
+.sci-diag .k.hard { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--accent); }
+.sci-fig .sci-hard { fill: var(--accent); stroke: var(--panel); stroke-width: 2.5px; }
+.sci-phase { position: absolute; top: 10px; left: 10px; z-index: 1; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 700 11px var(--ui); letter-spacing: .06em; text-transform: uppercase; }
+.sci-curve-box { position: relative; overflow: hidden; border-radius: 12px; }
+.sci-cur { position: absolute; inset: 0; border-left: 2px solid var(--accent); opacity: .55; pointer-events: none; will-change: transform; }
+.sci-dot { position: absolute; left: -7px; top: 0; width: 12px; height: 100%; will-change: transform; }
+.sci-dot::before { content: ''; position: absolute; top: -6px; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--panel); }
 .sci-prof { display: grid; gap: 6px; }
 .sci-prof p, .sci-p { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
 .sci-prof b, .sci-p b { color: var(--ink); }

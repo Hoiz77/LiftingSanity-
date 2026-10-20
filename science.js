@@ -302,7 +302,17 @@ window.LS_SCIENCE = (() => {
     };
   });
   // legs
-  add('legExt', (ex, n) => has(n, /leg extension|knee extension|sissy/), (ex, n) => ({
+  // sissy squats extend the knee like a leg extension, but with body weight and the hips kept straight
+  add('sissy', (ex, n) => has(n, /sissy/), () => ({
+    title: 'Knee extension with the hips straight (sissy squat)', joints: ['Knee extension', 'Hips held straight'],
+    movers: 'Quads, all four heads. Keeping the hips straight while the knees travel forward puts the rectus femoris, which also crosses the hip, at a very long length at the bottom.',
+    scene: null,
+    moment: 'Your body weight (and any plate you hold) acts at your centre of mass. As the knees travel forward its moment arm about the knee grows, so it is hardest at the bottom, where the quads are longest, and easier as you rise.',
+    r: { L: 3, S: 1, P: 1, F: 2, G: 1 },
+    evidence: [['pedrosa2022', 'In leg extensions, reps in the deep, bent-knee half grew the quads at least as well as full reps. Sissy squats are hardest in that same range.']],
+    tips: ['Hold on to something for balance and keep knees, hips and shoulders in one line as the knees go forward.', 'Go as deep as your knees are comfortable with; hold a plate to your chest once 15 or more reps are easy.']
+  }));
+  add('legExt', (ex, n) => has(n, /leg extension|knee extension/), (ex, n) => ({
     title: 'Knee extension', joints: ['Knee extension'],
     movers: 'Quads, all four heads. The rectus femoris also crosses the hip, so sitting upright (hip bent) keeps it short; leaning back lengthens it.',
     scene: scenes.legExt({}),
@@ -433,10 +443,11 @@ window.LS_SCIENCE = (() => {
   const verdict = s => s == null ? '' : s >= 9 ? 'Excellent for growth' : s >= 7 ? 'Very good' : s >= 5 ? 'Good' : 'Fine, with trade-offs';
 
   // ---------- drawing: the setup as a simple diagram, plus the resistance curve ----------
-  function diagram(a) {
-    const sc = a && a.scene;
-    if (!sc) return '';
-    const J = sc.joint, segAt = ang => at(J, ang, sc.seg), loadAt = ang => at(J, ang, sc.load);
+  // the drawing's frame, worked out once per exercise: it fits every position of the rep, so the moving parts stay inside
+  const frames = new WeakMap();
+  function frameOf(a) {
+    if (frames.has(a)) return frames.get(a);
+    const sc = a.scene, J = sc.joint, segAt = ang => at(J, ang, sc.seg), loadAt = ang => at(J, ang, sc.load);
     // the position where it is hardest (for machines: the middle)
     let hard = (sc.a0 + sc.a1) / 2;
     if (a.curve) { const k = a.curve.indexOf(Math.max(...a.curve)); hard = sc.a0 + (sc.a1 - sc.a0) * k / (a.curve.length - 1); }
@@ -445,17 +456,50 @@ window.LS_SCIENCE = (() => {
     for (const b of sc.body || []) line(...b);
     for (const f of sc.fixed || []) line(...f);
     for (const f of sc.frame || []) line(...f);
-    for (const ang of [sc.a0, sc.a1, hard]) { const e = segAt(ang); line(J[0], J[1], e[0], e[1]); }
     if (sc.head) { pts.push([sc.head[0] - sc.head[2], sc.head[1] - sc.head[2]], [sc.head[0] + sc.head[2], sc.head[1] + sc.head[2]]); }
     if (sc.force.q) pts.push(sc.force.q);
     if (sc.bench) pts.push([sc.bench[0], sc.bench[1]], [sc.bench[0] + sc.bench[2], sc.bench[1] + sc.bench[3]]);
-    if (sc.force.type === 'gravity') { const L = loadAt(hard); pts.push([L[0], L[1] - 0.75]); }
+    for (let i = 0; i <= 12; i++) {
+      const ang = sc.a0 + (sc.a1 - sc.a0) * i / 12, E = segAt(ang), Pl = loadAt(ang);
+      line(J[0], J[1], E[0], E[1]);
+      if (sc.force.type === 'gravity') pts.push([Pl[0], Pl[1] - 0.75]);
+    }
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     const pad = 0.35, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
     // drawn at 100 px per unit so text and strokes have ordinary sizes
     const K = 100, W = (x1 - x0) * K, H = (y1 - y0) * K;
     const X = x => ((x - x0) * K).toFixed(1), Y = y => ((y1 - y) * K).toFixed(1);
     const L = (x1_, y1_, x2_, y2_, cls) => `<line class="${cls}" x1="${X(x1_)}" y1="${Y(y1_)}" x2="${X(x2_)}" y2="${Y(y2_)}"/>`;
+    const f = { sc, J, segAt, loadAt, hard, K, W, H, X, Y, L };
+    frames.set(a, f);
+    return f;
+  }
+  // the parts that move with the rep, drawn at one angle: line of force, moment arm, the moving segment and what it holds
+  function liveAt(a, ang) {
+    const { sc, J, segAt, loadAt, X, Y, L } = frameOf(a);
+    const E = segAt(ang), Pl = loadAt(ang), F = sc.force.type === 'cam' ? null : forceDir(sc, Pl);
+    let s = '';
+    if (sc.force.type === 'cable') s += L(Pl[0], Pl[1], sc.force.q[0], sc.force.q[1], 'sci-force');
+    else if (sc.force.type === 'gravity') s += L(Pl[0], Pl[1], Pl[0], Pl[1] - 0.7, 'sci-force') + `<path class="sci-arrow" d="M${X(Pl[0] - 0.07)} ${Y(Pl[1] - 0.6)} L${X(Pl[0])} ${Y(Pl[1] - 0.72)} L${X(Pl[0] + 0.07)} ${Y(Pl[1] - 0.6)}"/>`;
+    if (F) {
+      const t = (J[0] - Pl[0]) * F[0] + (J[1] - Pl[1]) * F[1], foot = [Pl[0] + F[0] * t, Pl[1] + F[1] * t];
+      s += L(Pl[0], Pl[1], foot[0], foot[1], 'sci-force-ext') + L(J[0], J[1], foot[0], foot[1], 'sci-moment');
+    }
+    return s + L(J[0], J[1], E[0], E[1], 'sci-seg') + equip(sc.attach, Pl, ang, X, Y);
+  }
+  // p: 0 = start (muscle long) … 1 = end (muscle short)
+  const live = (a, p) => liveAt(a, a.scene.a0 + (a.scene.a1 - a.scene.a0) * p);
+  // how hard it is at that point, 0 to 1, from the resistance curve (null for machines)
+  function effortAt(a, p) {
+    const c = a && a.curve;
+    if (!c) return null;
+    const x = Math.min(1, Math.max(0, p)) * (c.length - 1), i = Math.min(c.length - 2, Math.floor(x));
+    return c[i] + (c[i + 1] - c[i]) * (x - i);
+  }
+  function diagram(a) {
+    const sc = a && a.scene;
+    if (!sc) return '';
+    const { J, segAt, hard, K, W, H, X, Y, L } = frameOf(a);
     // text sized to the drawing so every diagram reads the same once scaled to fit
     let s = `<svg class="sci-fig" style="--fs:${(Math.max(W, H * 0.75) / 15).toFixed(0)}px" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" role="img" aria-label="${a.title}: diagram of the joint, the moving part and the line of force">`;
     if (sc.bench) s += `<rect class="sci-bench" x="${X(sc.bench[0])}" y="${Y(sc.bench[1] + sc.bench[3])}" width="${(sc.bench[2] * K).toFixed(1)}" height="${(sc.bench[3] * K).toFixed(1)}" rx="4"/>`;
@@ -466,26 +510,15 @@ window.LS_SCIENCE = (() => {
     for (const b of sc.body || []) s += L(...b, 'sci-body');
     if (sc.head) s += `<circle class="sci-head" cx="${X(sc.head[0])}" cy="${Y(sc.head[1])}" r="${sc.head[2] * K}"/>`;
     for (const f of sc.fixed || []) s += L(...f, 'sci-body');
-    // range of motion arc
+    // range of motion arc, with the hardest point marked on it
     const R = sc.seg * 0.42, arc = [];
     for (let i = 0; i <= 20; i++) { const p = at(J, sc.a0 + (sc.a1 - sc.a0) * i / 20, R); arc.push(`${X(p[0])},${Y(p[1])}`); }
     s += `<polyline class="sci-arc" points="${arc.join(' ')}"/>`;
-    // start and end ghosts, then the hardest position solid
+    // start and end ghosts; the moving parts are drawn at the hardest position (and animated from there by the app)
     for (const [ang, cls] of [[sc.a0, 'sci-ghost start'], [sc.a1, 'sci-ghost end']]) { const e = segAt(ang); s += L(J[0], J[1], e[0], e[1], cls); }
-    const E = segAt(hard), Pl = loadAt(hard), F = sc.force.type === 'cam' ? null : forceDir(sc, Pl);
-    // line of force and its moment arm
-    if (sc.force.type === 'cable') {
-      s += L(Pl[0], Pl[1], sc.force.q[0], sc.force.q[1], 'sci-force');
-      s += `<circle class="sci-pulley" cx="${X(sc.force.q[0])}" cy="${Y(sc.force.q[1])}" r="9"/>`;
-    } else if (sc.force.type === 'gravity') {
-      s += L(Pl[0], Pl[1], Pl[0], Pl[1] - 0.7, 'sci-force') + `<path class="sci-arrow" d="M${X(Pl[0] - 0.07)} ${Y(Pl[1] - 0.6)} L${X(Pl[0])} ${Y(Pl[1] - 0.72)} L${X(Pl[0] + 0.07)} ${Y(Pl[1] - 0.6)}"/>`;
-    }
-    if (sc.force.type !== 'cam') {
-      const t = (J[0] - Pl[0]) * F[0] + (J[1] - Pl[1]) * F[1], foot = [Pl[0] + F[0] * t, Pl[1] + F[1] * t];
-      s += L(Pl[0], Pl[1], foot[0], foot[1], 'sci-force-ext') + L(J[0], J[1], foot[0], foot[1], 'sci-moment');
-    }
-    s += L(J[0], J[1], E[0], E[1], 'sci-seg');
-    s += equip(sc.attach, Pl, hard, X, Y);
+    if (a.curve) { const h = at(J, hard, R); s += `<circle class="sci-hard" cx="${X(h[0])}" cy="${Y(h[1])}" r="6"/>`; }
+    s += `<g class="sci-live">${liveAt(a, hard)}</g>`;
+    if (sc.force.type === 'cable') s += `<circle class="sci-pulley" cx="${X(sc.force.q[0])}" cy="${Y(sc.force.q[1])}" r="9"/>`;
     s += `<circle class="sci-joint" cx="${X(J[0])}" cy="${Y(J[1])}" r="7.5"/>`;
     s += `<text class="sci-t" x="${X(J[0] - 0.08)}" y="${Y(J[1] - 0.22)}" text-anchor="end">${sc.label}</text>`;
     const st = segAt(sc.a0), en = segAt(sc.a1);
@@ -502,7 +535,8 @@ window.LS_SCIENCE = (() => {
     const off = (o, k, v) => [o[0] + v[0] * k, o[1] + v[1] * k];
     if (kind === 'cuff') {
       const c = off(p, -0.06, d);
-      return seg(off(c, -0.11, n), off(c, 0.11, n), 'sci-cuff') + `<circle class="sci-ring" cx="${X(off(c, 0.16, n)[0])}" cy="${Y(off(c, 0.16, n)[1])}" r="5"/><text class="sci-t c" x="${X(off(c, 0.32, n)[0])}" y="${Y(off(c, 0.32, n)[1])}">cuff</text>`;
+      // named in the legend: a label here would run into "start" or "end" as the arm moves
+      return seg(off(c, -0.11, n), off(c, 0.11, n), 'sci-cuff') + `<circle class="sci-ring" cx="${X(off(c, 0.16, n)[0])}" cy="${Y(off(c, 0.16, n)[1])}" r="5"/>`;
     }
     if (kind === 'dumbbell') return seg(off(p, -0.16, n), off(p, 0.16, n), 'sci-db') + seg(off(off(p, -0.16, n), -0.08, d), off(off(p, -0.16, n), 0.08, d), 'sci-plate') + seg(off(off(p, 0.16, n), -0.08, d), off(off(p, 0.16, n), 0.08, d), 'sci-plate');
     if (kind === 'bar') return seg(off(p, -0.22, n), off(p, 0.22, n), 'sci-db');
@@ -517,5 +551,5 @@ window.LS_SCIENCE = (() => {
     return `<svg class="sci-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="sci-curve-a" points="0,${H} ${pts.join(' ')} ${W},${H}"/><polyline class="sci-curve-l" points="${pts.join(' ')}"/></svg>`;
   }
 
-  return { analyze, diagram, curveSvg, REFS, SHAPES, RATE_NAMES, RATE_MAX, verdict };
+  return { analyze, diagram, live, effortAt, curveSvg, REFS, SHAPES, RATE_NAMES, RATE_MAX, verdict };
 })();

@@ -176,7 +176,7 @@
 [data-style="y2k"] :is(.thumb.art.ek, .exc-hero.ek, .exd-art.ek) img { filter: invert(1) grayscale(1) contrast(1.4); mix-blend-mode: screen; }
 [data-style="y2k"] .thumb:not(.art) { background: #0A1240; --fig: #1A2670; --fig-m: #24318C; --hit: var(--magenta); --hit-2: #A0145D; }
 [data-style="y2k"] .exc-hero.maps, [data-style="y2k"] .exd-map { background: #0A1240; --fig: #1A2670; --fig-m: #24318C; --hit: var(--magenta); --hit-2: #A0145D; }
-[data-style="y2k"] .exc-hero::after { content: attr(data-callout); position: absolute; left: 10px; top: 42%; padding: 3px 7px; border: 1px solid var(--cyan); background: rgba(2, 4, 20, .85); color: var(--cyan); font: 400 15px/1 var(--lcd); letter-spacing: .04em; box-shadow: 18px 14px 0 -17px var(--cyan); }
+[data-style="y2k"] .exc-hero::after { content: attr(data-callout); position: absolute; left: 10px; top: 12px; padding: 3px 7px; border: 1px solid var(--cyan); background: rgba(2, 4, 20, .85); color: var(--cyan); font: 400 15px/1 var(--lcd); letter-spacing: .04em; box-shadow: 18px 14px 0 -17px var(--cyan); }
 [data-style="y2k"] .exc-hero .hero-tag, [data-style="y2k"] .exc-hero .hero-note { background: #020414; color: var(--cyan); border: 1px solid var(--cyan); font: 400 15px var(--lcd); }
 
 /* ---------- rest timer: LCD player ---------- */
@@ -209,6 +209,11 @@
 [data-style="y2k"] .sci-score { background: #020414; color: var(--cyan); border: 1px solid var(--cyan); }
 [data-style="y2k"] .sci-score b { font-size: 34px; text-shadow: 0 0 8px var(--cyan); }
 [data-style="y2k"] .sci-diag, [data-style="y2k"] .sci-rates, [data-style="y2k"] .sci-ev, [data-style="y2k"] .sci-curve { background: #020414; border: 1px solid var(--line); }
+[data-style="y2k"] .sci-phase { background: #020414; color: var(--cyan); border: 1px solid var(--cyan); font: 400 15px/1 var(--lcd); letter-spacing: .06em; text-shadow: 0 0 6px var(--cyan); }
+[data-style="y2k"] .sci-cur { border-left-color: var(--magenta); opacity: .8; }
+[data-style="y2k"] .sci-dot::before { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+[data-style="y2k"] .sci-fig .sci-hard { fill: var(--magenta); stroke: #020414; }
+[data-style="y2k"] .sci-diag .k.hard { background: var(--magenta); }
 [data-style="y2k"] .sci-curve-l { stroke: var(--cyan); }
 [data-style="y2k"] .sci-curve-a { fill: rgba(25, 240, 255, .12); }
 [data-style="y2k"] .sci-fig .sci-seg { stroke: var(--cyan); }
@@ -249,3 +254,6 @@
   [data-style="y2k"] h1, [data-style="y2k"] #hud .hud-log span { animation: none; }
 }
 [data-style="y2k"] .exc-hero.noted::after { display: none; }
+[data-style="y2k"] .exd-art figcaption { background: linear-gradient(rgba(2, 4, 20, 0), rgba(2, 4, 20, .88) 45%); color: var(--cyan); font: 400 14px var(--lcd); }
+[data-style="y2k"] .exd-art figcaption a { color: var(--cyan); }
+[data-style="y2k"] .exd-step i { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
