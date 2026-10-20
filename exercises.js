@@ -410,12 +410,57 @@ Open Book Rotation|mobility|bodyweight|bw||u
 Knee-to-Wall Ankle Mobility|mobility|bodyweight|bw||u
 Band Shoulder Dislocate|mobility|band|bw
 Foam Rolling|mobility|other|dur
+Lever Seated Fly|chest|machine|wr|frontdelts
+Lever Shoulder Press|frontdelts|machine|wr|triceps,sidedelts
+Side Lateral Standing|sidedelts|machine|wr||u
+Gym Leco Preacher|biceps|machine|wr|forearms|u
+Cable Standing Reverse Grip Curl|forearms|cable|wr|biceps|u
+S/A Cuffed Pushdown|triceps|cable|wr||u
+Lever Pullover|lats|machine|wr|chest
+Lever Front Pulldown|lats|machine|wr|biceps,upperback
+Cable Seated Horizontal Shrug|traps|cable|wr|upperback
+Lever Total Abdominal Crunch|abs|machine|wr
+Lever Gripper Hands|forearms|machine|wr
+Lever Seated Leg Curl|hamstrings|machine|wr
+Lever Seated Hip Adduction|adductors|machine|wr
+Lever Seated Hip Abduction|abductors|machine|wr|glutes
+Lever Leg Extension|quads|machine|wr
+Lever Seated Squat Calf Raise|calves|machine|wr||u
 `;
 
 /* Ready-made splits. Each line of a day: exercise | sets | reps | RIR target | rest in seconds
    sets: "2w+3" = 2 warm-ups then 3 working, "3+1d" = 3 working then a drop set,
-   letters: w warm-up, t top set, b back-off, d drop, f failure, a AMRAP, p partials, m myo-reps */
+   letters: w warm-up, t top set, b back-off, d drop, f failure, a AMRAP, p partials, m myo-reps.
+   A day can also list each set as [type, starting weight in kg, target reps, target RIR, side L/R],
+   and 'rest' in a split's days is a rest day. */
 window.FORGE_PROGRAMS = [
+  {
+    id: 'fbeod', name: 'Full Body EOD', freq: 'Every other day',
+    about: 'Your full-body machine session from Lyfta: train one day, rest the next. It starts from your last logged weights.',
+    note: 'Weights are from your last Lyfta session. Each rep range starts at the reps you did. Hit the top of the range on every set and the app suggests adding weight.',
+    days: [
+      ['Full Body', [
+        { ex: 'Lever Seated Fly', rest: 120, sets: [['W', 72.5, 4], ['N', 80, '5-7', 1], ['N', 80, '5-7', 1]] },
+        { ex: 'Lever Shoulder Press', rest: 120, sets: [['W', 50, 3], ['N', 55, '4-6', 1], ['N', 55, '4-6', 0]] },
+        { ex: 'Side Lateral Standing', uni: true, rest: 90, sets: [['W', 45, 3, null, 'R'], ['W', 45, 3, null, 'L'], ['N', 45, '5-7', 1, 'R'], ['N', 45, '5-7', 2, 'L']] },
+        { ex: 'Gym Leco Preacher', uni: true, rest: 90, sets: [['W', 30, 3, null, 'L'], ['W', 30, 3, null, 'R'], ['N', 32, '5-7', 1, 'L'], ['N', 32, '5-7', 1, 'R']] },
+        { ex: 'Cable Standing Reverse Grip Curl', uni: true, rest: 90, sets: [['W', 36, 4, null, 'L'], ['W', 36, 4, null, 'R'], ['N', 41, '8-10', 0, 'L'], ['N', 41, '8-10', 1, 'R']] },
+        { ex: 'S/A Cuffed Pushdown', uni: true, rest: 90, sets: [['W', 43, 6, null, 'R'], ['W', 43, 6, null, 'L'], ['N', 52, '7-9', 0, 'R'], ['N', 52, '7-9', 0, 'L']] },
+        { ex: 'Lever Pullover', rest: 120, sets: [['W', 70, 6], ['N', 80, '4-6', 1], ['N', 80, '4-6', 0]] },
+        { ex: 'Lever Front Pulldown', rest: 120, sets: [['W', 70, 4], ['N', 80, '5-7', 1], ['N', 80, '5-7', 0]] },
+        { ex: 'Cable Seated Horizontal Shrug', rest: 90, sets: [['N', 60, '5-7', 2], ['N', 60, '5-7', 0]] },
+        { ex: 'Lever Total Abdominal Crunch', rest: 90, sets: [['W', 15, 6], ['W', 15, 6], ['W', 15, 6], ['N', 20, '6-8', 0]] },
+        { ex: 'Lever Gripper Hands', rest: 90, sets: [['W', 40, 12], ['N', 62.5, '6-8', 0]] },
+        { ex: 'Lever Seated Leg Curl', rest: 120, sets: [['W', 65, 4], ['N', 72.5, '5-7', 0]] },
+        { ex: 'Lever Seated Hip Adduction', rest: 120, sets: [['W', 102, 4], ['N', 128.7, '8-10', 1]] },
+        { ex: 'Lever Seated Hip Abduction', rest: 120, sets: [['W', 80, 6], ['N', 110, '8-10', 0]] },
+        { ex: 'Lever Leg Extension', rest: 120, sets: [['W', 80, 7], ['N', 110, '8-10', 1]] },
+        { ex: 'Barbell Glute Bridge', rest: 120, sets: [['W', 93.7, 6], ['N', 93.7, '10-12', 0]] },
+        { ex: 'Lever Seated Squat Calf Raise', uni: true, rest: 90, sets: [['W', 80, 5, null, 'L'], ['W', 80, 5, null, 'R'], ['N', 102.5, '4-6', 1, 'L'], ['N', 102.5, '4-6', 1, 'R']] }
+      ]],
+      'rest'
+    ]
+  },
   {
     id: 'ppl', name: 'Push / Pull / Legs', freq: '3 or 6 days a week',
     about: 'The classic split. Run the three days in order, once or twice a week.',
