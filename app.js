@@ -262,10 +262,27 @@ function figVars(ex) {
 function figure(view, ex, crop) {
   return `<svg viewBox="${CROPS[crop]}" style="${figVars(ex)}" aria-hidden="true"><use href="#fig-${view}"/>${ex.m === 'cardio' && view === 'front' ? HEART : ''}</svg>`;
 }
-// the small square picture shown beside an exercise: your photo if you added one, otherwise the muscle map
+/* ----- exercise illustrations: RepDB free tier (repdb.co), loaded from RepDB's own published copy ----- */
+const VIS = window.LS_VISUALS || { base: '', map: {} };
+const artFailed = new Set();
+// picture URLs for an exercise: [start, finish], or one for a held position; null when there is none
+function artOf(exId) {
+  const v = VIS.map[exId];
+  if (!v || artFailed.has(exId)) return null;
+  const names = v[0] === '=' ? [v.slice(1)] : v.includes(' ') ? v.split(' ') : [v + '-start', v + '-peak'];
+  return names.map(n => VIS.base + n + '.webp');
+}
+// start and finish shown in turn, like a two-frame animation
+const artFrames = (exId, art, alt) => art.map((u, i) => `<img class="${art.length > 1 ? 'f' + i : ''}" src="${u}" alt="${i ? '' : esc(alt)}" loading="lazy" decoding="async" data-art="${esc(exId)}">`).join('');
+// the small square picture shown beside an exercise: your photo, the illustration, or the muscle map
 function thumb(exId, size = '') {
   const url = photos.get(exId);
   if (url) return `<span class="thumb ${size} photo"><img src="${url}" alt="" loading="lazy"></span>`;
+  const art = artOf(exId);
+  if (art) return `<span class="thumb ${size} art${size.includes('lg') && art.length > 1 ? ' moving' : ''}">${size.includes('lg') ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
+  return mapThumb(exId, size);
+}
+function mapThumb(exId, size = '') {
   const ex = getEx(exId);
   const crop = ex.m === 'fullbody' || ex.m === 'cardio' || ex.m === 'mobility' ? 'full' : LOWER_BODY.has(ex.m) ? 'lower' : 'upper';
   return `<span class="thumb ${size}">${figure(BACK_VIEW.has(ex.m) ? 'back' : 'front', ex, crop)}</span>`;
@@ -342,7 +359,7 @@ const KEY = 'liftingsanity:data:v1';
 let state;
 let storageOK = true;
 const ui = {
-  tab: 'train', woHidden: false, effOpen: null, kp: null,
+  tab: 'train', woHidden: false, effOpen: null, kp: null, delMode: null,
   lib: { q: '', g: 'all', m: 'all', eq: 'all' },
   hist: { month: null, day: null }
 };
@@ -352,7 +369,7 @@ function defaults() {
     v: 1,
     settings: {
       unit: 'kg', effort: 'rir', rest: 120, autoRest: true, autoNext: true, view: 'focus',
-      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto'
+      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows'
     },
     custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null,
     workouts: [], active: null, rest: null,
@@ -1106,8 +1123,10 @@ function sparkline(vals) {
 
 VIEWS.train = function () {
   const split = activeSplit();
+  const streak = streakWeeks();
   let h = `<header class="page-h"><div><p class="eyebrow">${esc(dfmt(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' }))}</p><h1>Train</h1></div>
-    <p class="page-h-side">Session <b>#${state.workouts.length + 1}</b> is next</p></header>`;
+    <div class="page-h-side">${streak ? `<span class="streak">${icon('flame')}<b>${streak}</b> week${streak === 1 ? '' : 's'}</span>` : ''}<span class="sess">Session <b>#${state.workouts.length + 1}</b> next</span></div></header>`;
+  h += weekStrip();
   if (!storageOK) h += `<div class="notice bad">${icon('info')}<p>This browser is blocking storage, so nothing you log will be kept. Open Lifting Sanity in Safari, or add it to your Home Screen.</p></div>`;
   h += installHint();
   if (state.active) {
@@ -1120,6 +1139,17 @@ VIEWS.train = function () {
   h += programLibrary();
   return h;
 };
+// this week at a glance: a dot for each day, filled on the days you trained
+function weekStrip() {
+  const ws = weekStart(Date.now()), today = dayStart(Date.now());
+  const done = state.workouts.filter(w => w.start >= ws && w.end);
+  const on = new Set(done.map(w => dayStart(w.start)));
+  const vol = done.reduce((a, w) => a + workoutVolume(w), 0);
+  return `<section class="week" aria-label="This week"><div class="week-days">${Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(ws); d.setDate(d.getDate() + i); const t = d.getTime();
+    return `<span class="wd ${on.has(t) ? 'on' : ''} ${t === today ? 'today' : ''} ${t > today ? 'later' : ''}"><small>${esc(dfmt(t, { weekday: 'narrow' }))}</small><b>${on.has(t) ? icon('check', 'thick') : d.getDate()}</b></span>`;
+  }).join('')}</div><p class="week-sum"><b>${done.length}</b> workout${done.length === 1 ? '' : 's'} this week${vol ? ` · <b>${esc(fmtVol(vol))}</b>` : ''}</p></section>`;
+}
 function installHint() {
   if (inFrame || !state.settings.installHint || navigator.standalone || matchMedia('(display-mode: standalone)').matches) return '';
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1137,15 +1167,17 @@ function splitCard(split) {
   const head = st.state === 'rest' ? `<p class="eyebrow good">${icon('moon')}Rest day today</p><h3>Recover</h3><p class="muted">Next up: <b>${esc(t ? t.name : '')}</b> ${whenText(st.due)} · ${t ? t.ex.length : 0} exercises</p>`
     : st.state === 'done' ? `<p class="eyebrow good">${icon('check')}Done for today</p><h3>Nice work</h3><p class="muted">Next up: <b>${esc(t ? t.name : '')}</b> ${whenText(st.due)}${restDays ? ', after a rest day' : ''}</p>`
     : `<p class="eyebrow accent">Up next · Day ${pos + 1} of ${n}</p><h3>${esc(t.name)}</h3><div class="facts"><span>${icon('dumbbell')}${t.ex.length} exercises</span><span>${icon('rows')}${trimNum(tplWorkingSets(t), 1)} working sets</span><span>${icon('clock')}about ${est} min</span><span>${icon('calendar')}${last ? 'last done ' + relDay(last.start) : 'not done yet'}</span></div>`;
-  return `<section class="card split">
+  const strip = t ? t.ex.filter(x => artOf(x.exId) || photos.get(x.exId)).slice(0, 4) : [];
+  return `<section class="split">
     <div class="split-h"><div><p class="eyebrow">Your split · ${trainDays} training day${trainDays === 1 ? '' : 's'}${restDays ? ` + ${restDays} rest` : ''}</p><h2>${esc(split.name)}</h2></div>
       <div class="split-actions"><button class="btn sm" data-a="splitSwitch">${icon('swap')}Change</button><button class="btn sm" data-a="splitEdit" data-id="${split.id}">${icon('edit')}Edit</button></div></div>
     ${t ? `<div class="upnext ${st.state === 'due' ? '' : 'resting'}">
-      ${head}
-      <ol class="ex-preview">${(ui.nextOpen ? t.ex : t.ex.slice(0, 6)).map(x => `<li><span>${thumb(x.exId, 'sm')}<span>${esc(getEx(x.exId).name)}</span></span><span class="muted">${esc(scheme(x.sets))}</span></li>`).join('')}</ol>
-      ${t.ex.length > 6 ? `<button class="btn ghost sm more-ex" data-a="nextOpen">${ui.nextOpen ? 'Show less' : `Show all ${t.ex.length} exercises`}</button>` : ''}
+      ${strip.length >= 3 ? `<div class="strip" aria-hidden="true">${strip.map(x => thumb(x.exId, 'tile')).join('')}</div>` : ''}
+      <div class="upnext-b">${head}
+      <ol class="ex-preview">${(ui.nextOpen ? t.ex : t.ex.slice(0, 5)).map(x => `<li><span>${thumb(x.exId, 'md')}<span class="exn"><b>${esc(getEx(x.exId).name)}</b><small>${esc(scheme(x.sets))}</small></span></span></li>`).join('')}</ol>
+      ${t.ex.length > 5 ? `<button class="btn sm more-ex" data-a="nextOpen">${ui.nextOpen ? 'Show less' : `Show all ${t.ex.length} exercises`}${icon(ui.nextOpen ? 'up' : 'down')}</button>` : ''}
       <button class="btn ${st.state === 'due' ? 'primary' : ''} big" data-a="startDay" data-split="${split.id}" data-day="${pos}">${icon('play')}${st.state === 'due' ? 'Start' : 'Train anyway: start'} ${esc(t.name)}</button>
-    </div>` : ''}
+    </div></div>` : ''}
     <p class="eyebrow">Any day, any time</p>
     <div class="days">${days.map((d, i) => !d ? '' : isRest(d)
       ? `<div class="day rest"><span class="day-n">Day ${i + 1}</span><b>Rest</b><span class="muted">recover</span></div>`
@@ -1544,10 +1576,13 @@ function placeholder(x, j, ctx) {
   }
   return out;
 }
-function setCols(k, eff) {
+// one-side exercises: each side its own row ('rows'), or one row with reps for each side ('one')
+const uniStyle = x => (state.exPrefs[x.exId] || {}).uniStyle || state.settings.uniStyle || 'rows';
+const isCompact = x => uniStyle(x) === 'one' && x.sets.some(s => s.side);
+function setCols(k, eff, two) {
   const c = ['var(--c-badge)', 'minmax(0,1fr)'];
   if (hasWeight(k)) c.push('var(--c-w)');
-  if (hasReps(k)) c.push('var(--c-r)');
+  if (hasReps(k)) c.push(two ? 'var(--c-r2) var(--c-r2)' : 'var(--c-r)');
   if (hasDist(k)) c.push('var(--c-w)');
   if (hasTime(k)) c.push('var(--c-t)');
   if (eff && hasReps(k)) c.push('var(--c-e)');
@@ -1561,32 +1596,35 @@ function exCardHTML(w, i, focus) {
   const work = liftSets(x.sets).filter(s => s.t !== 'W');
   const target = work.length ? `${work.length} × ${(work[0].tr || '').replace('-', '–') || 'your reps'}${work[0].trir != null && effOn ? ` · ${effName()} ${effDisp(work[0].trir)}` : ''}` : '';
   let h = `<article class="exc ${exComplete(x) ? 'complete' : ''}" data-e="${i}" id="exc-${i}">
+    ${exHero(x.exId, i)}
     <div class="exc-h">
-      <button class="exc-pic" data-a="exInfo" data-e="${i}" aria-label="About ${esc(ex.name)}">${thumb(x.exId, 'lg')}</button>
       <div class="exc-t"><p class="eyebrow">${focus ? `Exercise ${i + 1} of ${w.ex.length} · ` : ''}${esc(MUSCLES[ex.m])} · ${esc(EQUIP[ex.eq])}${ss ? ` · <span class="ss-tag">Superset ${ss.label}</span>` : ''}</p>
         <h2><button class="exc-name" data-a="exInfo" data-e="${i}">${esc(ex.name)}</button></h2>
-        <p class="exc-sub">${target ? `<span>${esc(target)}</span>` : ''}<button class="chip" data-a="exRest" data-e="${i}">${icon('timer')}Rest ${fmtRest(x.rest || state.settings.rest)}</button>${hasReps(k) && (x.uni || ex.uni) ? `<button class="chip ${x.uni ? 'on' : ''}" data-a="exUni" data-e="${i}" aria-pressed="${!!x.uni}">${icon('side')}${x.uni ? 'Left and right' : 'Both sides together'}</button>` : ''}</p></div>
+        <p class="exc-sub">${target ? `<span>${esc(target)}</span>` : ''}<button class="chip" data-a="exRest" data-e="${i}">${icon('timer')}Rest ${fmtRest(x.rest || state.settings.rest)}</button>${hasReps(k) && (x.uni || ex.uni) ? `<button class="chip ${x.uni ? 'on' : ''}" data-a="exUni" data-e="${i}">${icon('side')}${x.uni ? (uniStyle(x) === 'one' ? 'Left and right, one row' : 'Left and right') : 'Both sides together'}</button>` : ''}</p></div>
       <button class="icon-btn" data-a="exMenu" data-e="${i}" aria-label="Options for ${esc(ex.name)}">${icon('dots')}</button>
     </div>`;
   if (x.note) h += `<button class="exc-note" data-a="exNote" data-e="${i}">${icon('note')}<span>${esc(x.note)}</span></button>`;
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>Last time you hit ${ctx.suggest.hi}+ reps on every set. Try <b>${esc(fmtW(ctx.suggest.w))}</b> today.</span></p>`;
   else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>“Previous” is from before your reset (${esc(fmtShort(ctx.lp.w.start))}). Records for this block start fresh.</span></p>`;
-  h += `<div class="sets" style="--cols:${setCols(k, effOn)}"><div class="set-row head"><span>Set</span><span>Previous</span>`;
+  const two = isCompact(x), f1 = firstSide(x), del = ui.delMode === x.id;
+  h += `<div class="sets ${del ? 'deleting' : ''}" style="--cols:${setCols(k, effOn, two)}"><div class="set-row head"><span>Set</span><span>Previous</span>`;
   if (hasWeight(k)) h += `<span>${esc(weightLabel(k))}</span>`;
-  if (hasReps(k)) h += `<span>Reps</span>`;
+  if (hasReps(k)) h += two ? `<span class="hs-${f1}">${f1} reps</span><span class="hs-${otherSide(f1)}">${otherSide(f1)} reps</span>` : `<span>Reps</span>`;
   if (hasDist(k)) h += `<span>${distUnit(k)}</span>`;
   if (hasTime(k)) h += `<span>Time</span>`;
   if (effOn) h += `<span>${effName()}</span>`;
   h += `<span class="sr">Done</span></div>`;
   x.sets.forEach((s, j) => {
     const head = s.side && isPairTail(x.sets, j + 1), tail = s.side && isPairTail(x.sets, j);
+    if (two && tail) return;
+    if (two && head) { h += oneRowHTML(i, x, j, k, ctx, effOn); return; }
     if (head) h += `<div class="pair ${s.side === 'R' ? 'r-first' : ''} ${s.done && x.sets[j + 1].done ? 'done' : ''}">`;
-    h += setRowHTML(i, x, j, k, ctx, effOn);
+    h += setRowHTML(i, x, j, k, ctx, effOn, two);
     if (tail) h += `</div>`;
   });
   const anyDone = x.sets.some(s => s.done);
-  h += `</div><div class="exc-actions">
-    <div class="set-ctl"><button class="btn add" data-a="addSet" data-e="${i}">${icon('plus')}Add set</button><button class="btn icon-only" data-a="removeSet" data-e="${i}" ${x.sets.length ? '' : 'disabled'} aria-label="Remove a set">${icon('minus')}</button></div>
+  h += `</div>${del ? `<p class="hint del-hint">${icon('trash')}<span>Tap <b>Delete</b> on a set to remove it. Any time, you can also swipe a set to the left.</span></p>` : ''}<div class="exc-actions">
+    <div class="set-ctl"><button class="btn add" data-a="addSet" data-e="${i}">${icon('plus')}Add set</button><button class="btn del-btn ${del ? 'on' : ''}" data-a="delMode" data-e="${i}" ${x.sets.length || del ? '' : 'disabled'} aria-pressed="${del}">${icon(del ? 'check' : 'trash')}${del ? 'Done' : 'Delete'}</button></div>
     <button class="btn ghost" data-a="repeatSet" data-e="${i}" ${anyDone ? '' : 'disabled'}>${icon('repeat')}Repeat last</button>
     <button class="btn ghost" data-a="addWarm" data-e="${i}">${icon('flame')}Warm-ups</button>${BAR_EQUIP.has(ex.eq) ? `<button class="btn ghost" data-a="plates" data-e="${i}">${icon('plate')}Plates</button>` : ''}</div>`;
   if (focus) {
@@ -1597,7 +1635,16 @@ function exCardHTML(w, i, focus) {
   }
   return h + `</article>`;
 }
-function setRowHTML(i, x, j, k, ctx, effOn) {
+// the picture across the top of an exercise: your photo, the start and finish illustrations, or the muscle map
+function exHero(exId, i) {
+  const ex = getEx(exId), photo = photos.get(exId), art = artOf(exId);
+  const inner = photo ? `<img class="own" src="${photo}" alt="Your photo of ${esc(ex.name)}">`
+    : art ? art.map((u, n) => `<img src="${u}" alt="${n ? '' : esc(ex.name)}" decoding="async" data-art="${esc(exId)}">`).join(art.length > 1 ? icon('right', 'arr') : '')
+    : heroMaps(ex);
+  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' : 'maps'}" data-a="exInfo" data-e="${i}" aria-label="How to do ${esc(ex.name)}">${inner}${art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
+}
+const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, 'full')}${figure('back', ex, 'full')}</span>`;
+function setRowHTML(i, x, j, k, ctx, effOn, two) {
   const s = x.sets[j], ph = placeholder(x, j, ctx), prev = ctx.prevSets[j], prs = ctx.prs[j] || [];
   const pad = useKeypad();
   const inp = (f, val, pv, mode, aria) => pad
@@ -1612,15 +1659,72 @@ function setRowHTML(i, x, j, k, ctx, effOn) {
   h += `<div class="prev">${above ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="Same as the set above, ${esc(fmtSet(x, above, k, false))}">${icon('same')}<span>${esc(fmtSet(x, above, k, false))}</span></button>` : ''}`
     + (prev ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="Use last time, ${esc(fmtSet(ctx.lp.x, prev, k))}">${above ? '' : '<i>Last</i>'}${esc(fmtSet(ctx.lp.x, prev, k))}</button>` : above ? '' : '<span class="none">—</span>') + `</div>`;
   if (hasWeight(k)) h += inp('w', s.w != null ? dispW(s.w) : '', ph.w != null ? dispW(ph.w) : '', 'decimal', `Weight, ${n}`);
-  if (hasReps(k)) h += inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`);
+  if (hasReps(k)) h += two ? inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`).replace('class="cell"', 'class="cell span2"') : inp('r', s.r ?? '', ph.r ?? '', 'numeric', `Reps, ${n}`);
   if (hasDist(k)) h += inp('dist', s.dist != null ? dispDist(s.dist, k) : '', ph.dist != null ? dispDist(ph.dist, k) : '', 'decimal', `Distance, ${n}`);
   if (hasTime(k)) h += inp('sec', s.sec != null ? fmtClock(s.sec) : '', ph.sec != null ? fmtClock(ph.sec) : '0:00', 'numeric', `Time, ${n}`);
   if (effOn) h += `<button class="cell eff ${s.rir != null ? 'has' : ''}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()}, ${n}">${s.rir != null ? esc(effDisp(s.rir)) : s.trir != null ? `<span class="ph">${esc(effDisp(s.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
-  h += `<button class="check" data-a="toggleSet" data-e="${i}" data-s="${j}" aria-pressed="${!!s.done}" aria-label="${s.done ? 'Uncheck' : 'Check'} ${n}">${icon('check')}</button>`;
+  h += ui.delMode === x.id ? delBtn(i, j, n)
+    : `<button class="check" data-a="toggleSet" data-e="${i}" data-s="${j}" aria-pressed="${!!s.done}" aria-label="${s.done ? 'Uncheck' : 'Check'} ${n}">${icon('check')}</button>`;
   h += `</div></div>`;
   if (prs.length && s.done) h += `<div class="pr-row">${icon('trophy')}<span>New record: ${esc(prs.join(' · '))}</span></div>`;
   if (ui.effOpen === `${i}:${j}`) h += effPicker(i, j, s);
   return h;
+}
+const delBtn = (i, j, n) => `<button class="check del" data-a="rowDel" data-e="${i}" data-s="${j}" aria-label="Delete ${esc(n)}">${icon('trash')}</button>`;
+// a left/right pair in one row: one weight, reps for each side, one effort, one check (the earlier style)
+function oneRowHTML(i, x, j, k, ctx, effOn) {
+  const a = x.sets[j], b = x.sets[j + 1], f1 = firstSide(x);
+  const [p, q] = a.side === f1 ? [j, j + 1] : [j + 1, j];
+  const done = a.done && b.done, part = !done && (a.done || b.done);
+  const pad = useKeypad(), pha = placeholder(x, j, ctx), php = placeholder(x, p, ctx), phq = placeholder(x, q, ctx);
+  const n = `set ${oneLabel(x.sets, j)}`;
+  const inp = (jj, f, val, pv, mode, aria, cls = '') => pad
+    ? `<button class="cell ${cls}" data-a="kp" data-f="${f}" data-e="${i}" data-s="${jj}" data-ph="${esc(pv)}" aria-label="${esc(aria)}">${val !== '' ? esc(val) : `<span class="ph">${esc(pv)}</span>`}</button>`
+    : `<input class="cell ${cls}" data-f="${f}" data-e="${i}" data-s="${jj}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
+  const prevA = ctx.prevSets[p], prevB = ctx.prevSets[q];
+  const lw = prevA && prevA.w != null && hasWeight(k) ? dispW(prevA.w) + ' × ' : '';
+  const last = prevA || prevB ? `${lw}${prevA ? prevA.r ?? '–' : '–'} / ${prevB ? prevB.r ?? '–' : '–'}` : '';
+  const upA = done ? null : setAbove(x, p), upB = done ? null : setAbove(x, q);
+  const up = upA || upB ? `${upA && upA.w != null && hasWeight(k) ? dispW(upA.w) + ' × ' : ''}${upA ? upA.r ?? '–' : '–'}/${upB ? upB.r ?? '–' : '–'}` : '';
+  const sp = x.sets[p], sq = x.sets[q];
+  let h = `<div class="row-wrap"><button class="row-del" data-a="rowDel" data-e="${i}" data-s="${j}" tabindex="-1">${icon('trash')}<span>Delete</span></button>`
+    + `<div class="set-row one ${done ? 'done' : ''} ${part ? 'part' : ''} ${a.t === 'W' ? 'warm' : ''}" data-s="${j}">`;
+  h += `<button class="badge t-${a.t} ${a.t === 'N' ? 'lr' : ''}" data-a="setType" data-e="${i}" data-s="${j}" aria-label="Set ${esc(oneLabel(x.sets, j))}, left and right. Change type">${esc(oneLabel(x.sets, j))}</button>`;
+  h += `<div class="prev">${up ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="Same as the set above, ${esc(up)}">${icon('same')}<span>${esc(up)}</span></button>` : ''}`
+    + (last ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="Use last time, ${esc(last)}">${up ? '' : '<i>Last</i>'}${esc(last)}</button>` : up ? '' : '<span class="none">—</span>') + `</div>`;
+  if (hasWeight(k)) h += inp(j, 'w', a.w != null ? dispW(a.w) : '', pha.w != null ? dispW(pha.w) : '', 'decimal', `Weight, ${n}`);
+  h += inp(p, 'r', sp.r ?? '', php.r ?? '', 'numeric', `${sideName(f1)} reps, ${n}`, 'side-' + f1 + (sp.done ? ' got' : ''));
+  h += inp(q, 'r', sq.r ?? '', phq.r ?? '', 'numeric', `${sideName(otherSide(f1))} reps, ${n}`, 'side-' + otherSide(f1) + (sq.done ? ' got' : ''));
+  if (effOn) h += `<button class="cell eff ${a.rir != null ? 'has' : ''}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${effName()}, ${n}">${a.rir != null ? esc(effDisp(a.rir)) : a.trir != null ? `<span class="ph">${esc(effDisp(a.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
+  h += ui.delMode === x.id ? delBtn(i, j, n)
+    : `<button class="check" data-a="toggleBoth" data-e="${i}" data-s="${j}" aria-pressed="${done}" aria-label="${done ? 'Uncheck' : 'Check'} ${n}, both sides">${icon('check')}</button>`;
+  h += `</div></div>`;
+  const prs = [...(ctx.prs[j] || []), ...(ctx.prs[j + 1] || [])];
+  if (prs.length && done) h += `<div class="pr-row">${icon('trophy')}<span>New record: ${esc([...new Set(prs)].join(' · '))}</span></div>`;
+  if (ui.effOpen === `${i}:${j}`) h += effPicker(i, j, a);
+  return h;
+}
+function oneLabel(sets, j) {
+  const s = sets[j];
+  if (s.t !== 'N') return SET_TYPES[s.t].short;
+  return String(sets.slice(0, j + 1).filter((o, n) => o.t === 'N' && !isPairTail(sets, n)).length);
+}
+// check both sides of a one-row pair; a half-done pair counts as not done
+function toggleBoth(i, j, viaPad) {
+  const w = A(), x = w.ex[i], a = x.sets[j], b = x.sets[j + 1], k = getEx(x.exId).k;
+  if (a.done || b.done) { for (const o of [a, b]) { o.done = false; delete o.at; } ui.kp = null; save(); renderWorkout(); return; }
+  const ctx = exCtx(w, x);
+  for (const [o, jj] of [[a, j], [b, j + 1]]) { const ph = placeholder(x, jj, ctx); for (const f of ['w', 'r', 'sec', 'dist']) if (o[f] == null && ph[f] != null) o[f] = ph[f]; }
+  if (a.w != null) b.w = a.w;
+  if (a.rir != null) b.rir = a.rir;
+  if (!hasValue(k, x, a) || !hasValue(k, x, b)) {
+    toast('Type the reps for both sides first.');
+    const row = $(`#workout .exc[data-e="${i}"] .set-row[data-s="${j}"]`);
+    if (row) { row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); }
+    return;
+  }
+  a.done = true; a.at = Date.now();
+  toggleSet(i, j + 1, viaPad);
 }
 // nearest set above this one of the same kind (and side) that has numbers in it
 function setAbove(x, j) {
@@ -1640,12 +1744,6 @@ function deleteRows(x, rows, label) {
   x.sets = x.sets.filter(o => !rows.includes(o));
   save(); renderWorkout();
   toast(label || (rows.length > 1 ? 'Set deleted, both sides.' : 'Set deleted.'), { label: 'Undo', fn: () => { if (A() && A().ex.includes(x)) { x.sets = before; save(); renderWorkout(); } } });
-}
-function removeSet(i) {
-  const x = A().ex[i];
-  // the last set not logged yet (a left/right pair only when neither side is), else the last set
-  const last = x.sets.slice().reverse().find(s => setRows(x, s).every(o => !o.done)) || x.sets[x.sets.length - 1];
-  if (last) deleteRows(x, setRows(x, last), 'Removed a set.');
 }
 function repeatSet(i) {
   const x = A().ex[i];
@@ -1678,6 +1776,7 @@ function woGo(i, smooth) {
   w.cur = i;
   ui.effOpen = null;
   ui.kp = null;
+  ui.delMode = null;
   save();
   if (state.settings.view === 'focus') {
     renderWorkout(true);
@@ -1819,11 +1918,29 @@ function woSetField(i, j, f, v) {
   else if (f === 'dist') s.dist = toMeters(parseNum(v), k);
   else { const n = parseInt(v, 10); s[f] = isFinite(n) ? n : null; }
   if (s[f] == null) delete s[f];
+  const m = f === 'w' && isCompact(x) ? partnerOf(x, s) : null;
+  if (m) { if (s.w == null) delete m.w; else m.w = s.w; }
   save();
 }
 
 /* ----- Workout sheets ----- */
 
+// how a one-side exercise is logged: both sides as one set, a row for each side, or one row with reps for each side
+function uniSheet(i) {
+  const x = A().ex[i], ex = getEx(x.exId), cur = !x.uni ? 'off' : uniStyle(x);
+  const pick = v => {
+    const p = state.exPrefs[x.exId] = state.exPrefs[x.exId] || {};
+    if (v === 'off') { setUni(x, false); p.uni = false; }
+    else { if (!x.uni) setUni(x, true); p.uni = true; p.uniStyle = v; }
+    ui.kp = null; save(); renderWorkout();
+  };
+  const opt = (v, ic, label, sub) => [label, cur === v ? 'check' : ic, () => pick(v), { sub }];
+  menuSheet(`Left and right · ${ex.name}`, [
+    opt('rows', 'rows', 'Left and right, separate rows', 'Each side gets its own row: weight, reps, effort and check. Best when the sides differ.'),
+    opt('one', 'side', 'Left and right in one row', 'One weight, the reps for each side side by side, and one check. The quick way.'),
+    opt('off', 'dumbbell', 'Both sides together', 'One set counts both sides, like a normal exercise.')
+  ]);
+}
 function exMenu(i) {
   const w = A(), x = w.ex[i], ex = getEx(x.exId);
   const ss = ssInfo(w, i);
@@ -2581,10 +2698,11 @@ function exerciseSheet(exId) {
         : k === 'dur' || k === 'wdur' ? [['Longest', rec.sec ? fmtClock(rec.sec) : '—'], ['Sessions', rec.sessions]]
         : [['Farthest', rec.dist ? dispDist(rec.dist, k) + ' ' + distUnit(k) : '—'], ['Sessions', rec.sessions]];
       const yt = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(ex.name + ' exercise form');
-      const photo = photos.get(exId);
+      const photo = photos.get(exId), art = artOf(exId);
       return `${sheetHead(esc(ex.name), ex.custom ? `<button class="btn sm" data-a="editCustom">${icon('edit')}Edit</button>` : '')}
       <div class="sheet-body pad exd">
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="Your photo of ${esc(ex.name)}">` : ''}
+          ${art ? `<figure class="exd-art ${art.length > 1 ? 'moving' : ''}">${artFrames(exId, art, ex.name)}${art.length > 1 ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>Illustration: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a></figcaption></figure>` : ''}
           <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>Front</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>Back</figcaption></figure></div></div>
         <div class="exd-legend"><span><i class="dot hit"></i>Main: ${esc(MUSCLES[ex.m])}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>Also: ${esc(ex.sec.map(m => MUSCLES[m]).join(', '))}</span>` : ''}
           <button class="btn sm" data-a="photo">${icon('camera')}${photo ? 'Change photo' : 'Add your own photo'}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">Remove photo</button>` : ''}</div>
@@ -2692,7 +2810,7 @@ function weekLines() {
 }
 function weekCard() {
   const rule = '-'.repeat(28);
-  return `<section class="term" aria-label="This week"><div class="term-h"><span>LIFTING-SANITY v1.2</span><button class="term-btn" data-a="shareWeek">${icon('share')}Share</button></div>
+  return `<section class="term" aria-label="This week"><div class="term-h"><span>LIFTING-SANITY v1.3</span><button class="term-btn" data-a="shareWeek">${icon('share')}Share</button></div>
     <pre>${rule}\n$ cat weekly_stats.log\n${rule}\n${weekLines().map(l => '> ' + esc(l)).join('\n')}\n${rule}\n$ <span class="cur">_</span></pre></section>`;
 }
 function liftsSection(from, to, title) {
@@ -2762,6 +2880,7 @@ VIEWS.settings = function () {
   </div>
   <h2 class="section-h">During a workout</h2><div class="card list-card">
     ${row('Layout', 'One exercise at a time with big next and previous buttons, or every exercise in one list.', seg('setView', s.view, [['focus', 'One at a time'], ['list', 'List']]))}
+    ${row('One-side exercises', 'How left and right are logged on one-arm and one-leg exercises. You can also change it on each exercise.', seg('setUniStyle', s.uniStyle || 'rows', [['rows', 'Separate rows'], ['one', 'One row']]))}
     ${row('Number pad', 'Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.', seg('setKeypad', s.keypad, [['auto', 'Auto'], ['app', 'In-app pad'], ['system', 'Keyboard']]))}
     ${row('Default rest', 'Each exercise can have its own.', `<label class="select-wrap sm"><select data-f="rest">${REST_PRESETS.map(v => `<option value="${v}" ${v === s.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>`)}
     ${row('Start rest timer when a set is checked', '', toggle(s.autoRest, 'tgl', 'data-k="autoRest"'))}
@@ -2782,7 +2901,8 @@ VIEWS.settings = function () {
     <ol><li>Open Lifting Sanity in <b>Safari</b>.</li><li>Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.</li><li>Open it from your Home Screen. It runs full screen and works without internet.</li></ol>
     <p class="muted small">Your workouts are stored on this device only. Safari can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.</p>
   </div>
-  <p class="muted small center">Lifting Sanity 1.2 · ${LIB.length} exercises · ${storageOK ? 'saving to this device' : 'storage blocked'}</p>`;
+  <p class="muted small center">Lifting Sanity 1.3 · ${LIB.length} exercises · ${storageOK ? 'saving to this device' : 'storage blocked'}</p>
+  <p class="muted small center credits">Illustrations: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a> · Instructions: <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT)</p>`;
 };
 function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
@@ -2923,20 +3043,18 @@ const ACT = {
       save(); renderWorkout();
     } });
   },
-  exUni: b => {
-    const x = A().ex[+b.dataset.e];
-    setUni(x, !x.uni);
-    (state.exPrefs[x.exId] = state.exPrefs[x.exId] || {}).uni = x.uni;
-    save(); renderWorkout();
-  },
+  exUni: b => uniSheet(+b.dataset.e),
   addSet: b => addSet(+b.dataset.e),
-  removeSet: b => removeSet(+b.dataset.e),
+  toggleBoth: b => toggleBoth(+b.dataset.e, +b.dataset.s),
+  delMode: b => { const x = A().ex[+b.dataset.e]; ui.delMode = ui.delMode === x.id ? null : x.id; ui.kp = null; ui.effOpen = null; renderWorkout(); },
   repeatSet: b => repeatSet(+b.dataset.e),
   rowDel: b => { const x = A().ex[+b.dataset.e], s = x && x.sets[+b.dataset.s]; if (s) deleteRows(x, setRows(x, s)); },
   copyAbove: b => {
-    const x = A().ex[+b.dataset.e], j = +b.dataset.s, s = x.sets[j], o = setAbove(x, j);
-    if (!o) return;
-    for (const f of ['w', 'r', 'sec', 'dist']) { if (o[f] != null) s[f] = o[f]; else delete s[f]; }
+    const x = A().ex[+b.dataset.e], s = x.sets[+b.dataset.s];
+    for (const row of isCompact(x) ? setRows(x, s) : [s]) {
+      const o = setAbove(x, x.sets.indexOf(row));
+      if (o) for (const f of ['w', 'r', 'sec', 'dist']) { if (o[f] != null) row[f] = o[f]; else delete row[f]; }
+    }
     save(); renderWorkout();
   },
   addWarm: b => warmMenu(+b.dataset.e),
@@ -2945,10 +3063,11 @@ const ACT = {
   toggleSet: b => toggleSet(+b.dataset.e, +b.dataset.s),
   usePrev: b => {
     const w = A(), i = +b.dataset.e, j = +b.dataset.s, x = w.ex[i];
-    const p = exCtx(w, x).prevSets[j];
-    if (!p) return;
-    const s = x.sets[j];
-    for (const f of ['w', 'r', 'sec', 'dist']) { if (p[f] != null) s[f] = p[f]; }
+    const prev = exCtx(w, x).prevSets;
+    for (const s of isCompact(x) ? setRows(x, x.sets[j]) : [x.sets[j]]) {
+      const p = prev[x.sets.indexOf(s)];
+      if (p) for (const f of ['w', 'r', 'sec', 'dist']) { if (p[f] != null) s[f] = p[f]; }
+    }
     save(); renderWorkout();
   },
   effort: b => { const key = `${b.dataset.e}:${b.dataset.s}`; ui.effOpen = ui.effOpen === key ? null : key; ui.kp = null; renderWorkout(); },
@@ -2986,22 +3105,31 @@ const ACT = {
   kpNext: () => {
     const fld = kpField();
     if (!fld) { kpClose(); return; }
-    const fields = rowFields(fld.x, fld.k), n = fields.indexOf(ui.kp.f);
     kpShow(kpCurrent());
-    if (n < fields.length - 1) ui.kp.f = fields[n + 1];
-    else if (ui.kp.s < fld.x.sets.length - 1) { ui.kp.s++; ui.kp.f = fields[0]; }
-    else { kpClose(); return; }
+    const cells = $$(`#workout .exc[data-e="${ui.kp.e}"] .cell[data-a="kp"]`), nx = cells[cells.indexOf(kpCell()) + 1];
+    if (!nx) { kpClose(); return; }
+    ui.kp.s = +nx.dataset.s; ui.kp.f = nx.dataset.f;
     ui.kp.fresh = true; ui.kp.buf = null;
     renderKeypad(); markKpCell(true);
   },
   kpLog: () => {
     const fld = kpField();
     if (!fld) { kpClose(); return; }
-    if (fld.set.done) { kpClose(); return; }
+    if (fld.set.done && !isCompact(fld.x)) { kpClose(); return; }
+    if (isCompact(fld.x) && fld.set.side && partnerOf(fld.x, fld.set)) {
+      const rows = setRows(fld.x, fld.set);
+      if (rows.every(o => o.done)) { kpClose(); return; }
+      toggleBoth(ui.kp.e, fld.x.sets.indexOf(rows[0]), true);
+      return;
+    }
     toggleSet(ui.kp.e, ui.kp.s, true);
   },
   kpClose: () => kpClose(),
-  effPick: b => { const s = A().ex[+b.dataset.e].sets[+b.dataset.s]; s.rir = b.dataset.v === '' ? null : +b.dataset.v; if (s.rir == null) delete s.rir; ui.effOpen = null; save(); renderWorkout(); },
+  effPick: b => {
+    const x = A().ex[+b.dataset.e], s = x.sets[+b.dataset.s];
+    for (const o of isCompact(x) ? setRows(x, s) : [s]) { o.rir = b.dataset.v === '' ? null : +b.dataset.v; if (o.rir == null) delete o.rir; }
+    ui.effOpen = null; save(); renderWorkout();
+  },
   restAdj: b => { const r = state.rest; if (!r) return; r.end += +b.dataset.d * 1000; r.total = Math.max(r.total, Math.ceil((r.end - Date.now()) / 1000)); if (r.end > Date.now()) { r.alerted = false; $('#restbar').classList.remove('over'); const l = $('.rb-label', $('#restbar')); if (l) l.textContent = 'Rest'; } save(); tickRest(); },
   restSkip: () => { state.rest = null; save(); renderRest(); },
   restPresets: () => restChooser({ title: 'Rest length', current: state.rest ? state.rest.total : null, onPick: v => startRest(v, state.rest ? state.rest.next : '') }),
@@ -3043,6 +3171,7 @@ const ACT = {
   setEffort: b => { state.settings.effort = b.dataset.v; save(); render(); },
   setView: b => { state.settings.view = b.dataset.v; save(); render(); },
   setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
+  setUniStyle: b => { state.settings.uniStyle = b.dataset.v; for (const p of Object.values(state.exPrefs)) delete p.uniStyle; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
@@ -3082,6 +3211,24 @@ function showCopyBox(text) {
 
 function sheetFor(el) { const w = el.closest('[data-sheet]'); return w ? sheets.find(s => s.id === w.dataset.sheet) : null; }
 
+// an illustration that can't load (offline and never seen) falls back to the muscle map
+document.addEventListener('error', ev => {
+  const img = ev.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.art) return;
+  const exId = img.dataset.art, box = img.closest('.thumb, .exd-art, .exc-hero');
+  artFailed.add(exId);
+  if (!box) return;
+  if (box.classList.contains('exc-hero')) { box.className = 'exc-hero maps'; box.innerHTML = heroMaps(getEx(exId)); }
+  else if (box.classList.contains('thumb')) box.outerHTML = mapThumb(exId, [...box.classList].filter(c => !['thumb', 'art', 'moving'].includes(c)).join(' '));
+  else box.remove();
+}, true);
+// keep the pictures for your current split on the device, so they show at the gym without signal
+function warmArt() {
+  const sp = state.splits.find(s => s.id === state.activeSplit);
+  if (!sp || !navigator.onLine) return;
+  const ids = new Set(sp.days.filter(d => !isRest(d)).flatMap(d => (tplById(d) || { ex: [] }).ex.map(x => x.exId)));
+  for (const id of ids) for (const u of artOf(id) || []) { const im = new Image(); im.decoding = 'async'; im.src = u; }
+}
 document.addEventListener('click', ev => {
   if (!ev.target.closest('.row-del')) closeSwipes();
   const t = ev.target.closest('[data-a]');
@@ -3219,7 +3366,7 @@ render();
 if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => setTimeout(warmArt, 3000)).catch(() => {});
 
 window.LiftingSanity = { get state() { return state; }, save: () => save(true) };
 })();
