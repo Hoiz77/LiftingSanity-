@@ -244,7 +244,7 @@
 [data-style="y2k"] #toast { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; padding: 26px 10px 10px; background: var(--panel); color: var(--ink); border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi); box-shadow: 6px 6px 0 rgba(0, 0, 0, .7); font-family: var(--ui); }
 [data-style="y2k"] #toast::before { content: "⚠ SYSTEM MESSAGE ─ システム"; position: absolute; left: 0; right: 0; top: 0; height: 20px; padding: 0 8px; background: var(--titlebar); color: #fff; font: 700 10px/20px var(--pixel); letter-spacing: .08em; }
 [data-style="y2k"] #toast::after { content: "×"; position: absolute; right: 3px; top: 2px; width: 16px; height: 16px; background: var(--chrome); color: #05060F; font: 700 12px/16px var(--pixel); text-align: center; border: 1px solid; border-color: #fff #3a4370 #3a4370 #fff; }
-[data-style="y2k"] #toast > span::before { content: "!"; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 10px; background: var(--magenta); color: #fff; font: 700 14px var(--pixel); vertical-align: middle; }
+[data-style="y2k"] #toast > span::before { content: "!"; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-inline-end: 10px; background: var(--magenta); color: #fff; font: 700 14px var(--pixel); vertical-align: middle; }
 [data-style="y2k"] #toast button { color: #05060F; background: var(--chrome); border: 2px solid; border-color: #fff #3a4370 #3a4370 #fff; padding: 0 12px; font: 700 11px var(--pixel); text-transform: uppercase; }
 
 /* ---------- XP-style sky for the up-next banner ---------- */
@@ -270,3 +270,8 @@
 @keyframes sweepSq { 0% { clip-path: inset(0 100% 0 0); opacity: .5; } 55% { clip-path: inset(0); opacity: .35; } 100% { clip-path: inset(0); opacity: 0; } }
 [data-style="y2k"] .cell.empty, [data-style="y2k"] input.cell:placeholder-shown { background: transparent; border-style: dashed; box-shadow: none; }
 [data-style="y2k"] .cell.empty .ph { opacity: .8; }
+
+/* right to left: the window chrome keeps its left-to-right look; the rail and switches mirror */
+[dir="rtl"][data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term, .sheet, #toast)::before { direction: ltr; text-align: left; }
+[dir="rtl"][data-style="y2k"] .switch span { left: auto; right: 1px; }
+@media (min-width: 760px) { [dir="rtl"][data-style="y2k"] #tabs { border-right: 0; border-left: 2px solid var(--cobalt); } }

@@ -66,49 +66,49 @@ window.LS_SCIENCE = (() => {
   // upper body only: arm exercises read bigger without the legs
   const STAND_SIDE = { head: [0.05, 1.42, 0.2], body: [[0, 1.2, 0, 0.95], [0, 0.95, -0.05, -0.6]] };
   const scenes = {
-    pushdown: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 25, a1: -85, label: 'elbow', fixed: [[0, 0.95, 0, 0]], ...STAND_SIDE,
+    pushdown: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 25, a1: -85, label: T('elbow'), fixed: [[0, 0.95, 0, 0]], ...STAND_SIDE,
       force: { type: 'cable', q: [0.5, 2.05] }, attach: v.attach || 'handle', frame: [[0.5, 2.05, 0.5, 2.5]] }),
-    overheadCable: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 222, a1: 80, label: 'elbow', fixed: [[-0.2, -0.95, 0, 0]],
+    overheadCable: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 222, a1: 80, label: T('elbow'), fixed: [[-0.2, -0.95, 0, 0]],
       head: [0.12, -0.72, 0.19], body: [[-0.2, -0.95, -0.45, -2.4]], force: { type: 'cable', q: [-0.85, -2.7] }, attach: v.attach || 'rope', frame: [[-0.85, -2.7, -0.85, -2.95]] }),
-    overheadFree: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 230, a1: 82, label: 'elbow', fixed: [[-0.05, -0.95, 0, 0]],
+    overheadFree: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 230, a1: 82, label: T('elbow'), fixed: [[-0.05, -0.95, 0, 0]],
       head: [0.2, -0.75, 0.19], body: [[-0.05, -0.95, -0.1, -2.4], [-0.1, -2.4, -0.05, -3.2]], force: { type: 'gravity' }, attach: v.attach || 'dumbbell' }),
-    lyingExt: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 196, a1: 90, label: 'elbow', fixed: [[0, -0.95, 0, 0]],
+    lyingExt: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: 196, a1: 90, label: T('elbow'), fixed: [[0, -0.95, 0, 0]],
       head: [-0.3, -0.98, 0.19], body: [[0, -0.95, 1.6, -0.95], [1.6, -0.95, 2.3, -1.6]], bench: [-0.5, -1.25, 2.2, 0.18], force: { type: 'gravity' }, attach: v.attach || 'bar' }),
-    kickback: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -90, a1: 0, label: 'elbow', fixed: [[-0.95, 0.05, 0, 0]],
+    kickback: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -90, a1: 0, label: T('elbow'), fixed: [[-0.95, 0.05, 0, 0]],
       head: [-1.25, 0.25, 0.19], body: [[-0.95, 0.05, 0.6, -0.15], [0.6, -0.15, 0.7, -1.2]],
       force: v.cable ? { type: 'cable', q: [1.3, -1.5] } : { type: 'gravity' }, attach: v.cable ? 'handle' : 'dumbbell' }),
-    curl: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -88, a1: 52, label: 'elbow', fixed: [[0, 0.95, 0, 0]], ...STAND_SIDE,
+    curl: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -88, a1: 52, label: T('elbow'), fixed: [[0, 0.95, 0, 0]], ...STAND_SIDE,
       force: v.cable ? { type: 'cable', q: [1.2, -2.6] } : { type: 'gravity' }, attach: v.attach || (v.cable ? 'bar' : 'dumbbell'), frame: v.cable ? [[1.2, -2.6, 1.2, -2.9]] : null }),
-    inclineCurl: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -90, a1: 45, label: 'elbow', fixed: [[0, 0.95, 0, 0]],
+    inclineCurl: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -90, a1: 45, label: T('elbow'), fixed: [[0, 0.95, 0, 0]],
       head: [-0.75, 1.75, 0.19], body: [[0, 0.95, -0.55, 1.55], [0, 0.95, 0.75, -0.2], [0.75, -0.2, 1.45, -0.3]], bench: null, incline: [[0.35, 0.35, -0.8, 1.85]],
       force: { type: 'gravity' }, attach: 'dumbbell' }),
-    preacher: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -42, a1: 95, label: 'elbow', fixed: [[-0.68, 0.68, 0, 0]],
+    preacher: v => ({ view: 'side', joint: [0, 0], seg: 0.85, load: 0.85, a0: -42, a1: 95, label: T('elbow'), fixed: [[-0.68, 0.68, 0, 0]],
       head: [-0.6, 1.5, 0.19], body: [[-0.68, 0.68, -0.8, 1.1], [-0.8, 1.1, -0.95, -0.35], [-0.95, -0.35, -0.1, -0.4], [-0.1, -0.4, -0.05, -1.3]], pad: [[-0.85, 0.62, 0.12, -0.35]],
       force: v.machine ? { type: 'cam' } : { type: 'gravity' }, attach: v.machine ? 'pad' : v.attach || 'dumbbell' }),
-    lateral: v => ({ view: 'front', joint: [0, 0], seg: 0.95, load: 0.95, a0: -95, a1: 5, label: 'shoulder', fixed: [[-0.75, 0, 0, 0]],
+    lateral: v => ({ view: 'front', joint: [0, 0], seg: 0.95, load: 0.95, a0: -95, a1: 5, label: T('shoulder'), fixed: [[-0.75, 0, 0, 0]],
       head: [-0.375, 0.45, 0.2], body: [[-0.375, 0.25, -0.375, -1.2], [-0.75, 0, -0.85, -0.95]],
       force: v.cable ? { type: 'cable', q: [-1.05, -1.75] } : v.machine ? { type: 'cam' } : { type: 'gravity' }, attach: v.machine ? 'pad' : v.cable ? 'cuff' : 'dumbbell' }),
-    flyFree: v => ({ view: 'end', joint: [0, 0], seg: 0.95, load: 0.95, a0: -12, a1: 90, label: 'shoulder', fixed: [[-0.7, 0, 0, 0]],
+    flyFree: v => ({ view: 'end', joint: [0, 0], seg: 0.95, load: 0.95, a0: -12, a1: 90, label: T('shoulder'), fixed: [[-0.7, 0, 0, 0]],
       head: [-0.35, -0.02, 0.2], body: [[-0.7, 0, -1.65, 0.0]], bench: [-1.05, -0.32, 0.7, 0.2], force: { type: 'gravity' }, attach: 'dumbbell', mirror: true }),
-    flyCable: v => ({ view: 'top', joint: [0, 0], seg: 0.95, load: 0.95, a0: -22, a1: 88, label: 'shoulder', fixed: [[-0.7, 0, 0, 0]],
+    flyCable: v => ({ view: 'top', joint: [0, 0], seg: 0.95, load: 0.95, a0: -22, a1: 88, label: T('shoulder'), fixed: [[-0.7, 0, 0, 0]],
       head: [-0.35, 0.05, 0.2], body: [], force: { type: 'cable', q: [1.7, -0.3] }, attach: 'handle', frame: [[1.7, -0.3, 1.7, 0.3]] }),
-    flyMachine: v => ({ view: 'top', joint: [0, 0], seg: 0.95, load: 0.95, a0: -15, a1: 88, label: 'shoulder', fixed: [[-0.7, 0, 0, 0]],
+    flyMachine: v => ({ view: 'top', joint: [0, 0], seg: 0.95, load: 0.95, a0: -15, a1: 88, label: T('shoulder'), fixed: [[-0.7, 0, 0, 0]],
       head: [-0.35, 0.05, 0.2], body: [], force: { type: 'cam' }, attach: 'pad' }),
-    pulloverFree: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 1.0, a0: 192, a1: 92, label: 'shoulder', fixed: [],
+    pulloverFree: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 1.0, a0: 192, a1: 92, label: T('shoulder'), fixed: [],
       head: [-0.3, -0.05, 0.19], body: [[0, 0, 1.5, 0], [1.5, 0, 2.2, -0.65]], bench: [-0.45, -0.3, 2.0, 0.18], force: { type: 'gravity' }, attach: 'dumbbell' }),
-    pulloverMachine: v => ({ view: 'side', joint: [0, 0], seg: 0.95, load: 0.75, a0: 112, a1: -78, label: 'shoulder', fixed: [],
+    pulloverMachine: v => ({ view: 'side', joint: [0, 0], seg: 0.95, load: 0.75, a0: 112, a1: -78, label: T('shoulder'), fixed: [],
       head: [0.1, 0.4, 0.19], body: [[0, 0, -0.1, -1.35], [-0.1, -1.35, 0.75, -1.4], [0.75, -1.4, 0.8, -2.2]], force: { type: 'cam' }, attach: 'pad' }),
-    legExt: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: -100, a1: -2, label: 'knee', fixed: [[-1.05, 0, 0, 0]],
+    legExt: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: -100, a1: -2, label: T('knee'), fixed: [[-1.05, 0, 0, 0]],
       head: [-1.1, 1.75, 0.19], body: [[-1.05, 0, -1.1, 1.5]], seat: [[-1.25, -0.12, 0.05, -0.12], [-1.3, -0.1, -1.4, 1.5]], force: { type: 'cam' }, attach: 'roller' }),
-    legCurlSeated: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: -5, a1: -118, label: 'knee', fixed: [[-1.05, 0, 0, 0]],
+    legCurlSeated: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: -5, a1: -118, label: T('knee'), fixed: [[-1.05, 0, 0, 0]],
       head: [-1.1, 1.75, 0.19], body: [[-1.05, 0, -1.1, 1.5]], seat: [[-1.25, -0.12, 0.05, -0.12], [-1.3, -0.1, -1.4, 1.5]], force: { type: 'cam' }, attach: 'roller' }),
-    legCurlLying: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: 2, a1: 125, label: 'knee', fixed: [[-1.05, 0, 0, 0]],
+    legCurlLying: v => ({ view: 'side', joint: [0, 0], seg: 1.0, load: 0.9, a0: 2, a1: 125, label: T('knee'), fixed: [[-1.05, 0, 0, 0]],
       head: [-2.75, 0.12, 0.19], body: [[-1.05, 0, -2.55, 0.05]], bench: [-2.7, -0.3, 2.9, 0.18], force: { type: 'cam' }, attach: 'roller' }),
-    hipAdd: v => ({ view: 'top', joint: [0, 0], seg: 1.0, load: 0.75, a0: 38, a1: 2, label: 'hip', fixed: [[-0.5, 0, 0, 0]],
-      head: null, body: [[-0.5, 0, -1.0, 0.0]], force: { type: 'cam' }, attach: 'pad', note: 'seen from above' }),
-    hipAbd: v => ({ view: 'top', joint: [0, 0], seg: 1.0, load: 0.75, a0: 2, a1: 40, label: 'hip', fixed: [[-0.5, 0, 0, 0]],
-      head: null, body: [[-0.5, 0, -1.0, 0.0]], force: { type: 'cam' }, attach: 'pad', note: 'seen from above' }),
-    crunch: v => ({ view: 'side', joint: [0, 0], seg: 1.2, load: 1.0, a0: 102, a1: 52, label: 'spine', fixed: [],
+    hipAdd: v => ({ view: 'top', joint: [0, 0], seg: 1.0, load: 0.75, a0: 38, a1: 2, label: T('hip'), fixed: [[-0.5, 0, 0, 0]],
+      head: null, body: [[-0.5, 0, -1.0, 0.0]], force: { type: 'cam' }, attach: 'pad', note: T('seen from above') }),
+    hipAbd: v => ({ view: 'top', joint: [0, 0], seg: 1.0, load: 0.75, a0: 2, a1: 40, label: T('hip'), fixed: [[-0.5, 0, 0, 0]],
+      head: null, body: [[-0.5, 0, -1.0, 0.0]], force: { type: 'cam' }, attach: 'pad', note: T('seen from above') }),
+    crunch: v => ({ view: 'side', joint: [0, 0], seg: 1.2, load: 1.0, a0: 102, a1: 52, label: T('spine'), fixed: [],
       head: null, body: [[0, 0, 1.0, 0.0], [1.0, 0, 1.05, -0.95]], seat: [[-0.35, -0.12, 1.1, -0.12]], force: v.machine ? { type: 'cam' } : { type: 'cable', q: [-0.2, 2.3] }, attach: v.machine ? 'pad' : 'rope', headOnSeg: true })
   };
 
@@ -560,7 +560,7 @@ window.LS_SCIENCE = (() => {
     if (!sc) return '';
     const { J, segAt, hard, K, W, H, X, Y, L } = frameOf(a);
     // text sized to the drawing so every diagram reads the same once scaled to fit
-    let s = `<svg class="sci-fig" style="--fs:${(Math.max(W, H * 0.75) / 15).toFixed(0)}px" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" role="img" aria-label="${a.title}: diagram of the joint, the moving part and the line of force">`;
+    let s = `<svg class="sci-fig" style="--fs:${(Math.max(W, H * 0.75) / 15).toFixed(0)}px" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" role="img" aria-label="${T('{title}: diagram of the joint, the moving part and the line of force', { title: T(a.title) })}">`;
     if (sc.bench) s += `<rect class="sci-bench" x="${X(sc.bench[0])}" y="${Y(sc.bench[1] + sc.bench[3])}" width="${(sc.bench[2] * K).toFixed(1)}" height="${(sc.bench[3] * K).toFixed(1)}" rx="4"/>`;
     for (const sl of sc.seat || []) s += L(...sl, 'sci-bench-l');
     for (const sl of sc.incline || []) s += L(...sl, 'sci-bench-l');
@@ -583,7 +583,7 @@ window.LS_SCIENCE = (() => {
     const st = segAt(sc.a0), en = segAt(sc.a1);
     const tip = (p, k) => [J[0] + (p[0] - J[0]) * k, J[1] + (p[1] - J[1]) * k];
     const ts = tip(st, 1.22), te = tip(en, 1.22);
-    s += `<text class="sci-t g" x="${X(ts[0])}" y="${Y(ts[1])}" text-anchor="middle" dominant-baseline="middle">start</text><text class="sci-t g" x="${X(te[0])}" y="${Y(te[1])}" text-anchor="middle" dominant-baseline="middle">end</text>`;
+    s += `<text class="sci-t g" x="${X(ts[0])}" y="${Y(ts[1])}" text-anchor="middle" dominant-baseline="middle">${T('start')}</text><text class="sci-t g" x="${X(te[0])}" y="${Y(te[1])}" text-anchor="middle" dominant-baseline="middle">${T('end')}</text>`;
     if (sc.note) s += `<text class="sci-t g" x="10" y="${(H - 10).toFixed(1)}">${sc.note}</text>`;
     return s + '</svg>';
   }

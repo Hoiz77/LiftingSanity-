@@ -53,6 +53,12 @@ const NO_RECORD = new Set(['W', 'P', 'E']);
 const BAR_EQUIP = new Set(['barbell', 'ezbar', 'trapbar', 'smith', 'specialty']);
 const REST_PRESETS = [30, 45, 60, 75, 90, 120, 150, 180, 240, 300];
 const PLATE_COLORS = { 25: 'red', 20: 'blue', 15: 'yellow', 10: 'green', 5: 'white', 2.5: 'red', 1.25: 'steel', 0.5: 'steel' };
+// in Arabic, the names in these lists are shown translated (exercise names stay as they are)
+for (const k in MUSCLES) MUSCLES[k] = T(MUSCLES[k]);
+for (const g of GROUPS) g[1] = T(g[1]);
+for (const k in EQUIP) EQUIP[k] = T(EQUIP[k]);
+for (const k in KINDS) KINDS[k] = T(KINDS[k]);
+for (const k in SET_TYPES) { SET_TYPES[k].label = T(SET_TYPES[k].label); SET_TYPES[k].desc = T(SET_TYPES[k].desc); }
 
 const slug = s => s.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const parseLib = text => text.trim().split('\n').map(line => {
@@ -75,6 +81,12 @@ function loadSteps() {
   return stepsLoading;
 }
 const PROGRAMS = window.FORGE_PROGRAMS;
+// ready-made plans in the chosen language: their names, notes and day names (the exercises keep their names)
+for (const p of PROGRAMS) {
+  p.name = T(p.name); p.about = T(p.about); p.freq = T(p.freq);
+  if (p.note) p.note = T(p.note);
+  for (const d of p.days) if (Array.isArray(d)) d[0] = T(d[0]);
+}
 
 /* ============================== Utilities ============================== */
 
@@ -101,7 +113,7 @@ function compact(v) {
   if (v >= 1e6) return trimNum(v / 1e6, 1) + 'M';
   if (v >= 1e5) return trimNum(v / 1e3, 0) + 'k';
   if (v >= 1e4) return trimNum(v / 1e3, 1) + 'k';
-  return Math.round(v).toLocaleString();
+  return Math.round(v).toLocaleString(LOC);
 }
 function fmtVol(kg) { return compact(U() === 'lb' ? kg * KG_LB : kg) + ' ' + U(); }
 function distUnit(k) { return k === 'wdist' ? (U() === 'lb' ? 'yd' : 'm') : (U() === 'lb' ? 'mi' : 'km'); }
@@ -141,11 +153,11 @@ function fmtDuration(ms) {
   const min = Math.max(1, Math.round(ms / 60000));
   return min >= 60 ? `${Math.floor(min / 60)}h ${pad2(min % 60)}m` : `${min} min`;
 }
-const dfmt = (ts, o) => new Date(ts).toLocaleDateString(undefined, o);
+const dfmt = (ts, o) => new Date(ts).toLocaleDateString(LOC, o);
 const fmtDate = ts => dfmt(ts, { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtDateY = ts => dfmt(ts, { day: 'numeric', month: 'short', year: 'numeric' });
 const fmtShort = ts => dfmt(ts, { day: 'numeric', month: 'short' });
-const fmtTime = ts => new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const fmtTime = ts => new Date(ts).toLocaleTimeString(LOC, { hour: 'numeric', minute: '2-digit' });
 function dayStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
 function weekStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); }
 function relDay(ts) {
@@ -549,7 +561,7 @@ function load() {
   }
   if (!state) state = defaults();
   // nothing saved yet: someone new (or a new device). They get the welcome, not the Full Body EOD split
-  if (!raw && !saveBlocked) { state.flags.fbeod = 1; ui.firstRun = true; }
+  if (!raw && !saveBlocked) { state.flags.fbeod = 1; state.flags.newUser = 1; }
   ensureSplits();
   if (saveBlocked) setTimeout(() => toast('Your saved data couldn’t be read, so nothing is saved over it. Free some storage, then reopen.'), 600);
   else persist();
@@ -1225,7 +1237,7 @@ function fmtLine(x, s, k) {
 
 /* ============================== Shell ============================== */
 
-const TABS = [['train', 'Train', 'dumbbell'], ['history', 'History', 'clock'], ['library', 'Exercises', 'list'], ['progress', 'Progress', 'chart'], ['settings', 'Settings', 'sliders']];
+const TABS = [['train', 'Train', 'dumbbell'], ['history', 'History', 'clock'], ['library', 'Exercises', 'list'], ['progress', 'Progress', 'chart'], ['settings', 'Settings', 'sliders']].map(([id, l, ic]) => [id, T(l), ic]);
 
 function applyTheme() {
   const t = state.settings.theme;
@@ -1472,7 +1484,7 @@ function welcomeSheet() {
   };
   openSheet({
     full: true, cls: 'welcome',
-    render: () => step === 'start' ? `${sheetHead('', '<button class="btn ghost sm" data-a="sheetClose">Skip</button>', '<span></span>')}<div class="sheet-body pad welcome-b">
+    render: () => step === 'start' ? `${sheetHead('', '<button class="btn ghost sm" data-a="sheetClose">Skip</button>', `<div class="seg sm lang-seg" role="group" aria-label="Language">${[['en', 'English'], ['ar', 'العربية']].map(([v, l]) => `<button class="${LANG === v ? 'on' : ''}" data-a="setLang" data-v="${v}" lang="${v}">${l}</button>`).join('')}</div>`)}<div class="sheet-body pad welcome-b">
         <div class="welcome-mark" aria-hidden="true">${plateMark()}</div>
         <h1 class="welcome-h">Welcome to Lifting Sanity</h1>
         <ul class="welcome-points">
@@ -1484,7 +1496,7 @@ function welcomeSheet() {
         <p class="eyebrow">How do you want to start?</p>
         <div class="welcome-opts">
           <button class="welcome-opt" data-a="wPlans">${icon('calendar')}<span><b>Pick a ready-made plan</b><small>Push / pull / legs, upper / lower, full body and more</small></span>${icon('right', 'chev')}</button>
-          <button class="welcome-opt" data-a="wOwn">${icon('edit')}<span><b>Build my own</b><small>Your own days and exercises, from a library of ${LIB.length.toLocaleString()}</small></span>${icon('right', 'chev')}</button>
+          <button class="welcome-opt" data-a="wOwn">${icon('edit')}<span><b>Build my own</b><small>Your own days and exercises, from a library of ${LIB.length.toLocaleString(LOC)}</small></span>${icon('right', 'chev')}</button>
           <button class="welcome-opt" data-a="wLook">${icon('play')}<span><b>Look around first</b><small>With 8 weeks of sample workouts, easy to remove later</small></span>${icon('right', 'chev')}</button>
           <label class="welcome-opt">${icon('upload')}<span><b>I have a backup</b><small>A file saved from this app on another device</small></span>${icon('right', 'chev')}<input type="file" accept=".json,application/json" data-f="importFile" hidden></label>
         </div>
@@ -2373,7 +2385,7 @@ function workoutParts(w) {
 function workoutHTML(w, P = workoutParts(w)) {
   let h = `<div class="wo ${P.focus ? 'focus' : 'list'}">${P.head}${P.prog}<div class="wo-body">${P.nav}<div class="wo-main">`;
   if (!w.ex.length) {
-    h += `<div class="wo-empty"><h2>Add your first exercise</h2><p class="muted">Search ${LIB.length.toLocaleString()} exercises or create your own.</p><button class="btn primary big" data-a="woAddEx">${icon('plus')}Add exercises</button></div>`;
+    h += `<div class="wo-empty"><h2>Add your first exercise</h2><p class="muted">Search ${LIB.length.toLocaleString(LOC)} exercises or create your own.</p><button class="btn primary big" data-a="woAddEx">${icon('plus')}Add exercises</button></div>`;
   } else {
     h += P.cards.join('');
     if (!P.focus) h += `<button class="btn wide add-ex" data-a="woAddEx">${icon('plus')}Add exercises</button>`;
@@ -3261,7 +3273,7 @@ async function wake(on) {
 function filterBar(f, prefix) {
   const g = GROUPS.find(x => x[0] === f.g);
   return `<div class="filters">
-    <label class="search">${icon('search')}<input id="${prefix}Q" data-f="${prefix}q" value="${esc(f.q)}" placeholder="Search ${(LIB.length + state.custom.length).toLocaleString()} exercises" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" type="search"></label>
+    <label class="search">${icon('search')}<input id="${prefix}Q" data-f="${prefix}q" value="${esc(f.q)}" placeholder="Search ${(LIB.length + state.custom.length).toLocaleString(LOC)} exercises" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" type="search"></label>
     <div class="chips" role="group" aria-label="Muscle group"><button class="chip ${f.g === 'all' ? 'on' : ''}" data-a="${prefix}G" data-v="all">All</button>${GROUPS.map(([id, label]) => `<button class="chip ${f.g === id ? 'on' : ''}" data-a="${prefix}G" data-v="${id}">${label}</button>`).join('')}</div>
     ${g && g[2].length > 1 ? `<div class="chips sub" role="group" aria-label="Muscle"><button class="chip ${f.m === 'all' ? 'on' : ''}" data-a="${prefix}M" data-v="all">All ${esc(g[1].toLowerCase())}</button>${g[2].map(m => `<button class="chip ${f.m === m ? 'on' : ''}" data-a="${prefix}M" data-v="${m}">${esc(MUSCLES[m])}</button>`).join('')}</div>` : ''}
     <div class="filter-row"><label class="select-wrap"><span class="sr">Equipment</span><select data-f="${prefix}eq"><option value="all">Any equipment</option>${Object.entries(EQUIP).map(([k, v]) => `<option value="${k}" ${f.eq === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
@@ -3605,7 +3617,7 @@ function calendarHTML(mStart) {
     cells += `<button class="cal-d ${c ? 'has' : ''} ${ts === today ? 'today' : ''} ${ui.hist.day === ts ? 'on' : ''}" data-a="histDay" data-v="${c ? ts : ''}" ${c ? '' : 'tabindex="-1"'} aria-label="${esc(fmtDateY(ts))}${c ? `, ${c} workout${c > 1 ? 's' : ''}` : ''}">${i}</button>`;
   }
   const monthCount = state.workouts.filter(w => { const x = new Date(w.start); return x.getFullYear() === y && x.getMonth() === m; }).length;
-  return `<section class="card cal"><div class="cal-h"><button class="icon-btn" data-a="histMonth" data-d="-1" aria-label="Previous month">${icon('left')}</button><div><b>${esc(d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))}</b><small class="muted">${monthCount} workout${monthCount === 1 ? '' : 's'}</small></div><button class="icon-btn" data-a="histMonth" data-d="1" aria-label="Next month">${icon('right')}</button></div>
+  return `<section class="card cal"><div class="cal-h"><button class="icon-btn" data-a="histMonth" data-d="-1" aria-label="Previous month">${icon('left')}</button><div><b>${esc(d.toLocaleDateString(LOC, { month: 'long', year: 'numeric' }))}</b><small class="muted">${monthCount} workout${monthCount === 1 ? '' : 's'}</small></div><button class="icon-btn" data-a="histMonth" data-d="1" aria-label="Next month">${icon('right')}</button></div>
     <div class="cal-grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span class="cal-w">${x}</span>`).join('')}${cells}</div></section>`;
 }
 function workoutSheet(id) {
@@ -3895,6 +3907,7 @@ VIEWS.settings = function () {
     ${row('Keep the screen awake', 'While a workout is open.', toggle(s.wake, 'tgl', 'data-k="wake"'))}
   </div>
   <h2 class="section-h">Look</h2><div class="card list-card">
+    ${row('Language', 'العربية: the app reads right to left. Exercise names and how-to steps stay in English.', seg('setLang', LANG, [['en', 'English'], ['ar', 'العربية']]))}
     ${row('Theme', '', seg('setTheme', s.theme, [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]))}
     ${row('Style', 'Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.', seg('setStyle', s.style || 'clean', [['clean', 'Clean'], ['y2k', 'Y2K']]))}
     ${row('Movement animations', `Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.${reduceMotion.matches ? ' Reduce Motion is on in your device settings, so they stay still.' : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', 'On'], ['off', 'Off']]))}
@@ -4108,6 +4121,8 @@ const ACT = {
   toastAct: () => { const a = toast.action; $('#toast').classList.remove('in'); if (a) a.fn(); },
   resume: () => { ui.woHidden = false; renderWorkout(); wake(true); },
   nextOpen: () => { ui.nextOpen = !ui.nextOpen; render(); },
+  // a new language takes effect on a fresh start of the page (everything is drawn in it from the beginning)
+  setLang: b => { if (b.dataset.v === LANG) return; setLang(b.dataset.v); persist(); location.reload(); },
   backupLater: () => { state.flags.backupSnooze = Date.now() + 3 * DAY; save(); render(); },
   copies: () => copiesSheet(),
   dismissInstall: () => { state.settings.installHint = false; save(); render(); },
@@ -4623,7 +4638,8 @@ if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
 mvWatch();
 requestAnimationFrame(() => { ui.booted = true; placePill(true); });
-if (ui.firstRun && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
+// the welcome stays until it's used or skipped (switching language on it starts the page again with it open)
+if (state.flags.newUser && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
 setTimeout(keepCopy, 2000);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // https, or a local copy on this computer (how the tests run it)
