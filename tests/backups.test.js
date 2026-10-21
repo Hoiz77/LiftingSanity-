@@ -35,6 +35,21 @@ const { open, report } = require('./lib');
   for (let i = 0; i < 9; i++) { await p.clock.fastForward(86400e3); await t.ev('keepCopy()'); await p.waitForTimeout(120); }
   const copies = await t.ev('listCopies().then(l => l.length)');
   r.ok(copies >= 5 && copies <= 6, 'one copy a day, the last 5 days kept', copies);
+  // which older copy survives: the fullest of the OLDER ones, even when a recent copy is fuller still
+  // (copies d1..d8 are 1..8 days old; n is how many workouts each holds; keepCopy adds today's)
+  const keptAfter = list => t.ev(`(async () => {
+    const db = await copyDB(), st = db.transaction('copies', 'readwrite').objectStore('copies');
+    st.clear();
+    for (const [k, n] of ${JSON.stringify(list)}) st.put({ key: 'd' + k, at: Date.now() - k * 864e5, n, json: '{}' }, 'd' + k);
+    await new Promise(res => { st.transaction.oncomplete = res; });
+    db.close();
+    await keepCopy();
+    return (await listCopies()).map(c => c.key).filter(k => k.startsWith('d')).sort();
+  })()`);
+  let kept = await keptAfter([[1, 50], [2, 99], [3, 50], [4, 50], [5, 10], [6, 30], [7, 20], [8, 5]]);
+  r.ok(JSON.stringify(kept) === JSON.stringify(['d1', 'd2', 'd3', 'd4', 'd6']), 'with the fullest copy among the recent ones, the fullest older copy is still kept as a fallback', kept);
+  kept = await keptAfter([[1, 1], [2, 1], [3, 1], [4, 1], [5, 80], [6, 90], [7, 70], [8, 60]]);
+  r.ok(JSON.stringify(kept) === JSON.stringify(['d1', 'd2', 'd3', 'd4', 'd6']), 'after a wipe (recent copies nearly empty), the fullest older copy is the one kept', kept);
   await t.ev(`(() => { state.workouts = state.workouts.slice(0, 1); recalcPRs(); save(true); render(); })()`);
   await t.tab('settings'); await t.click('[data-a="copies"]', 700);
   await t.inSheet('[data-a="useCopy"]', 600);

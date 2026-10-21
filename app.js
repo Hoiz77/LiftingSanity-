@@ -3980,10 +3980,12 @@ async function keepCopy() {
     const d = new Date(), key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     await idbDone(db.transaction('copies', 'readwrite').objectStore('copies').put({ key, at: Date.now(), n: backupInfo().real, json: JSON.stringify({ ...state, rest: null }) }, key));
     const all = (await idbDone(db.transaction('copies').objectStore('copies').getAll())).sort((a, b) => b.at - a.at);
-    // the last few days, plus the fullest older copy, so a wiped or damaged save can't push every good copy out
-    const fullest = all.reduce((m, c) => (c.n > m.n ? c : m), all[0]);
+    // the last few days, plus the fullest of the older copies, so a wiped or damaged save can't push every good copy out
+    // (picked among the older ones only: there's always one older copy to go back to, however full the recent ones are)
+    const older = all.slice(COPY_DAYS);
+    const fullest = older.reduce((m, c) => (c.n > m.n ? c : m), older[0]);
     const st = db.transaction('copies', 'readwrite').objectStore('copies');
-    for (const c of all.slice(COPY_DAYS)) if (c !== fullest) st.delete(c.key);
+    for (const c of older) if (c !== fullest) st.delete(c.key);
   } catch (e) { /* copies are a safety net; they never get in the way */ } finally { db.close(); }
 }
 async function copiesSheet() {
