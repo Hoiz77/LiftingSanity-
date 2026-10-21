@@ -1,8 +1,9 @@
 // Arabic: the whole app reads right to left, nothing is left in English except what's meant to be (exercise names,
 // how-to steps, units, citations), nothing is cut off, gestures follow the reading direction, and English comes back
 const { open, report } = require('./lib');
-// words that stay as they are in Arabic: units, abbreviations, names of things
-const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body)$/;
+// words that stay as they are in Arabic: units, abbreviations (1RM shows up as RM), names of things and plans, the
+// English choice in the language setting
+const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive)$/;
 const ENGLISH = (names) => {
   const skip = '.steps, .refs, .credits, #hud, .term, .sci-ref, a[href^="http"], input, textarea, svg, [hidden], .lang-seg, [lang="en"]';
   const out = new Set();

@@ -712,7 +712,9 @@ const hasWeight = k => k === 'wr' || k === 'bw' || k === 'aw' || k === 'wdur' ||
 const hasReps = k => k === 'wr' || k === 'bw' || k === 'aw';
 const hasTime = k => k === 'dur' || k === 'wdur' || k === 'dist';
 const hasDist = k => k === 'dist' || k === 'wdist';
-function weightLabel(k) { return k === 'bw' ? '+' + U() : k === 'aw' ? '−' + U() : U(); }
+// a signed number (+20, −2.5) kept in one piece, so right-to-left text doesn't move its sign to the other end
+const signed = t => (RTL ? `\u2066${t}\u2069` : t);
+function weightLabel(k) { return k === 'bw' ? signed('+' + U()) : k === 'aw' ? signed('−' + U()) : U(); }
 function filterExercises({ q = '', g = 'all', m = 'all', eq = 'all', sort = 'az' }) {
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
   const gm = g === 'all' ? null : new Set((GROUPS.find(x => x[0] === g) || [0, 0, []])[2]);
@@ -898,6 +900,8 @@ function baselineAt(exId, ts) {
 }
 const baseline = exId => baselineAt(exId, Infinity);
 // the latest reset of one exercise that is newer than the current block, or 0
+// a block still called by its default name ("Block 2") shows in the language in use; a name you typed shows as typed
+const blkName = b => { const m = /^Block (\d+)$/.exec(b.name); return m ? T('Block {n}', { n: +m[1] }) : b.name; };
 function exResetSince(exId) { const r = state.exResets[exId] || []; const t = r.length ? Math.max(...r) : 0; return t > curBlock().start ? t : 0; }
 // a reset made during a workout counts that workout as after it
 function resetStamp(exId) {
@@ -1198,8 +1202,8 @@ function fmtSet(x, s, k, withEff = true) {
   const reps = `${s.r ?? 0}`;
   let t;
   if (k === 'wr') t = `${dispW(s.w || 0)} × ${reps}`;
-  else if (k === 'bw') t = s.w ? `+${dispW(s.w)} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
-  else if (k === 'aw') t = s.w ? `−${dispW(s.w)} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
+  else if (k === 'bw') t = s.w ? `${signed('+' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
+  else if (k === 'aw') t = s.w ? `${signed('−' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
   else if (k === 'dur') t = fmtClock(s.sec || 0);
   else if (k === 'wdur') t = `${dispW(s.w || 0)} · ${fmtClock(s.sec || 0)}`;
   else if (k === 'dist') t = `${dispDist(s.dist || 0, k)} ${distUnit(k)}${s.sec ? ' · ' + fmtClock(s.sec) : ''}`;
@@ -1227,7 +1231,7 @@ function lineTag(sets, j) {
 function fmtLine(x, s, k) {
   k = k || getEx(x.exId).k;
   const parts = [];
-  if (hasWeight(k) && s.w != null) parts.push(`${k === 'bw' ? '+' : k === 'aw' ? '−' : ''}${dispW(s.w)} ${U()}`);
+  if (hasWeight(k) && s.w != null) parts.push(signed(`${k === 'bw' ? '+' : k === 'aw' ? '−' : ''}${dispW(s.w)} ${U()}`));
   if (hasReps(k)) parts.push(TN(s.r ?? 0, '{n} reps', '{n} reps'));
   if (hasDist(k) && s.dist != null) parts.push(`${dispDist(s.dist, k)} ${distUnit(k)}`);
   if (hasTime(k) && s.sec != null) parts.push(fmtClock(s.sec));
@@ -2518,7 +2522,7 @@ function exCardHTML(w, i, focus) {
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>${T('Last time you hit {n}+ reps on every set. Try <b>{w}</b> today.', { n: ctx.suggest.hi, w: esc(fmtW(ctx.suggest.w)) })}</span></p>`;
   else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>${exResetSince(x.exId) ? T('“Previous” is from before your reset ({date}). Records for this exercise start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) }) : T('“Previous” is from before your reset ({date}). Records for this block start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) })}</span></p>`;
   const two = isCompact(x), f1 = firstSide(x), del = ui.delMode === x.id;
-  h += `<div class="sets ${del ? 'deleting' : ''}" style="--cols:${setCols(k, effOn, two)}"><div class="set-row head"><span>${T('Set')}</span><span>${T('Previous')}</span>`;
+  h += `<div class="sets ${del ? 'deleting' : ''}" style="--cols:${setCols(k, effOn, two)}"><div class="set-row head"><span>${TC('Set', 'column')}</span><span>${T('Previous')}</span>`;
   if (hasWeight(k)) h += `<span>${esc(weightLabel(k))}</span>`;
   if (hasReps(k)) h += two ? `<span class="hs-${f1}">${T('{side} reps', { side: f1 })}</span><span class="hs-${otherSide(f1)}">${T('{side} reps', { side: otherSide(f1) })}</span>` : `<span>${T('Reps')}</span>`;
   if (hasDist(k)) h += `<span>${distUnit(k)}</span>`;
@@ -3622,7 +3626,7 @@ VIEWS.history = function () {
   for (const w of list) {
     const b = blockAt(w.start);
     if (b !== lastBlock && state.blocks.length > 1) {
-      h += `<p class="block-div">${icon(b === curBlock() ? 'chart' : 'archive')}<span>${esc(b.name)}</span><small>${b === curBlock() ? T('current block') : T('earlier block')}${b.start ? ' · ' + T('from {date}', { date: esc(fmtDateY(b.start)) }) : ''}</small></p>`;
+      h += `<p class="block-div">${icon(b === curBlock() ? 'chart' : 'archive')}<span>${esc(blkName(b))}</span><small>${b === curBlock() ? T('current block') : T('earlier block')}${b.start ? ' · ' + T('from {date}', { date: esc(fmtDateY(b.start)) }) : ''}</small></p>`;
       lastBlock = b;
     }
     h += histCard(w);
@@ -3667,7 +3671,7 @@ function workoutSheet(id) {
       const b = blockAt(w.start);
       return `${sheetHead(esc(w.name), `<button class="btn sm" data-a="edit">${icon('edit')}${T('Edit')}</button>`)}
       <div class="sheet-body pad">
-        <p class="eyebrow">${T('Session #{n} · {date}, {time}', { n: sessionNumber(w), date: esc(fmtDate(w.start)), time: esc(fmtTime(w.start)) })}${state.blocks.length > 1 ? ' · ' + esc(b.name) : ''}</p>
+        <p class="eyebrow">${T('Session #{n} · {date}, {time}', { n: sessionNumber(w), date: esc(fmtDate(w.start)), time: esc(fmtTime(w.start)) })}${state.blocks.length > 1 ? ' · ' + esc(blkName(b)) : ''}</p>
         <div class="tiles"><div class="tile"><span>${T('Time')}</span><b>${fmtDuration(w.end - w.start)}</b></div><div class="tile"><span>${T('Working sets')}</span><b>${workingSets(w)}</b></div><div class="tile"><span>${T('Volume')}</span><b>${fmtVol(workoutVolume(w))}</b></div><div class="tile"><span>${T('Records')}</span><b>${(w.prs || []).length}</b></div></div>
         ${w.note ? `<p class="note-text">${esc(w.note)}</p>` : ''}
         ${w.ex.map(x => {
@@ -3736,7 +3740,7 @@ function exerciseSheet(exId) {
       const allPts = exSeries(exId, st.metric);
       const hasArchived = allPts.some(p => p.x < base);
       const pts = (st.range === 'all' ? allPts : allPts.filter(p => p.x >= base)).map(p => ({ ...p, dim: p.x < base }));
-      const marks = st.range === 'all' ? [...state.blocks.slice(1).map(b => ({ x: b.start, label: b.name })), ...resets.map(r => ({ x: r, label: T('Reset') }))] : [];
+      const marks = st.range === 'all' ? [...state.blocks.slice(1).map(b => ({ x: b.start, label: blkName(b) })), ...resets.map(r => ({ x: r, label: T('Reset') }))] : [];
       const rec = records(exId, st.range === 'all' ? 0 : base);
       const prefs = state.exPrefs[exId] || {};
       const sessions = [];
@@ -3823,7 +3827,7 @@ VIEWS.progress = function () {
   const archived = state.blocks.slice(0, -1).reverse();
   let h = `<header class="page-h"><div><p class="eyebrow">${TN(state.workouts.length, '{n} sessions all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
   h += weekCard();
-  h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(b.name)}${icon('edit')}</button></h2>
+  h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(blkName(b))}${icon('edit')}</button></h2>
       <p class="muted">${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(inBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
       <div class="block-btns"><button class="btn" data-a="blockReset">${icon('reset')}${T('Reset progression')}</button>${archived.length ? `<button class="btn ghost" data-a="blockUndo">${icon('undo')}${T('Undo reset')}</button>` : ''}</div></div>
     <p class="small muted">${T('Starting a new block gives you fresh records and charts for everything, for a new program, after a break or after an injury. To start just one exercise fresh, tap {icon} next to it under Your lifts, or use its ⋯ menu in a workout. Everything stays saved below and in History.', { icon: icon('reset', 'inline') })}</p></section>`;
@@ -3845,7 +3849,7 @@ VIEWS.progress = function () {
   if (prs.length) h += `<section class="section"><h2 class="section-h">${T('Recent records')}</h2><div class="card list-card">${prs.map(({ w, p }) => `<button class="pr-item" data-a="openEx" data-id="${p.exId}">${icon('trophy')}<span><b>${esc(getEx(p.exId).name)}</b><small>${esc(kindName[p.kind] || p.kind)} · ${esc(fmtShort(w.start))}</small></span><span class="num">${esc(fmtSet({ uni: p.uni, exId: p.exId }, p.set))}</span></button>`).join('')}</div></section>`;
   if (archived.length) h += `<section class="section"><h2 class="section-h">${T('Earlier blocks')}</h2><p class="muted section-sub">${T('Saved progress from before each reset.')}</p><div class="tpl-grid">${archived.map(bk => {
     const [f, t] = blockRange(bk), ws = workoutsIn(f, t);
-    return `<button class="tpl-card block-old" data-a="openBlock" data-id="${bk.id}"><span class="tpl-main"><b>${esc(bk.name)}</b><span class="muted">${bk.start ? `${esc(fmtShort(bk.start))} – ${esc(fmtShort(t))}` : T('Start – {to}', { to: esc(fmtShort(t)) })}</span><span class="tpl-ex">${TN(ws.length, '{n} sessions', '{n} sessions')} · ${esc(fmtVol(sum(ws, workoutVolume)))}</span></span>${icon('right', 'chev')}</button>`;
+    return `<button class="tpl-card block-old" data-a="openBlock" data-id="${bk.id}"><span class="tpl-main"><b>${esc(blkName(bk))}</b><span class="muted">${bk.start ? `${esc(fmtShort(bk.start))} – ${esc(fmtShort(t))}` : T('Start – {to}', { to: esc(fmtShort(t)) })}</span><span class="tpl-ex">${TN(ws.length, '{n} sessions', '{n} sessions')} · ${esc(fmtVol(sum(ws, workoutVolume)))}</span></span>${icon('right', 'chev')}</button>`;
   }).join('')}</div></section>`;
   return h;
 };
@@ -3879,7 +3883,7 @@ function liftsSection(from, to, title) {
     const first = ptsAll[0], last = ptsAll[ptsAll.length - 1];
     const best = ptsAll.length ? Math.max(...ptsAll.map(p => p.y)) : 0;
     const diff = first && last ? last.y - first.y : 0;
-    const dtxt = ptsAll.length > 1 && Math.abs(diff) > 1e-6 ? `${diff > 0 ? '+' : '−'}${fmtMetric(m, Math.abs(diff), ex.k)}` : '';
+    const dtxt = ptsAll.length > 1 && Math.abs(diff) > 1e-6 ? signed(`${diff > 0 ? '+' : '−'}${fmtMetric(m, Math.abs(diff), ex.k)}`) : '';
     const fresh = exResetSince(id);
     return `<div class="lift-row"><button class="lift" data-a="openEx" data-id="${id}"><span class="lift-n"><b>${esc(ex.name)}</b><small>${fresh ? `${T('Fresh since {date}', { date: esc(fmtShort(fresh)) })} · ` : ''}${TN(count[id], '{n} session', '{n} sessions')} · ${esc(metricsFor(ex.k)[0][1])}</small></span>${sparkline(ptsAll.map(p => p.y))}<span class="lift-v"><b>${esc(best ? fmtMetric(m, best, ex.k) : '—')}</b>${dtxt ? `<small class="${diff > 0 ? 'up' : 'down'}">${esc(dtxt)}</small>` : ''}</span></button>`
       + `<button class="icon-btn lift-reset ${fresh ? 'on' : ''}" data-a="liftReset" data-id="${id}" aria-label="${T('Reset progression for {name}', { name: esc(ex.name) })}">${icon('reset')}</button></div>`;
@@ -3891,7 +3895,7 @@ function blockResetSheet() {
     cls: 'small', focus: '#blkName',
     render: () => `<div class="sheet-body pad confirm"><h2>${T('Start a new block?')}</h2>
       <p>${T('Records, charts, “try more weight” tips and progress all start fresh from today.')}</p>
-      <p>${T('<b>Nothing is deleted.</b> {name} is saved under Earlier blocks, every workout stays in History, and the All time view still shows it. You can undo this.', { name: esc(curBlock().name) })}</p>
+      <p>${T('<b>Nothing is deleted.</b> {name} is saved under Earlier blocks, every workout stays in History, and the All time view still shows it. You can undo this.', { name: esc(blkName(curBlock())) })}</p>
       <label class="field"><span>${T('Name for the new block')}</span><input id="blkName" value="${T('Block {n}', { n })}" autocomplete="off"></label>
       <div class="row-btns"><button class="btn" data-a="sheetClose">${T('Cancel')}</button><button class="btn primary" data-a="ok">${icon('reset')}${T('Start new block')}</button></div></div>`,
     actions: {
@@ -3911,7 +3915,7 @@ function blockSheet(id) {
   const [f, t] = blockRange(b), ws = workoutsIn(f, t);
   openSheet({
     full: true,
-    render: () => `${sheetHead(esc(b.name))}<div class="sheet-body pad">
+    render: () => `${sheetHead(esc(blkName(b)))}<div class="sheet-body pad">
       <p class="eyebrow">${b.start ? esc(fmtDateY(b.start)) : T('From the start')} – ${esc(fmtDateY(t))} · ${T('saved block')}</p>
       <div class="tiles"><div class="tile"><span>${T('Sessions')}</span><b>${ws.length}</b></div><div class="tile"><span>${T('Working sets')}</span><b>${sum(ws, workingSets)}</b></div><div class="tile"><span>${T('Volume')}</span><b>${fmtVol(sum(ws, workoutVolume))}</b></div><div class="tile"><span>${T('Records')}</span><b>${sum(ws, w => (w.prs || []).length)}</b></div></div>
       ${liftsSection(f, t, T('Lifts in this block'))}
@@ -4360,10 +4364,10 @@ const ACT = {
   blockUndo: () => {
     const b = curBlock();
     if (state.blocks.length < 2) return;
-    confirmSheet({ title: T('Undo {name}?', { name: b.name }), text: T('{name} merges back into {prev}. No workouts are changed.', { name: esc(b.name), prev: esc(state.blocks[state.blocks.length - 2].name) }), ok: T('Undo reset'),
+    confirmSheet({ title: T('Undo {name}?', { name: blkName(b) }), text: T('{name} merges back into {prev}. No workouts are changed.', { name: esc(blkName(b)), prev: esc(blkName(state.blocks[state.blocks.length - 2])) }), ok: T('Undo reset'),
       onOk: () => { const i = state.blocks.indexOf(b); if (i > 0) { state.blocks.splice(i, 1); recalcPRs(); save(); refreshAll(); } } });
   },
-  blockRename: () => { const b = curBlock(); inputSheet({ title: T('Rename block'), label: T('Name'), value: b.name, onOk: v => { if (v) { b.name = v; save(); render(); } } }); },
+  blockRename: () => { const b = curBlock(); inputSheet({ title: T('Rename block'), label: T('Name'), value: blkName(b), onOk: v => { if (v) { b.name = v; save(); render(); } } }); },
   openBlock: b => blockSheet(b.dataset.id),
   // settings
   setUnit: b => {

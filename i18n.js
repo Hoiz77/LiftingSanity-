@@ -23,6 +23,8 @@
   // dates and times in the language, always with 0–9 digits (the same digits you type weights in)
   window.LOC = lang === 'ar' ? 'ar-u-nu-latn' : undefined;
   window.T = (s, v) => { const d = dict(), t = d && typeof d[s] === 'string' ? d[s] : s; return fill(t, v); };
+  // a word that needs a different translation in one place (a narrow column heading): TC('Set', 'column')
+  window.TC = (s, ctx, v) => { const d = dict(), t = d && d[s + '|' + ctx]; return typeof t === 'string' ? fill(t, v) : window.T(s, v); };
   window.TN = (n, one, other, v) => {
     const vars = Object.assign({ n }, v), d = dict(), forms = d && d[one];
     if (forms && typeof forms === 'object' && plural) return fill(forms[plural.select(n)] || forms.other, vars);
