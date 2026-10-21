@@ -586,7 +586,9 @@ const SCI = window.LS_SCIENCE;
 const profOf = id => (state.exPrefs[id] || {}).profile;
 const sciOf = id => SCI ? SCI.analyze(getEx(id), profOf(id)) : null;
 const scoreOf = id => { const a = sciOf(id); return a ? a.score : null; };
-const scorePill = id => { const v = scoreOf(id); return v == null ? '' : `<span class="score ${v >= 9 ? 'hi' : v >= 7 ? 'good' : v >= 5 ? 'ok' : 'lo'}" title="Growth rating ${v}/10">${v}</span>`; };
+// the growth score is an estimate from the mechanics; a dot marks exercises with studies of their own (shown in their details)
+const studied = id => { const a = sciOf(id); return !!(a && a.evidence && a.evidence.length); };
+const scorePill = id => { const v = scoreOf(id), st = v != null && studied(id); return v == null ? '' : `<span class="score ${v >= 9 ? 'hi' : v >= 7 ? 'good' : v >= 5 ? 'ok' : 'lo'}${st ? ' studied' : ''}" title="Growth estimate ${v}/10, from the mechanics${st ? '; studies on this kind of exercise are in its details' : ''}">${v}</span>`; };
 // the best-rated exercises for a muscle, best first; ones with pictures win ties
 function bestFor(m, n = 3, not = null, min = 0) {
   const used = new Set(state.workouts.flatMap(w => w.ex.map(x => x.exId)));
@@ -662,19 +664,22 @@ function scienceHTML(exId) {
   const total = allExercises().filter(e => e.m === ex.m && scoreOf(e.id) != null).length;
   const mv = !!a.scene && motionOn();
   return `<section class="sci">
-    <div class="sci-h"><h3 class="sub-h">${icon('flask')}How it works</h3>${a.score != null ? `<span class="sci-score"><b>${a.score}</b><small>/10</small><span>${esc(SCI.verdict(a.score))}</span></span>` : ''}</div>
+    <div class="sci-h"><h3 class="sub-h">${icon('flask')}How it works</h3>${a.score != null ? `<span class="sci-score"><b>${a.score}</b><small>/10</small><span>${esc(SCI.verdict(a.score))}<i>Estimate from the mechanics</i></span></span>` : ''}</div>
     <p class="sci-title">${esc(a.title)}</p>
     ${a.joints.length || a.movers ? `<dl class="sci-facts">${a.joints.length ? `<dt>Joint action</dt><dd>${esc(a.joints.join(' · '))}</dd>` : ''}${a.movers ? `<dt>Muscles</dt><dd>${esc(a.movers)}</dd>` : ''}</dl>` : ''}
     ${a.scene ? `<figure class="sci-diag"${mv ? ` data-mv="sci" data-ex="${esc(exId)}"` : ''}>${mv ? '<span class="sci-phase" aria-hidden="true">Lift</span>' : ''}${SCI.diagram(a)}<figcaption>${mv ? '<span><i class="k seg"></i>moving part</span>' : '<span><i class="k seg"></i>where it’s hardest</span>'}${a.curve && a.shape !== 'flat' ? '<span><i class="k hard"></i>hardest point</span>' : ''}<span><i class="k ghost"></i>start and end</span>${a.scene.attach === 'cuff' ? '<span><i class="k cuff"></i>cuff on the wrist</span>' : ''}${a.scene.force.type !== 'cam' ? `<span><i class="k force"></i>line of force</span><span><i class="k arm"></i>moment arm</span>` : ''}</figcaption></figure>` : ''}
     ${profileHTML(exId, a, mv)}
     ${a.moment ? `<p class="sci-p"><b>Moment arm.</b> ${esc(a.moment)}</p>` : ''}
-    ${a.r ? `<div class="sci-rates">${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(SCI.RATE_NAMES[k])}</span>${dots(v, SCI.RATE_MAX[k])}</div>`).join('')}</div>
+    ${a.r ? `<div class="sci-rates"><p class="sci-rates-h">Why ${a.score}/10: points from the mechanics</p>${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(SCI.RATE_NAMES[k])}</span><span class="rate-v">${dots(v, SCI.RATE_MAX[k])}<small>${v}/${SCI.RATE_MAX[k]}</small></span></div>`).join('')}</div>
     ${a.profWhy && a.profWhy.length ? `<p class="prof-why">${icon('info', 'inline')}Your machine’s profile: ${a.profWhy.map(esc).join('; ')}.</p>` : ''}
-    <p class="muted small">Ratings are rules of thumb from the mechanics above (how well the stretched position is loaded, stability, tension through the range, focus, progression). Where a study compared exercises directly, it is cited below and beats the rating.</p>` : ''}
+    ${a.eqWhy ? `<p class="prof-why">${icon('info', 'inline')}${esc(a.eqWhy)}</p>` : ''}
+    <div class="sci-sure"><b>${icon('info', 'inline')}How sure is this?</b>
+      <p>${a.evidence.length ? 'There are studies on this kind of exercise, below. Where they compared exercises directly, they count for more than this score.' : 'No study has compared this kind of exercise directly, so the score is a rule of thumb from its mechanics: a reasoned estimate, not a measured result.'}</p>
+      <p>What it can’t see: how the exercise feels on your joints, your technique and range of motion, how close to failure you take your sets (which matters more than the choice of exercise), whether you can keep adding weight or reps, and the rest of your program.</p></div>` : a.unrated ? `<div class="sci-sure"><b>${icon('info', 'inline')}Not rated for growth</b><p>${esc(a.unrated)}</p></div>` : ''}
     ${a.fibers ? `<p class="sci-p"><b>Fibers.</b> ${esc(a.fibers)}</p>` : ''}
     ${a.evidence.length ? `<div class="sci-ev"><b>What studies found</b>${a.evidence.map(([k, t]) => `<p>${esc(t)} <span class="muted">(${refLink(k)})</span></p>`).join('')}</div>` : ''}
     ${a.tips.length ? `<ul class="sci-tips">${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
-    ${a.score != null && total > 1 ? `<p class="sci-rank">Ranks <b>#${rank}</b> of ${total} for ${esc(MUSCLES[ex.m].toLowerCase())} in this library.</p>` : ''}
+    ${a.score != null && total > 1 ? `<p class="sci-rank">Ranks <b>#${rank}</b> of ${total} for ${esc(MUSCLES[ex.m].toLowerCase())} in this library, by this estimate.</p>` : ''}
     ${better.length ? `<div class="sci-alt"><b>Higher-rated for ${esc(MUSCLES[ex.m].toLowerCase())}</b><p class="muted small">Worth a try if they suit your joints, your gym and your progress; a lower rating doesn’t mean this exercise is a bad choice.</p>${better.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'sm')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(sciOf(e.id).title)}</small></span>${scorePill(e.id)}</button>`).join('')}</div>` : ''}
   </section>`;
 }
@@ -1690,6 +1695,7 @@ VIEWS.train = function () {
   h += weekStrip();
   if (!storageOK) h += `<div class="notice bad">${icon('info')}<p>This browser is blocking storage, so nothing you log will be kept. Open Lifting Sanity in Safari, or add it to your Home Screen.</p></div>`;
   h += installHint();
+  h += backupNudge();
   if (state.active) {
     const w = state.active;
     h += `<button class="card resume" data-a="resume"><span class="live-dot"></span><span><b>${esc(w.mode === 'edit' ? 'Editing ' + w.name : w.name + ' in progress')}</b><small>${woTally(w).done} sets done${w.mode === 'edit' ? '' : ` · started ${fmtTime(w.start)}`}</small></span><span class="btn primary sm">Resume</span></button>`;
@@ -1819,9 +1825,9 @@ function planReview(split) {
       if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', 'Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.', ['plotkin2023']);
       if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', `Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: ${best('quads')}.`, ['plotkin2023']);
       const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
-      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', `${esc(o.e.name)} rates ${o.a.score}/10 (${esc(o.a.title.toLowerCase())}). A higher-rated swap for the ${name(o.e.m)}: <button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button> (${scoreOf(b.id)}/10).`); }
+      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', `${esc(o.e.name)} rates ${o.a.score}/10 on its mechanics (${esc(o.a.title.toLowerCase())}). A higher-rated swap for the ${name(o.e.m)}: <button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button> (${scoreOf(b.id)}/10).`); }
       const strong = st.ex.filter(o => o.a && o.a.score >= 9);
-      if (strong.length) say('good', `${strong.length} of your ${st.ex.length} exercises rate 9 or 10 out of 10 for growth: ${strong.slice(0, 6).map(o => esc(o.e.name)).join(', ')}${strong.length > 6 ? '…' : ''}.`);
+      if (strong.length) say('good', `${strong.length} of your ${st.ex.length} exercises rate 9 or 10 out of 10 on their mechanics: ${strong.slice(0, 6).map(o => esc(o.e.name)).join(', ')}${strong.length > 6 ? '…' : ''}.`);
       // rest
       const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
       if (shortRest.length) say('tip', `Rest under 2 minutes on big lifts: ${shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`).join(', ')}. Longer rests (about 3 minutes) gave more growth in trained men.`, ['schoenfeld2016r']);
@@ -2051,6 +2057,7 @@ function finishWorkout() {
   renderWorkout();
   renderRest();
   if (canMove() && !calm()) setTimeout(() => summarySheet(w.id, !editing), 280); else summarySheet(w.id, !editing);
+  keepCopy();
 }
 function discardActive() {
   state.active = null;
@@ -2445,7 +2452,7 @@ function exHero(exId, i) {
     : art ? art.map((u, n) => `<img src="${u}" alt="${n ? '' : esc(ex.name)}" decoding="async" data-art="${esc(exId)}">`).join(art.length > 1 ? icon('right', 'arr') : '')
     : heroMaps(ex);
   const note = !photo && art ? artNote(exId) : '';
-  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}"${mv ? ' data-mv="pic"' : ''} data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="How to do ${esc(ex.name)}">${inner}${note ? `<span class="hero-note">Similar picture: ${esc(note.charAt(0).toLowerCase() + note.slice(1))}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} ${scoreOf(exId)}/10 · how it works</span>` : art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
+  return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}"${mv ? ' data-mv="pic"' : ''} data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="How to do ${esc(ex.name)}">${inner}${note ? `<span class="hero-note">Similar picture: ${esc(note.charAt(0).toLowerCase() + note.slice(1))}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} Est. ${scoreOf(exId)}/10 · how it works</span>` : art && !photo ? '<span class="hero-tag">How to</span>' : ''}</button>`;
 }
 const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, 'full')}${figure('back', ex, 'full')}</span>`;
 function setRowHTML(i, x, j, k, ctx, effOn, two) {
@@ -3203,6 +3210,7 @@ function filterBar(f, prefix) {
     ${g && g[2].length > 1 ? `<div class="chips sub" role="group" aria-label="Muscle"><button class="chip ${f.m === 'all' ? 'on' : ''}" data-a="${prefix}M" data-v="all">All ${esc(g[1].toLowerCase())}</button>${g[2].map(m => `<button class="chip ${f.m === m ? 'on' : ''}" data-a="${prefix}M" data-v="${m}">${esc(MUSCLES[m])}</button>`).join('')}</div>` : ''}
     <div class="filter-row"><label class="select-wrap"><span class="sr">Equipment</span><select data-f="${prefix}eq"><option value="all">Any equipment</option>${Object.entries(EQUIP).map(([k, v]) => `<option value="${k}" ${f.eq === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
     <div class="seg sm" role="group" aria-label="Order"><button class="${f.sort !== 'score' ? 'on' : ''}" data-a="${prefix}S" data-v="az">A–Z</button><button class="${f.sort === 'score' ? 'on' : ''}" data-a="${prefix}S" data-v="score">${icon('flask', 'inline')} Best for growth</button></div></div>
+    ${f.sort === 'score' ? '<p class="sort-note">Ordered by an estimate from each exercise’s mechanics, not a measured result. <span class="score studied" aria-hidden="true">9</span> a dot means there are studies on that kind of exercise, in its details.</p>' : ''}
   </div>`;
 }
 function pickExercises({ title, single = false, onPick }) {
@@ -3836,8 +3844,9 @@ VIEWS.settings = function () {
     ${row('Movement animations', `Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.${reduceMotion.matches ? ' Reduce Motion is on in your device settings, so they stay still.' : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', 'On'], ['off', 'Off']]))}
   </div>
   <h2 class="section-h">Your data</h2><div class="card list-card">
-    ${row('Back up', 'Save everything to a file in Files or iCloud Drive. Do this now and then.', `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}Save file</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}Copy</button></div>`)}
+    ${row('Back up', esc(backupText()) + ' Saves everything, photos included, to a file in Files or iCloud Drive.', `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}Save file</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}Copy</button></div>`)}
     ${row('Restore', 'Load a backup file. Replaces what’s on this device.', `<div class="btn-pair"><label class="btn sm">${icon('upload')}Choose file<input type="file" accept=".json,application/json" data-f="importFile" hidden></label><button class="btn sm ghost" data-a="importPaste">Paste</button></div>`)}
+    ${row('Copies on this device', `The last ${COPY_DAYS} days, kept automatically. Go back to one if something goes wrong.`, `<button class="btn sm" data-a="copies">${icon('clock')}View</button>`)}
     ${row('Sample history', demo ? 'Sample workouts are mixed into your history.' : 'Load 8 weeks of example workouts to see what the charts look like.', demo ? `<button class="btn sm" data-a="demoOff">Remove samples</button>` : `<button class="btn sm" data-a="demoOn">Load samples</button>`)}
     ${row('Erase everything', 'Deletes all workouts, templates and settings on this device.', `<button class="btn sm danger" data-a="eraseAll">Erase</button>`)}
   </div>
@@ -3851,6 +3860,74 @@ VIEWS.settings = function () {
 function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
 }
+/* ----- backups: when you last made one, a nudge when it's been a while, and automatic copies on the device ----- */
+// your own workouts (not the samples), and how many came after the last backup
+function backupInfo() {
+  const real = state.workouts.filter(w => !w.demo).length, at = state.flags.backup || 0;
+  return { real, at, since: at ? Math.max(0, real - (state.flags.backupN || 0)) : real, days: at ? Math.floor((Date.now() - at) / DAY) : null };
+}
+function markBackedUp() {
+  const b = backupInfo();
+  state.flags.backup = Date.now(); state.flags.backupN = b.real; delete state.flags.backupSnooze;
+  save(true); render();
+}
+function backupText() {
+  const b = backupInfo();
+  if (!b.at) return b.real ? `Never backed up. Your ${b.real} workout${b.real === 1 ? ' is' : 's are'} only on this device.` : 'Save everything to a file in Files or iCloud Drive.';
+  return `Last backup ${b.days === 0 ? 'today' : b.days === 1 ? 'yesterday' : b.days + ' days ago'}${b.since ? ` · ${b.since} workout${b.since === 1 ? '' : 's'} since` : ' · nothing new since'}.`;
+}
+// a gentle nudge on the Train page: a few workouts in and never backed up, or a week and something new since
+function backupNudge() {
+  const b = backupInfo();
+  if (state.active || b.real < 3 || (state.flags.backupSnooze || 0) > Date.now()) return '';
+  if (b.at && !(b.days >= 7 && b.since >= 1) && b.since < 8) return '';
+  return `<div class="notice backup-nudge">${icon('download')}<p><b>${b.at ? `${b.since} workout${b.since === 1 ? '' : 's'} since your last backup.` : `Your ${b.real} workouts are only on this device.`}</b> Save a copy to Files or iCloud Drive, so losing your phone doesn’t lose them.</p>
+    <div class="nudge-btns"><button class="btn sm primary" data-a="exportFile">Back up now</button><button class="btn sm ghost" data-a="backupLater">Later</button></div></div>`;
+}
+// one copy of your data a day on this device, for the last few days: a way back from a mistake or a damaged save.
+// It's on this device only, so it doesn't replace a backup file
+const COPY_DAYS = 5;
+function copyDB() {
+  return new Promise(res => {
+    try {
+      const rq = indexedDB.open('liftingsanity-copies', 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore('copies');
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = rq.onblocked = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+const idbDone = rq => new Promise((res, rej) => { rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
+async function listCopies() {
+  const db = await copyDB();
+  if (!db) return [];
+  try { return (await idbDone(db.transaction('copies').objectStore('copies').getAll())).sort((a, b) => b.at - a.at); } catch (e) { return []; } finally { db.close(); }
+}
+async function keepCopy() {
+  if (saveBlocked || !state.workouts.some(w => !w.demo)) return;
+  const db = await copyDB();
+  if (!db) return;
+  try {
+    const d = new Date(), key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await idbDone(db.transaction('copies', 'readwrite').objectStore('copies').put({ key, at: Date.now(), n: backupInfo().real, json: JSON.stringify({ ...state, rest: null }) }, key));
+    const all = (await idbDone(db.transaction('copies').objectStore('copies').getAll())).sort((a, b) => b.at - a.at);
+    // the last few days, plus the fullest older copy, so a wiped or damaged save can't push every good copy out
+    const fullest = all.reduce((m, c) => (c.n > m.n ? c : m), all[0]);
+    const st = db.transaction('copies', 'readwrite').objectStore('copies');
+    for (const c of all.slice(COPY_DAYS)) if (c !== fullest) st.delete(c.key);
+  } catch (e) { /* copies are a safety net; they never get in the way */ } finally { db.close(); }
+}
+async function copiesSheet() {
+  const list = await listCopies();
+  openSheet({
+    cls: 'small',
+    render: () => `${sheetHead('Copies on this device')}<div class="sheet-body pad">
+      <p class="muted">Each day you use the app it keeps a copy of your data here, for the last ${COPY_DAYS} days. Going back to one replaces what’s on the device now (that’s set aside first, and your photos stay). They’re on this device only, so they don’t replace a backup file.</p>
+      ${list.length ? `<div class="card list-card copies">${list.map((c, i) => `<button class="menu-item" data-a="useCopy" data-i="${i}">${icon('clock')}<span><b>${esc(relDay(c.at).replace(/^./, m => m.toUpperCase()))} · ${esc(fmtShort(c.at))}, ${esc(fmtTime(c.at))}</b><small>${c.n} workout${c.n === 1 ? '' : 's'}</small></span></button>`).join('')}</div>` : '<p class="muted">No copies yet. The first one is made once you have a workout logged.</p>'}
+    </div>`,
+    actions: { useCopy: (b, def) => { const c = list[+b.dataset.i]; let data = null; try { data = JSON.parse(c.json); } catch (e) { /* checked below */ } importText(JSON.stringify({ app: 'liftingsanity', version: 1, exported: c.at, data }), { copy: true }); } }
+  });
+}
 async function exportFile() {
   if (!photosLoaded) { toast('Your photos are still loading. Try again in a second.'); return; }
   const name = `lifting-sanity-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -3858,13 +3935,13 @@ async function exportFile() {
   // inside claude.ai the page can't download on its own, so the viewer saves through the host
   const host = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
   if (host) {
-    try { await host.save({ filename: name, data: blob }); toast('Backup saved.'); }
+    try { await host.save({ filename: name, data: blob }); markBackedUp(); toast('Backup saved.'); }
     catch (e) { if (!e || e.code !== 'declined') toast('Saving isn’t available here. Use Copy instead.'); }
     return;
   }
   try {
     const file = new File([blob], name, { type: 'application/json' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Lifting Sanity backup' }); return; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Lifting Sanity backup' }); markBackedUp(); toast('Backup saved.'); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3872,6 +3949,7 @@ async function exportFile() {
   document.body.append(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  markBackedUp();
   toast('Backup saved.');
 }
 // the shape a backup must have before anything on the device is touched
@@ -3884,7 +3962,8 @@ function backupProblem(d) {
   for (const k of ['settings', 'exPrefs', 'exResets']) if (d[k] != null && !obj(d[k])) return `its ${k === 'exPrefs' ? 'exercise settings' : k === 'exResets' ? 'resets' : k} are damaged`;
   return '';
 }
-function importText(text) {
+// opts.copy: going back to an automatic copy (it has no photos, so the ones on the device stay)
+function importText(text, opts = {}) {
   let obj;
   try { obj = JSON.parse(text); } catch (e) { toast('That isn’t a Lifting Sanity backup. The text isn’t valid JSON.'); return; }
   const data = obj && obj.app === 'liftingsanity' ? obj.data : null;
@@ -3895,7 +3974,7 @@ function importText(text) {
   if (problem) { toast(`This backup can’t be restored: ${problem}. Nothing was changed.`); return; }
   const pics = obj.photos && typeof obj.photos === 'object' ? Object.entries(obj.photos).filter(([id, url]) => typeof url === 'string' && url.startsWith('data:image/')) : [];
   confirmSheet({
-    title: 'Restore this backup?',
+    title: opts.copy ? 'Go back to this copy?' : 'Restore this backup?',
     text: `It has <b>${next.workouts.length}</b> workouts, <b>${next.templates.length}</b> templates${pics.length ? ` and <b>${pics.length}</b> photo${pics.length === 1 ? '' : 's'}` : ''}${obj.exported ? `, saved ${esc(fmtDateY(obj.exported))}` : ''}. Everything on this device is replaced.`,
     ok: 'Restore', danger: true,
     onOk: () => {
@@ -3907,9 +3986,11 @@ function importText(text) {
         return;
       }
       // photos too, once the data is in place: the backup's photos replace the ones on the device (none are left over from before)
-      const keep = new Set(pics.map(([id]) => id));
-      for (const id of [...photos.keys()]) if (!keep.has(id)) storePhoto(id, null);
-      for (const [id, url] of pics) storePhoto(id, url);
+      if (!opts.copy) {
+        const keep = new Set(pics.map(([id]) => id));
+        for (const id of [...photos.keys()]) if (!keep.has(id)) storePhoto(id, null);
+        for (const [id, url] of pics) storePhoto(id, url);
+      }
       rebuildCustom(); applyTheme(); save(true); renderWorkout(); renderRest(); render();
       toast(storageOK ? 'Backup restored.' : 'Backup loaded, but this device couldn’t save it. Free some space and restore again.');
     }
@@ -3971,6 +4052,8 @@ const ACT = {
   toastAct: () => { const a = toast.action; $('#toast').classList.remove('in'); if (a) a.fn(); },
   resume: () => { ui.woHidden = false; renderWorkout(); wake(true); },
   nextOpen: () => { ui.nextOpen = !ui.nextOpen; render(); },
+  backupLater: () => { state.flags.backupSnooze = Date.now() + 3 * DAY; save(); render(); },
+  copies: () => copiesSheet(),
   dismissInstall: () => { state.settings.installHint = false; save(); render(); },
   startEmpty: () => startEmpty(),
   startDay: b => startFromTemplate(splitById(b.dataset.split).days[+b.dataset.day], b.dataset.split, +b.dataset.day),
@@ -4196,7 +4279,7 @@ const ACT = {
   exportCopy: () => {
     if (!photosLoaded) { toast('Your photos are still loading. Try again in a second.'); return; }
     const text = exportData();
-    const done = () => toast('Backup copied. Paste it into Notes or Files to keep it.');
+    const done = () => { markBackedUp(); toast('Backup copied. Paste it into Notes or Files to keep it.'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => showCopyBox(text)); else showCopyBox(text);
   },
   importPaste: () => openSheet({
@@ -4216,6 +4299,7 @@ const ACT = {
       for (const id of [...photos.keys()]) storePhoto(id, null);
       // the copies kept before a restore or of unreadable data go too
       try { for (const k of Object.keys(localStorage)) if (k.startsWith(KEY + ':')) localStorage.removeItem(k); } catch (e) { /* nothing stored */ }
+      try { indexedDB.deleteDatabase('liftingsanity-copies'); } catch (e) { /* none kept */ }
       saveBlocked = false;
       state = defaults(); ensureSplits(); rebuildCustom(); applyTheme(); save(true); renderWorkout(); renderRest(); render();
       toast('Everything was erased.');
@@ -4482,8 +4566,10 @@ if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
 mvWatch();
 requestAnimationFrame(() => { ui.booted = true; placePill(true); });
+setTimeout(keepCopy, 2000);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) {
+// https, or a local copy on this computer (how the tests run it)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !inFrame) {
   // a new version installs in the background; offer to switch to it (the saved copy keeps opening instantly until then)
   const hadWorker = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) toast('Lifting Sanity has been updated.', { label: 'Reload', fn: () => { persist(); location.reload(); } }); });

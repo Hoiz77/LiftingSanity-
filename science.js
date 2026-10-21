@@ -351,7 +351,8 @@ window.LS_SCIENCE = (() => {
       title: `Ankle plantar flexion${bent ? ', knee bent' : ', knee straight'}`, joints: ['Ankle plantar flexion'],
       movers: bent ? 'Mostly the soleus. With the knee bent, the gastrocnemius (which crosses the knee) goes slack and does little.' : `Gastrocnemius and soleus.${donkey ? ' Bending at the hip doesn’t change the calves much, but the straight knee keeps the gastrocnemius long.' : ''}`,
       scene: null, moment: 'The load acts through the leg on the ball of the foot; the moment arm is the foot’s length in front of the ankle, so effort is fairly even. The calves are longest with the heel dropped at the bottom.',
-      r: bent ? { L: 2, S: 2, P: 2, F: 2, G: 1 } : { L: 3, S: 2, P: 2, F: 2, G: 1 },
+      // free-standing versions need balance (one leg even more); bodyweight alone is hard to add load to
+      r: { L: bent ? 2 : 3, S: machEq(ex) || ex.eq === 'smith' || /leg press|sled/.test(n) ? 2 : 1, P: 2, F: 2, G: ex.eq === 'bodyweight' ? 0 : 1 },
       evidence: [['kinoshita2023', bent ? 'Seated calf raises did not grow the gastrocnemius; standing ones did. Keep this for the soleus and add a straight-knee version.' : 'Standing calf raises grew the gastrocnemius; seated ones didn’t.'], ['kassiano2023', 'Reps in the bottom, stretched half grew the calves about twice as much as full reps.']],
       tips: ['Drop the heel as deep as you can and pause there for a second.', 'When full reps run out, keep going with bottom-half partials.']
     };
@@ -470,6 +471,16 @@ window.LS_SCIENCE = (() => {
     const n = (ex.name || '').toLowerCase();
     const p = P.find(x => x.test(ex, n));
     const out = p ? { pattern: p.id, ...p.build(ex, n) } : { pattern: 'generic', ...genericFor(ex) };
+    // what the score can't fairly judge gets no score rather than a guess
+    const unrated = ex.m === 'mobility' || ex.m === 'cardio' || /stretch/.test(n) ? 'It’s a stretch or a conditioning drill rather than a muscle-building exercise, so it isn’t rated for growth.'
+      : ex.k && !['wr', 'bw', 'aw'].includes(ex.k) ? 'It’s done for time or distance rather than reps, and the rating only covers exercises done for reps, so it isn’t rated.'
+      : out.pattern === 'generic' ? 'There’s no detailed model for this kind of exercise yet, so it isn’t rated rather than given a guess.' : '';
+    if (unrated) { out.r = null; out.unrated = unrated; }
+    // bands get heavier the more they stretch, usually at the end of the rep where the muscle is shortest
+    else if (out.r && ex.eq === 'band') {
+      out.r = { ...out.r, L: Math.min(out.r.L, 1), P: Math.min(out.r.P, 1), G: 0 };
+      out.eqWhy = 'A band gets heavier the more it stretches, which is usually at the end of the rep where the muscle is shortest. So the stretched start is lightly loaded, and load goes up in big jumps between bands.';
+    }
     const curve = out.scene ? curveOf(out.scene) : null;
     out.curve = curve;
     out.shape = out.scene ? shapeOf(curve) : null;
@@ -487,7 +498,8 @@ window.LS_SCIENCE = (() => {
     cache.set(key, out);
     return out;
   }
-  const verdict = s => s == null ? '' : s >= 9 ? 'Excellent for growth' : s >= 7 ? 'Very good' : s >= 5 ? 'Good' : 'Fine, with trade-offs';
+  // the score describes the setup's mechanics, so the words do too
+  const verdict = s => s == null ? '' : s >= 9 ? 'Excellent mechanics for growth' : s >= 7 ? 'Very good mechanics' : s >= 5 ? 'Good mechanics' : 'Fine, with trade-offs';
 
   // ---------- drawing: the setup as a simple diagram, plus the resistance curve ----------
   // the drawing's frame, worked out once per exercise: it fits every position of the rep, so the moving parts stay inside

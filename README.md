@@ -1,6 +1,13 @@
 # Lifting Sanity
 
-A lifting log for iPad and iPhone. Log every set, follow a split, rest between sets and watch your lifts go up. It opens full screen from your Home Screen and works without signal at the gym.
+**Log fast. Understand your progress. Keep your data.**
+
+A lifting log for iPhone and iPad, made for lifters who already know how to train:
+
+- **Fast logging.** A set done as planned is one tap; one more rep or a little more weight is three. Your split, warm-ups, left/right sets, supersets and rest timer are built in.
+- **Progress you can trust.** Records, estimated 1RM (from 1–12 reps only), weekly volume and sets per muscle. Every number follows written rules (see [How the numbers are worked out](#how-the-numbers-are-worked-out)), and records are worked out again whenever your history changes.
+- **Your data stays yours.** No account and no server: everything lives on your device and works without signal at the gym. Backups are a file you keep; the app reminds you to make one and keeps a few days of copies on the device as a safety net.
+- **The science, when you want it.** Each exercise can show how it loads the muscle: the resistance curve, the moment arm, and a growth estimate that says what it's based on, how sure it is and what it can't know.
 
 **Open it:** https://hoiz77.github.io/LiftingSanity-/ (after GitHub Pages is turned on, see below)
 
@@ -27,7 +34,7 @@ A lifting log for iPad and iPhone. Log every set, follow a split, rest between s
 - **Notes that are easy to reach.** Tap **Note** on an exercise to write today's note right on the card, with quick taps like "Felt strong" or "Pain / discomfort". Last time's note shows too, and notes appear in each exercise's history. At the end, the summary's "How did it go?" box has words to tap in: "Great session", "Tired", "Slept badly", "Good pump"…
 - **Machine setup, one tap away.** Tap **Setup** on an exercise and tap the parts that apply (seat, back pad, handles, range lock… or pulley height and attachment for cables, bench angle and rack height for barbells), typing each one's setting. It stays on the card as its own line every time you do that exercise.
 - **Moves along with you.** Finish the last set of an exercise and the app goes to the next unfinished one: it slides in when you see one exercise at a time, and scrolls down to it (with a short glow) in the list. Scroll anywhere you like; the exercise you're on is remembered, so closing and reopening the app brings you back to it.
-- **How it works, for every exercise.** Joint actions, the muscles and heads involved, a diagram of the setup with the line of force and the moment arm (the cuff on your cuffed pushdown included), the resistance profile (ascending, descending, bell-shaped or even) worked out from the geometry, and how well it loads the muscle in the stretch. Each exercise gets a growth rating out of 10, with what studies found where a direct comparison exists, tips, and higher-rated alternatives. The Exercises tab can sort by **Best for growth**.
+- **How it works, for every exercise.** Joint actions, the muscles and heads involved, a diagram of the setup with the line of force and the moment arm (the cuff on your cuffed pushdown included), the resistance profile (ascending, descending, bell-shaped or even) worked out from the geometry, and how well it loads the muscle in the stretch. Each exercise gets a growth estimate out of 10 (labelled as an estimate, with the points behind it and what it can't see), with what studies found where a direct comparison exists, tips, and higher-rated alternatives. The Exercises tab can sort by **Best for growth**.
 - **Review my plan.** The **Review** button on your split checks it against the training literature: weekly sets per muscle (helper muscles count half), how often each muscle is trained, effort (reps in reserve), exercise choice (overhead vs pushdown triceps work, seated vs lying leg curls, standing vs seated calf raises, lengthened partials), rest times, session length and push/pull balance, with links to the studies.
 - **Smooth from screen to screen.**
   - The workout grows up out of its bar at the bottom when you open it, and shrinks back into the bar when you minimize it.
@@ -53,7 +60,8 @@ These rules are used everywhere the app counts or compares sets (workout header,
 - **kg and lb.** Weights are stored in kg and converted only for display, so switching units back and forth never changes what's stored.
 - **Saving.** Changes are saved within a second, and straight away when the app goes to the background or is closed. If the device can't save (storage full), you're told. Saved data with something odd in it (a workout missing its exercises, a day whose template was deleted) is mended on opening instead of stopping the app. If saved data can't be read at all, it's copied aside first; if there's no room for the copy, the app never writes over it.
 - **Backups.** A backup holds everything: workouts, templates, splits, settings and style, exercise setups and notes, machine profiles, resets and your photos. Restoring checks the whole file first; a damaged backup changes nothing. A restore replaces everything, photos included (photos are swapped only once the data is in). Erase everything also removes the copy kept from before a restore.
-- **Ratings.** Each exercise's rating out of 10 is a rule of thumb from its mechanics (how well it loads the stretched position, stability, tension through the range, focus, how easy it is to add load). Where a study compared exercises directly, it's shown under "What studies found". In the plan review, each point is marked as coming from studies (with links) or as a rule of thumb.
+- **Growth estimates.** Each exercise's score out of 10 is an estimate from its mechanics, not a measured result: points for loading the stretched position (up to 3), stability (2), tension through the range (2), hitting the target with little extra fatigue (2) and being easy to add load to (1). The details show the points, label the score "Estimate", and say what it can't see (your joints, technique, how close to failure you go, your program). Where studies looked at that kind of exercise, they're shown and count for more than the score. Stretches, conditioning drills and anything done for time or distance get no score, and neither does anything the model doesn't cover; they say so instead of showing a guess. Bands are scored as light in the stretch, because they get heavier as they stretch. In the plan review, each point is marked as coming from studies (with links) or as a rule of thumb.
+- **Backups and copies.** Settings shows when you last backed up. After a few workouts with no backup, or a week and new workouts since the last one, the Train page reminds you ("Later" waits 3 days). The app also keeps one copy of your data a day on the device, for the last 5 days, that you can go back to; they're on the device only, so they don't replace a backup file.
 
 ## Turn on GitHub Pages (once)
 
@@ -87,8 +95,9 @@ Your workouts are saved on each device itself, not online, so the iPad and the i
 | `steps.json` | Step-by-step how-to instructions, loaded the first time you open an exercise's details |
 | `sw.js` | Keeps the app on the device so it opens offline |
 | `manifest.webmanifest`, `icon-*.png` | Home Screen name and icon |
+| `tests/` | Automated tests that use the app in a phone-sized browser; see [tests/README.md](tests/README.md) |
 
-No build step and no dependencies. Edit a file, push, and the site updates.
+No build step and no dependencies for the app. Edit a file, push, and the site updates. To run the tests: `npm install`, `npx playwright install chromium`, then `npm test`.
 
 ## Credits
 

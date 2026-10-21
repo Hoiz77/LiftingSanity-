@@ -209,7 +209,7 @@
 [data-style="y2k"] .score.lo, [data-style="y2k"] .score.ok { color: var(--ink-2) !important; border-color: var(--line-2); text-shadow: none; }
 [data-style="y2k"] .sci-score { background: #020414; color: var(--cyan); border: 1px solid var(--cyan); }
 [data-style="y2k"] .sci-score b { font-size: 34px; text-shadow: 0 0 8px var(--cyan); }
-[data-style="y2k"] .sci-diag, [data-style="y2k"] .sci-rates, [data-style="y2k"] .sci-ev, [data-style="y2k"] .sci-curve { background: #020414; border: 1px solid var(--line); }
+[data-style="y2k"] .sci-diag, [data-style="y2k"] .sci-rates, [data-style="y2k"] .sci-sure, [data-style="y2k"] .sci-ev, [data-style="y2k"] .sci-curve { background: #020414; border: 1px solid var(--line); }
 [data-style="y2k"] .sci-phase { background: #020414; color: var(--cyan); border: 1px solid var(--cyan); font: 400 15px/1 var(--lcd); letter-spacing: .06em; text-shadow: 0 0 6px var(--cyan); }
 [data-style="y2k"] .sci-cur { border-left-color: var(--magenta); opacity: .8; }
 [data-style="y2k"] .sci-dot::before { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
