@@ -4262,6 +4262,8 @@ function warmArt() {
 }
 document.addEventListener('click', ev => {
   if (ui.dragged && ev.timeStamp - ui.dragged < 450) { ui.dragged = 0; return; }
+  // a screen on its way out (a closing sheet, the workout sliding away) takes no taps
+  if (ev.target.closest && ev.target.closest('[inert]')) return;
   if (!ev.target.closest('.row-del')) closeSwipes();
   const t = ev.target.closest('[data-a]');
   if (!t || t.disabled) return;
@@ -4290,9 +4292,10 @@ document.addEventListener('change', ev => {
   }
 });
 function handleInput(el, ev) {
+  if (el.closest('[inert]')) return;
   const def = sheetFor(el);
   if (def) { if (def.onInput) def.onInput(el, def, ev); return; }
-  if (el.closest('#workout')) { woInput(el); return; }
+  if (el.closest('#workout')) { if (A()) woInput(el); return; }
   const f = el.dataset.f;
   if (f === 'libq') { ui.lib.q = el.value; ui.libLimit = PAGE; typed(() => { const l = $('#libList'); if (l) l.innerHTML = libListHTML(); }); }
   else if (f === 'libeq') { ui.lib.eq = el.value; ui.libLimit = PAGE; $('#libList').innerHTML = libListHTML(); }
