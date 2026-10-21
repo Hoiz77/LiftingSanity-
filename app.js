@@ -1852,75 +1852,107 @@ function planReview(split) {
     full: true,
     render: () => {
       const st = planStats(split, perWeek);
-      const out = { good: [], tip: [], fix: [] };
-      // each point says what it rests on: studies (linked) or a rule of thumb from mechanics and common practice
-      const say = (kind, text, refs = []) => out[kind].push(`<li class="${kind}">${icon(kind === 'good' ? 'check' : kind === 'tip' ? 'info' : 'x')}<p>${text}<span class="refs">${refs.length ? `<i class="basis">Studies</i>${refs.map(refLink).join(' · ')}` : '<i class="basis thumb">Rule of thumb</i>'}</span></p></li>`);
+      // the points, grouped by topic; each says what it rests on: studies (linked) or a rule of thumb from mechanics and common practice
+      const topics = [];
+      let cur = null;
+      const topic = (title, about) => topics.push(cur = { title, about, items: [], after: '' });
+      const say = (kind, text, refs = []) => cur.items.push({ kind, text, refs });
       const name = m => esc(MUSCLES[m].toLowerCase());
-      const best = m => { const b = bestFor(m, 1)[0]; return b ? `<button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button>` : ''; };
-      // volume
-      const trained = MAJOR.filter(m => (st.sets[m] || 0) > 0);
-      const low = MAJOR.filter(m => (st.sets[m] || 0) > 0 && st.sets[m] < 10), none = MAJOR.filter(m => !(st.sets[m] > 0));
-      const inRange = trained.filter(m => st.sets[m] >= 10 && st.sets[m] <= 20), high = trained.filter(m => st.sets[m] > 20);
-      if (inRange.length) say('good', `${inRange.length} muscle group${inRange.length === 1 ? ' gets' : 's get'} 10 to 20 weekly sets: ${inRange.map(name).join(', ')}.`, ['schoenfeld2017']);
-      if (low.length) say('tip', `Under 10 weekly sets: ${low.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`).join(', ')}. That still builds muscle, but more sets would likely build more. Adding one working set to the exercise for that muscle adds about ${trimNum(st.each, 1)} sets a week.`, ['schoenfeld2017', 'pelland2026']);
-      if (high.length) say('good', `Over 20 weekly sets: ${high.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`).join(', ')}. More can still help as long as you recover and keep the effort high, with diminishing returns.`, ['pelland2026']);
-      for (const m of none) say('fix', `No work for the ${name(m)}. A highly rated option: ${best(m)}.`);
-      // frequency
+      const list = a => a.join(T(', '));
+      // exercise names as links that wrap like words, so a full stop after a long name stays with it
+      const exLink = e => `<a class="link" role="button" tabindex="0" data-a="openEx" data-id="${e.id}">${esc(e.name)}</a>`;
+      const best = m => { const b = bestFor(m, 1)[0]; return b ? exLink(b) : ''; };
+      const trained = MAJOR.filter(m => (st.sets[m] || 0) > 0), none = MAJOR.filter(m => !(st.sets[m] > 0));
       const helperOnly = trained.filter(m => !st.days[m]);
-      if (helperOnly.length) say('tip', `Only worked as a helper (no exercise targets it): ${helperOnly.map(m => `${name(m)} (${trimNum(st.sets[m], 1)} half-sets a week)`).join(', ')}. A direct exercise would grow it more, for example ${helperOnly.map(best).filter(Boolean).slice(0, 2).join(' or ')}.`, ['pelland2026']);
+      // every muscle covered
+      topic(T('Every muscle covered'), T('Each major muscle should have at least one exercise aimed at it. Muscles that only help in other exercises get less work than it looks.'));
+      for (const m of none) say('fix', T('Nothing works the {muscle}, not even as a helper. A highly rated exercise for them: {ex}.', { muscle: name(m), ex: best(m) }));
+      if (helperOnly.length) say('tip', T('Only worked as a helper, in exercises aimed at other muscles: {list}. An exercise aimed at them would grow them more, for example {ex}.', { list: list(helperOnly.map(m => T('{muscle} ({n} sets a week, each helper set counted as half)', { muscle: name(m), n: trimNum(st.sets[m], 1) }))), ex: helperOnly.map(best).filter(Boolean).slice(0, 2).join(T(' or ')) }), ['pelland2026']);
+      if (!none.length && !helperOnly.length) say('good', T('Every major muscle has an exercise aimed at it.'));
+      // weekly sets
+      topic(T('Weekly sets per muscle'), T('How many hard sets each muscle gets in a week: the biggest single driver of growth. 10 to 20 is a common target.'));
+      const low = trained.filter(m => st.sets[m] < 10), inRange = trained.filter(m => st.sets[m] >= 10 && st.sets[m] <= 20), high = trained.filter(m => st.sets[m] > 20);
+      const withSets = ms => list(ms.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`));
+      if (low.length) say('tip', T('Under 10 sets a week: {list}. That still builds muscle, but more sets would likely build more. One more working set on an exercise adds about {n} sets a week for its muscle.', { list: withSets(low), n: trimNum(st.each, 1) }), ['schoenfeld2017', 'pelland2026']);
+      if (inRange.length) say('good', T('10 to 20 sets a week: {list}.', { list: list(inRange.map(name)) }), ['schoenfeld2017']);
+      if (high.length) say('good', T('Over 20 sets a week: {list}. More can still help as long as you recover and keep the effort high, with smaller returns.', { list: withSets(high) }), ['pelland2026']);
+      const muscles = Object.entries(st.sets).filter(([m, v]) => v > 0 && MUSCLES[m]).sort((a, b) => b[1] - a[1]);
+      const maxV = Math.max(22, ...muscles.map(([, v]) => v));
+      if (muscles.length) cur.after = `<div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
+        <p class="muted small rv-note">${T('Working sets a week. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far ({ref}). Shaded band: 10 to 20 sets.', { ref: refLink('pelland2026') })}</p>`;
+      // frequency
+      topic(T('How often each muscle is trained'), T('Spreading a muscle’s sets over two or more days a week helps a little. The weekly total matters more.'));
       const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
-      if (once.length) say('tip', `Trained directly about once a week: ${once.map(name).join(', ')}. Spreading the same sets over two sessions tends to help a little, though weekly sets matter more than frequency.`, ['schoenfeld2016f', 'pelland2026']);
-      else if (trained.length > helperOnly.length) say('good', `Every muscle you target is trained directly about ${trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1)} times a week or more.`, ['schoenfeld2016f']);
+      if (once.length) say('tip', T('Trained directly about once a week: {list}. Splitting the same sets over two sessions tends to help a little.', { list: list(once.map(name)) }), ['schoenfeld2016f', 'pelland2026']);
+      else if (trained.length > helperOnly.length) say('good', T('Every muscle you aim an exercise at is trained about {n} times a week or more.', { n: trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1) }), ['schoenfeld2016f']);
       // effort
+      topic(T('Effort'), T('How close to failure your working sets end. RIR is the reps you could still have done.'));
       const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
       if (rirs.length) {
         const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length, lo = Math.min(...rirs), hi = Math.max(...rirs);
-        const span = lo === hi ? `${lo} rep${lo === 1 ? '' : 's'}` : `${lo} to ${hi} reps`;
-        if (avg <= 3) say('good', `Working sets aim to stop ${span} short of failure. Close to failure is where growth is best; going all the way to failure on every set is optional.`, ['robinson2024', 'refalo2023']);
-        else say('tip', `Working sets aim to stop ${span} short of failure. Growth tends to improve as sets end closer to failure; try 0 to 3.`, ['robinson2024']);
-      } else say('tip', 'No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.', ['robinson2024']);
-      // exercise selection
+        const aim = lo === hi ? TN(lo, 'Working sets aim to stop {n} rep short of failure.', 'Working sets aim to stop {n} reps short of failure.') : T('Working sets aim to stop {lo} to {hi} reps short of failure.', { lo, hi });
+        if (avg <= 3) say('good', `${aim} ${T('Close to failure is where growth is best; going all the way on every set is optional.')}`, ['robinson2024', 'refalo2023']);
+        else say('tip', `${aim} ${T('Growth tends to improve as sets end closer to failure; try 0 to 3 reps short.')}`, ['robinson2024']);
+      } else say('tip', T('No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.'), ['robinson2024']);
+      // exercise choice
+      topic(T('Exercise choice'), T('Some versions of an exercise grew muscle more than others in direct comparisons. Scores are estimates from each exercise’s mechanics.'));
       const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
       const names = re => st.ex.filter(o => re.test(o.e.name.toLowerCase())).map(o => esc(o.e.name));
-      if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', `Triceps only get pushdowns (${names(/push ?down|press ?down/).join(', ')}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try ${best('triceps')}.`, ['maeo2023']);
-      if (pats.has('triOverhead')) say('good', 'Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.', ['maeo2023']);
+      if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', T('Triceps only get pushdowns ({names}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try {ex}.', { names: list(names(/push ?down|press ?down/)), ex: best('triceps') }), ['maeo2023']);
+      if (pats.has('triOverhead')) say('good', T('Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.'), ['maeo2023']);
       const curls = st.ex.filter(o => o.a && o.a.pattern === 'legCurl');
-      if (curls.some(o => /seated/.test(o.e.name.toLowerCase()))) say('good', 'Seated leg curls: the version that grew the hamstrings more than lying curls.', ['maeo2021']);
-      else if (curls.length) say('tip', 'Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).', ['maeo2021']);
+      if (curls.some(o => /seated/.test(o.e.name.toLowerCase()))) say('good', T('Seated leg curls: the version that grew the hamstrings more than lying curls.'), ['maeo2021']);
+      else if (curls.length) say('tip', T('Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).'), ['maeo2021']);
       const calves = st.ex.filter(o => o.a && o.a.pattern === 'calf');
-      if (calves.length && calves.every(o => /seated|squat calf/.test(o.e.name.toLowerCase()))) say('tip', `Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as ${best('calves')}, and spend time in the stretched bottom position.`, ['kinoshita2023', 'kassiano2023']);
-      if (pats.has('legExt')) say('tip', 'Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.', ['pedrosa2022']);
-      if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', 'Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.', ['plotkin2023']);
-      if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', `Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: ${best('quads')}.`, ['plotkin2023']);
+      if (calves.length && calves.every(o => /seated|squat calf/.test(o.e.name.toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
+      if (pats.has('legExt')) say('tip', T('Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.'), ['pedrosa2022']);
+      if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', T('Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.'), ['plotkin2023']);
+      if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', T('Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: {ex}.', { ex: best('quads') }), ['plotkin2023']);
       const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
-      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', `${esc(o.e.name)} rates ${o.a.score}/10 on its mechanics (${esc(o.a.title.toLowerCase())}). A higher-rated swap for the ${name(o.e.m)}: <button class="link" data-a="openEx" data-id="${b.id}">${esc(b.name)}</button> (${scoreOf(b.id)}/10).`); }
+      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', T('{name} rates {score}/10 on its mechanics ({title}). A higher-rated swap for the {muscle}: {ex} ({best}/10).', { name: esc(o.e.name), score: o.a.score, title: esc(T(o.a.title).toLowerCase()), muscle: name(o.e.m), ex: exLink(b), best: scoreOf(b.id) })); }
       const strong = st.ex.filter(o => o.a && o.a.score >= 9);
-      if (strong.length) say('good', `${strong.length} of your ${st.ex.length} exercises rate 9 or 10 out of 10 on their mechanics: ${strong.slice(0, 6).map(o => esc(o.e.name)).join(', ')}${strong.length > 6 ? '…' : ''}.`);
+      if (strong.length) say('good', T('{n} of your {total} exercises rate 9 or 10 out of 10 on their mechanics: {list}.', { n: strong.length, total: st.ex.length, list: list(strong.slice(0, 6).map(o => esc(o.e.name))) + (strong.length > 6 ? '…' : '') }));
       // rest
+      topic(T('Rest between sets'), T('Longer rests on the big lifts let you do more reps on the next set.'));
       const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
-      if (shortRest.length) say('tip', `Rest under 2 minutes on big lifts: ${shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`).join(', ')}. Longer rests (about 3 minutes) gave more growth in trained men.`, ['schoenfeld2016r']);
-      else if (st.ex.length) say('good', 'Rest times give the big lifts at least 2 minutes.', ['schoenfeld2016r']);
+      if (shortRest.length) say('tip', T('Rest under 2 minutes on big lifts: {list}. Longer rests (about 3 minutes) gave more growth in trained men.', { list: list(shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['schoenfeld2016r']);
+      else if (st.ex.some(o => o.a && COMPOUND.has(o.a.pattern))) say('good', T('The big lifts get at least 2 minutes of rest.'), ['schoenfeld2016r']);
       // session length
-      for (const t of st.tpls) { const min = estMinutes(t); if (min > 75) say('tip', `${esc(t.name)} takes about ${min} minutes. Effort tends to drop late in long sessions; pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.`); }
+      topic(T('Workout length'), T('Effort tends to drop late in very long sessions.'));
+      const long = st.tpls.map(t => [t, estMinutes(t)]).filter(([, min]) => min > 75);
+      for (const [t, min] of long) say('tip', T('{name} takes about {n} minutes. Pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.', { name: esc(t.name), n: min }));
+      if (!long.length && st.tpls.length) say('good', T('Each day takes about {n} minutes or less.', { n: Math.max(...st.tpls.map(estMinutes)) }));
       // balance
+      topic(T('Push and pull balance'), T('Similar amounts of pushing and pulling keep the shoulders balanced.'));
       const sum_ = ms => ms.reduce((a, m) => a + (st.sets[m] || 0), 0);
       const push = sum_(['chest', 'frontdelts', 'triceps']), pull = sum_(['lats', 'upperback', 'reardelts', 'biceps']);
-      if (push && pull) { const r = push / pull; if (r > 1.5 || r < 0.67) say('tip', `Pushing and pulling are uneven: about ${trimNum(push, 0)} pushing sets for ${trimNum(pull, 0)} pulling sets a week. Closer to 1:1 is a common target for balanced shoulders.`); else say('good', `Pushing and pulling are balanced (${trimNum(push, 0)} vs ${trimNum(pull, 0)} weekly sets).`); }
-      const muscles = Object.entries(st.sets).filter(([m, v]) => v > 0 && MUSCLES[m]).sort((a, b) => b[1] - a[1]);
-      const maxV = Math.max(22, ...muscles.map(([, v]) => v));
-      return `${sheetHead('Plan review')}
+      if (push && pull) { const r = push / pull; const v = { push: trimNum(push, 0), pull: trimNum(pull, 0) }; if (r > 1.5 || r < 0.67) say('tip', T('Pushing and pulling are uneven: about {push} pushing sets for {pull} pulling sets a week. Closer to 1:1 is a common target.', v)); else say('good', T('Pushing and pulling are balanced: {push} and {pull} sets a week.', v)); }
+      // what to show
+      const RANK = { fix: 0, tip: 1, good: 2 }, MARK = { fix: 'x', tip: 'info', good: 'check' };
+      const shown = topics.filter(t => t.items.length);
+      for (const t of shown) { t.items.sort((a, b) => RANK[a.kind] - RANK[b.kind]); t.worst = t.items[0].kind; }
+      const count = k => shown.reduce((n, t) => n + t.items.filter(i => i.kind === k).length, 0);
+      const STATUS = { fix: T('Needs a fix'), tip: T('Worth a look'), good: T('On track') };
+      const item = i => `<li class="${i.kind}">${icon(MARK[i.kind])}<div class="rv-txt"><p>${i.text}</p><p class="rv-src">${i.refs.length ? `<span class="basis study">${icon('flask')}${T('Studies')}</span>${i.refs.map(refLink).join('<span class="dot"> · </span>')}` : `<span class="basis rule">${T('Rule of thumb')}</span>`}</p></div></li>`;
+      const tiles = [['fix', T('To fix')], ['tip', T('To consider')], ['good', T('On track')]];
+      const trainDays = split.days.filter(d => !isRest(d)).length;
+      return `${sheetHead(T('Plan review'))}
       <div class="sheet-body pad review">
-        <p class="eyebrow accent">${icon('flask', 'inline')} Based on the training literature</p>
+        <p class="eyebrow accent">${icon('flask', 'inline')} ${T('Based on the training literature')}</p>
         <h2 class="big-title">${esc(split.name)}</h2>
-        <div class="review-week"><span>Sessions a week</span><div class="seg sm">${[2, 3, 3.5, 4, 5, 6].map(v => `<button class="${perWeek === v ? 'on' : ''}" data-a="pw" data-v="${v}">${v}</button>`).join('')}</div></div>
-        <p class="muted small">${split.days.some(isRest) ? `Worked out from your rotation (${split.days.filter(d => !isRest(d)).length} training day${split.days.filter(d => !isRest(d)).length === 1 ? '' : 's'} in a ${split.days.length}-day cycle).` : 'Worked out from your last four weeks.'} Change it if you train more or less often.</p>
-        <ul class="review-list">${out.fix.join('')}${out.tip.join('')}${out.good.join('')}</ul>
-        <h3 class="sub-h">Weekly sets per muscle</h3>
-        <div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
-        <p class="muted small">Working sets only. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far (${refLink('pelland2026')}). Shaded band: 10 to 20 sets.</p>
-        <h3 class="sub-h">Your exercises, rated</h3>
-        <div class="card list-card">${st.ex.map(o => `<button class="ex-row" data-a="openEx" data-id="${o.e.id}">${thumb(o.e.id, 'sm')}<span class="ex-txt"><b>${esc(o.e.name)}</b><small>${o.a ? esc(o.a.title) : ''}</small></span>${scorePill(o.e.id)}</button>`).join('')}</div>
-        <p class="muted small">Each point says whether it comes from studies (linked) or is a rule of thumb from the mechanics. A higher-rated exercise isn’t automatically better for you: how your joints feel, your equipment, fatigue, the order you do things in and whether you can keep progressing it all matter. The review can’t see those, so treat it as suggestions.</p>
+        <div class="review-week"><span>${T('Sessions a week')}</span><div class="seg sm">${[2, 3, 3.5, 4, 5, 6].map(v => `<button class="${perWeek === v ? 'on' : ''}" data-a="pw" data-v="${v}">${v}</button>`).join('')}</div></div>
+        <p class="muted small">${split.days.some(isRest) ? TN(trainDays, 'Worked out from your rotation ({n} training day in a {len}-day cycle).', 'Worked out from your rotation ({n} training days in a {len}-day cycle).', { len: split.days.length }) : T('Worked out from your last four weeks.')} ${T('Change it if you train more or less often.')}</p>
+        <div class="rv-sum">${tiles.map(([k, l]) => `<div class="rv-tile ${k}">${icon(MARK[k])}<b>${count(k)}</b><span>${l}</span></div>`).join('')}</div>
+        <div class="rv-key"><p class="rv-key-h">${T('How to read this')}</p>
+          <p><span class="basis study">${icon('flask')}${T('Studies')}</span><span>${T('Tested in research. Tap a source to read the study.')}</span></p>
+          <p><span class="basis rule">${T('Rule of thumb')}</span><span>${T('Common coaching practice or the exercise’s mechanics. Sensible, but not tested directly.')}</span></p></div>
+        ${shown.map(t => `<section class="rv-topic">
+          <h3 class="rv-h"><span>${esc(t.title)}</span><span class="rv-status ${t.worst}">${icon(MARK[t.worst])}${STATUS[t.worst]}</span></h3>
+          <p class="rv-about">${t.about}</p>
+          <ul class="review-list">${t.items.map(item).join('')}</ul>${t.after}</section>`).join('')}
+        <h3 class="sub-h">${T('Your exercises, rated')}</h3>
+        <div class="card list-card">${st.ex.map(o => `<button class="ex-row" data-a="openEx" data-id="${o.e.id}">${thumb(o.e.id, 'sm')}<span class="ex-txt"><b>${esc(o.e.name)}</b><small>${o.a ? esc(T(o.a.title)) : ''}</small></span>${scorePill(o.e.id)}</button>`).join('')}</div>
+        <p class="muted small">${T('A higher-rated exercise isn’t automatically better for you: how your joints feel, your equipment, fatigue, the order you do things in and whether you can keep progressing it all matter. The review can’t see those, so treat it as suggestions.')}</p>
       </div>`;
     },
     actions: { pw: (b, def) => { perWeek = +b.dataset.v; refreshSheet(def); } }
@@ -4485,6 +4517,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape' && top) { closeSheet(top); return; }
   if (top && top.onKey) top.onKey(ev, top);
   if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('cell') && ev.target.closest('#workout')) ev.target.blur();
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('a[role="button"][data-a]')) { ev.preventDefault(); ev.target.click(); }
 });
 // swipe a set row left to show Delete
 let rowSwipe = null;
@@ -4605,7 +4638,7 @@ sheetHost.addEventListener('touchend', sheetRelease, { passive: true });
 sheetHost.addEventListener('touchcancel', sheetRelease, { passive: true });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persist();
-  else { wake(true); tickRest(); }
+  else { wake(true); tickRest(); fitSoon(100); }
 });
 window.addEventListener('pagehide', persist);
 // another tab saved: take its data, unless this one has changes not written yet (those are written out instead of dropped)
@@ -4627,8 +4660,40 @@ window.addEventListener('resize', () => {
     const m = useKeypad();
     if (padMode !== null && m !== padMode && A() && !ui.woHidden) { ui.kp = null; renderWorkout(); }
     padMode = m;
+    fitScreen();
   }, 150);
 });
+// iPhone Home Screen app: after the keyboard has been up, iOS can leave the page shorter than the screen until the app
+// is closed, which showed as a dark strip under the workout and the tab bar. Taking the page out of layout for a moment
+// makes iOS measure it again; while it's still short, the parts on the bottom edge reach down to the real edge
+let fitTried = 0, fitT;
+function screenGap() {
+  if (navigator.standalone !== true) return 0;
+  const el = document.activeElement;
+  if (el && el.matches('input:not([readonly]), textarea:not([readonly]), [contenteditable]')) return 0; // the keyboard may be up
+  const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height), land = innerWidth > innerHeight;
+  if (Math.abs(innerWidth - (land ? long : short)) > 1) return 0; // not the whole width, e.g. an iPad window beside another app
+  const gap = (land ? short : long) - innerHeight;
+  return gap > 0 && gap < 160 ? gap : 0;
+}
+function fitScreen() {
+  let gap = screenGap();
+  if (gap && fitTried !== innerHeight) {
+    fitTried = innerHeight;
+    const keep = [document.scrollingElement, ...$$('.wo-main, .wo-nav, .sheet-body')].filter(Boolean).map(el => [el, el.scrollTop, el.scrollLeft]);
+    const b = document.body;
+    b.style.display = 'none'; void b.offsetHeight; b.style.display = ''; void b.offsetHeight;
+    for (const [el, top, left] of keep) { el.scrollTop = top; el.scrollLeft = left; }
+    gap = screenGap();
+  }
+  if (!gap) fitTried = 0;
+  document.documentElement.classList.toggle('vfix', gap > 0);
+  document.documentElement.style.setProperty('--vgap', gap + 'px');
+}
+const fitSoon = (ms = 600) => { clearTimeout(fitT); fitT = setTimeout(fitScreen, ms); };
+document.addEventListener('focusout', () => fitSoon());
+if (window.visualViewport) visualViewport.addEventListener('resize', () => fitSoon(250));
+window.addEventListener('pageshow', () => fitSoon(100));
 
 setInterval(() => {
   const w = state.active;
@@ -4655,6 +4720,7 @@ requestAnimationFrame(() => { ui.booted = true; placePill(true); });
 // the welcome stays until it's used or skipped (switching language on it starts the page again with it open)
 if (state.flags.newUser && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
 setTimeout(keepCopy, 2000);
+fitSoon(500);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // https, or a local copy on this computer (how the tests run it)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !inFrame) {
