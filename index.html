@@ -1188,6 +1188,9 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 [dir="rtl"] .switch.on span { transform: translateX(-20px); }
 /* arrows point the way you read */
 [dir="rtl"] .i-left, [dir="rtl"] .i-right, [dir="rtl"] .i-undo { transform: scaleX(-1); }
+/* names (mostly English) keep their own direction, so a long one is cut short at its end rather than its start */
+[dir="rtl"] :is(.mini-name, .wo-name, .nav-name, .ex-txt b, .lift-n b, .pr-item b, .tex-name b, .kp-title b) { unicode-bidi: plaintext; text-align: right; }
+[dir="rtl"] .sheet-h h2 { unicode-bidi: plaintext; }
 @media (min-width: 760px) {
   [dir="rtl"] #tabs { left: auto; right: 0; border-right: 0; border-left: 1px solid var(--line); width: calc(var(--rail) + env(safe-area-inset-right, 0px)); padding: calc(18px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 18px 10px; }
   [dir="rtl"] #view { margin-left: 0; margin-right: calc(var(--rail) + env(safe-area-inset-right, 0px)); padding-right: max(32px, calc((100vw - var(--rail) - 1000px) / 2)); padding-left: max(32px, env(safe-area-inset-left, 0px), calc((100vw - var(--rail) - 1000px) / 2)); }

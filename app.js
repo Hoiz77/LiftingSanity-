@@ -1858,7 +1858,8 @@ function planReview(split) {
       const topic = (title, about) => topics.push(cur = { title, about, items: [], after: '' });
       const say = (kind, text, refs = []) => cur.items.push({ kind, text, refs });
       const name = m => esc(MUSCLES[m].toLowerCase());
-      const list = a => a.join(T(', '));
+      // in Arabic each item is set apart, so a list of English names still reads from right to left
+      const list = a => a.map(x => RTL ? `<bdi>${x}</bdi>` : x).join(T(', '));
       // exercise names as links that wrap like words, so a full stop after a long name stays with it
       const exLink = e => `<a class="link" role="button" tabindex="0" data-a="openEx" data-id="${e.id}">${esc(e.name)}</a>`;
       const best = m => { const b = bestFor(m, 1)[0]; return b ? exLink(b) : ''; };
