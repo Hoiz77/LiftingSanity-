@@ -43,6 +43,8 @@ async function open(o = {}) {
   await p.route(/raw\.githubusercontent\.com/, r => r.fulfill({ status: 404, body: '' }));
   if (o.hook !== false) await p.route(/\/app\.js(\?|$)/, r => r.fulfill({ status: 200, contentType: 'application/javascript', body: HOOKED() }));
   if (o.clock) await p.clock.install({ time: o.clock });
+  // tests start as someone who's used the app before (with the Full Body EOD split); `fresh: true` starts from nothing
+  if (!o.seed && !o.fresh) o.seed = '{"v":1}';
   if (o.seed) await p.addInitScript(d => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.clear(); localStorage.setItem('liftingsanity:data:v1', d); } }, typeof o.seed === 'string' ? o.seed : JSON.stringify(o.seed));
   await p.goto(site.url);
   await p.waitForFunction(() => window.LiftingSanity);

@@ -14,13 +14,13 @@ A lifting log for iPhone and iPad, made for lifters who already know how to trai
 ## What it does
 
 - **Workouts that flow.** One exercise at a time with big Previous / Next buttons, swipe left or right to move, or switch to a single list. The exercise rail on the left shows how many sets are done on each.
-- **Your Full Body EOD split, built in.** All 17 exercises from your Lyfta session, in order, with your warm-ups, working sets, left/right order and last weights. Train one day, rest the next: rest days pass with the calendar, and you can still train any day you like.
+- **A plan from the first minute.** The first time it opens, it asks how you want to start: a ready-made plan (Push / Pull / Legs, Upper / Lower, Full Body, Full Body EOD, Bro Split, Arnold Split, PHUL, 5×5, Dumbbells Only), your own split, a look around with sample workouts, or a backup from another device. Rest days pass with the calendar, and you can still train any day you like.
 - **Fast set logging.** Each row shows what you did last time. Tap the check and it logs those numbers, or type new ones. Weight, reps and RIR (or RPE) for every set.
 - **Sets aren't fixed.** **Add set** adds one, **Repeat last** adds another copy of the set you just did, and **Delete** puts a red delete button on every set (tap **Done** when you're finished). Swiping a set to the left deletes it too, and every delete can be undone. Did 80 kg on the set before? The blue **↓ 80 × 6** button on the next set copies it in one tap.
 - **Set types.** Working, warm-up, top set, back-off, drop set, to failure, AMRAP, rest-pause, myo-reps, cluster, partials and negatives. Each set number is drawn as a small plate in its type's colour (dashed yellow for warm-ups) and fills in when the set is done. Tap it to change the type. Warm-ups and partials stay out of your records.
 - **One side at a time, your way.** Tap **Left and right** on an exercise to choose: **separate rows** (each side its own weight, reps, RIR and check), **one row** (one weight, the reps and RIR for each side, one check), or both sides together. Settings sets the default. In separate rows, one-arm and one-leg sets get a left row and a right row. The rows themselves are marked: a green **L** plate and a purple **R** plate, held together in one block with a green and purple edge. The rest timer waits until both sides are done.
 - **One-side warm-ups too.** Warm-up sides keep their green or purple plate, drawn dashed with a yellow **W** tag, and read "WL" / "WR" in your history. **Warm-ups** adds one more warm-up (left and right on a one-side exercise) or a one-side warm-up on any exercise. Tap a set's number to switch just that set between one side at a time and both sides together, in a workout or in a template.
-- **Exercise pictures.** 581 exercises, including 14 of the 17 in your Full Body EOD split, show illustrations of the start and finish position. When a picture shows a close variation rather than the exact exercise, it says how it differs (for example "pictured with a handle; yours uses a cuff on the wrist"). Pictures appear across the top of each exercise while you train, and large in the exercise details. Every exercise also has a body map with the muscles it works in red. Pictures for your split are saved on the device for the gym. You can add your own photo of any machine with your camera; photos stay on the device and are included in backups.
+- **Exercise pictures.** 581 exercises, including 14 of the 17 machines in the Full Body EOD plan, show illustrations of the start and finish position. When a picture shows a close variation rather than the exact exercise, it says how it differs (for example "pictured with a handle; yours uses a cuff on the wrist"). Pictures appear across the top of each exercise while you train, and large in the exercise details. Every exercise also has a body map with the muscles it works in red. Pictures for your split are saved on the device for the gym. You can add your own photo of any machine with your camera; photos stay on the device and are included in backups.
 - **Rest timer.** Starts by itself when you check a set, with −15 / +15 / Skip and a sound when it's over. Each exercise remembers its own rest.
 - **Supersets.** Link two exercises and it moves you back and forth, resting only after the round.
 - **Splits ready to go.** Push / Pull / Legs, Upper / Lower, Full Body, Bro Split, Arnold Split, PHUL, 5×5 and Dumbbells Only. Start the next day or any day you like. Build and edit your own templates and splits.
@@ -70,13 +70,17 @@ These rules are used everywhere the app counts or compares sets (workout header,
 3. Pick the **main** branch and the **/ (root)** folder, then **Save**.
 4. After a minute the site is live at https://hoiz77.github.io/LiftingSanity-/
 
-## Put it on your iPad or iPhone
+## Put it on your phone
 
-The same link works on both. The layout adapts to the screen, and on iPhone you type weights and reps on a built-in number pad with Next, + / − and Log keys, so the keyboard never covers your sets.
+The same link works on iPhone, iPad and Android. The layout adapts to the screen, and on phones you type weights and reps on a built-in number pad with Next, + / − and Log keys, so the keyboard never covers your sets.
 
-1. Open the link above in **Safari**.
-2. Tap **Share**, then **Add to Home Screen**.
+1. Open the link above: in **Safari** on iPhone or iPad, in **Chrome** on Android.
+2. iPhone / iPad: tap **Share**, then **Add to Home Screen**. Android: tap **⋮**, then **Add to Home screen** or **Install app**.
 3. Open Lifting Sanity from your Home Screen.
+
+## Share it with friends
+
+Send them the link. Each person gets their own copy of the app with an empty log and a welcome that helps them pick a plan; nobody sees anyone else's workouts, because nothing leaves the phone it was logged on. There's no account to make. Tell them to back up now and then from **Settings → Back up**: with no account, that file is the only copy off their phone.
 
 Your workouts are saved on each device itself, not online, so the iPad and the iPhone each keep their own log. Make a backup now and then from **Settings → Back up** and keep the file in Files or iCloud Drive. **Restore** loads it on any device, which is also how you move your log from one to the other.
 

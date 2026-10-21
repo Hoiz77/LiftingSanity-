@@ -170,6 +170,7 @@ const ICONS = {
   clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7.5V12l3 2',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
   chart: 'M4 4v16h16M8 15l3.5-4 3 2.5L19 8',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3M5.5 11h13v9.5h-13zM12 15v2',
   sliders: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
   plus: 'M12 5v14M5 12h14',
   check: 'M5 12.5l4.5 4.5L19 7',
@@ -547,6 +548,8 @@ function load() {
     }
   }
   if (!state) state = defaults();
+  // nothing saved yet: someone new (or a new device). They get the welcome, not the Full Body EOD split
+  if (!raw && !saveBlocked) { state.flags.fbeod = 1; ui.firstRun = true; }
   ensureSplits();
   if (saveBlocked) setTimeout(() => toast('Your saved data couldn’t be read, so nothing is saved over it. Free some storage, then reopen.'), 600);
   else persist();
@@ -556,7 +559,7 @@ function ensureSplits() {
   if (!state.flags) state.flags = {};
   if (state.flags.fbeod) return;
   const p = PROGRAMS.find(x => x.id === 'fbeod');
-  if (p && !state.splits.some(s => s.programId === 'fbeod')) installProgram(p, true);
+  if (p && !state.splits.some(s => s.programId === 'fbeod')) installProgram(p, true, true);
   state.flags.fbeod = 1;
 }
 let saveTimer = null;
@@ -766,8 +769,10 @@ function programDay(name, spec, from, note) {
   return { id: uid(), name, note: '', ex, from, created: Date.now() };
 }
 const isRest = d => d === 'rest';
-function installProgram(p, makeActive) {
+// keepWeights: the starting weights written into a plan are one person's; only the split first made for them keeps them
+function installProgram(p, makeActive, keepWeights) {
   const days = p.days.map(d => isRest(d) ? 'rest' : programDay(d[0], d[1], p.name, p.note));
+  if (!keepWeights) for (const d of days) if (!isRest(d)) for (const x of d.ex) for (const st of x.sets) delete st.tw;
   state.templates.push(...days.filter(d => !isRest(d)));
   const split = { id: uid(), name: p.name, days: days.map(d => isRest(d) ? 'rest' : d.id), pos: 0, programId: p.id };
   state.splits.push(split);
@@ -1455,6 +1460,56 @@ function renderMini() {
   el.innerHTML = `<button class="mini-btn" data-a="resume"><span class="live-dot"></span><span class="mini-name">${esc(w.mode === 'edit' ? 'Editing ' + w.name : w.name)}</span><span class="mini-meta">${w.mode === 'edit' ? '' : `<span data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span> · `}${done}/${total} sets</span><span class="mini-go">Resume ${icon('up')}</span></button>`;
 }
 
+/* ============================== Welcome (first time on a device) ============================== */
+
+function welcomeSheet() {
+  let step = 'start';
+  const done = () => { state.flags.welcomed = 1; save(true); };
+  const plan = p => {
+    const days = p.days.filter(d => !isRest(d)).length, rests = p.days.length - days;
+    return `<article class="tpl-card welcome-plan"><span class="tpl-main"><b>${esc(p.name)}</b><span class="muted">${esc(p.freq || '')} · ${days} training day${days === 1 ? '' : 's'}${rests ? ` + ${rests} rest` : ''}</span><span class="tpl-ex">${esc(p.about || '')}</span></span>
+      <button class="btn sm primary" data-a="wPlan" data-id="${p.id}">Use this</button></article>`;
+  };
+  openSheet({
+    full: true, cls: 'welcome',
+    render: () => step === 'start' ? `${sheetHead('', '<button class="btn ghost sm" data-a="sheetClose">Skip</button>', '<span></span>')}<div class="sheet-body pad welcome-b">
+        <div class="welcome-mark" aria-hidden="true">${plateMark()}</div>
+        <h1 class="welcome-h">Welcome to Lifting Sanity</h1>
+        <ul class="welcome-points">
+          <li>${icon('check')}<span><b>Log fast.</b> A set done as planned is one tap.</span></li>
+          <li>${icon('chart')}<span><b>See your progress.</b> Records, estimated 1RM and weekly volume, worked out by rules you can read.</span></li>
+          <li>${icon('lock')}<span><b>Your data stays on this phone.</b> No account, nothing sent anywhere. Back it up to a file whenever you like.</span></li>
+        </ul>
+        <div class="welcome-unit"><b>Weights in</b><div class="seg" role="group">${['kg', 'lb'].map(u => `<button class="${state.settings.unit === u ? 'on' : ''}" data-a="wUnit" data-v="${u}" aria-pressed="${state.settings.unit === u}">${u}</button>`).join('')}</div></div>
+        <p class="eyebrow">How do you want to start?</p>
+        <div class="welcome-opts">
+          <button class="welcome-opt" data-a="wPlans">${icon('calendar')}<span><b>Pick a ready-made plan</b><small>Push / pull / legs, upper / lower, full body and more</small></span>${icon('right', 'chev')}</button>
+          <button class="welcome-opt" data-a="wOwn">${icon('edit')}<span><b>Build my own</b><small>Your own days and exercises, from a library of ${LIB.length.toLocaleString()}</small></span>${icon('right', 'chev')}</button>
+          <button class="welcome-opt" data-a="wLook">${icon('play')}<span><b>Look around first</b><small>With 8 weeks of sample workouts, easy to remove later</small></span>${icon('right', 'chev')}</button>
+          <label class="welcome-opt">${icon('upload')}<span><b>I have a backup</b><small>A file saved from this app on another device</small></span>${icon('right', 'chev')}<input type="file" accept=".json,application/json" data-f="importFile" hidden></label>
+        </div>
+      </div>`
+      : `${sheetHead('Pick a plan', '', `<button class="btn ghost sm" data-a="wBack">${icon('left')}Back</button>`)}<div class="sheet-body pad">
+        <p class="muted">You can change the exercises, sets and rest in any of them later, or switch plans.</p>
+        <div class="welcome-plans">${PROGRAMS.map(plan).join('')}</div></div>`,
+    actions: {
+      wUnit: (b, def) => { ACT.setUnit(b); refreshSheet(def); },
+      wPlans: (b, def) => { step = 'plans'; refreshSheet(def); },
+      wBack: (b, def) => { step = 'start'; refreshSheet(def); },
+      wPlan: (b, def) => {
+        const p = PROGRAMS.find(x => x.id === b.dataset.id);
+        installProgram(p, true);
+        done(); closeSheet(def); render();
+        toast(`${p.name} is your plan. Tap Start when you’re at the gym.`);
+      },
+      wOwn: (b, def) => { done(); closeSheet(def); render(); splitEditor(null); },
+      wLook: (b, def) => { done(); closeSheet(def); loadSamples(); }
+    },
+    onInput: (el, def) => { if (el.dataset.f === 'importFile') { done(); closeSheet(def); readBackupFile(el); } },
+    onClose: () => { if (!state.flags.welcomed) done(); }
+  });
+}
+
 /* ============================== Toasts ============================== */
 
 let toastTimer;
@@ -1720,8 +1775,9 @@ function weekStrip() {
 function installHint() {
   if (inFrame || !state.settings.installHint || navigator.standalone || matchMedia('(display-mode: standalone)').matches) return '';
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (!ios) return '';
-  return `<div class="notice">${icon('share')}<p><b>Add Lifting Sanity to your Home Screen.</b> Tap the Share button, then <b>Add to Home Screen</b>. It opens full screen, works offline and keeps your data safe from Safari’s cleanup.</p><button class="icon-btn" data-a="dismissInstall" aria-label="Hide this tip">${icon('x')}</button></div>`;
+  const android = /Android/.test(navigator.userAgent);
+  const how = ios ? 'Tap the Share button, then <b>Add to Home Screen</b>.' : android ? 'Open the browser’s <b>⋮</b> menu, then <b>Add to Home screen</b> or <b>Install app</b>.' : 'It’s made for your phone: open this page there and add it to your Home Screen.';
+  return `<div class="notice">${icon('share')}<p><b>Add Lifting Sanity to your Home Screen.</b> ${how} It opens full screen, works offline and keeps your data safe from the browser’s cleanup.</p><button class="icon-btn" data-a="dismissInstall" aria-label="Hide this tip">${icon('x')}</button></div>`;
 }
 function splitCard(split) {
   const days = split.days.map(d => isRest(d) ? 'rest' : tplById(d) || null);
@@ -3850,9 +3906,9 @@ VIEWS.settings = function () {
     ${row('Sample history', demo ? 'Sample workouts are mixed into your history.' : 'Load 8 weeks of example workouts to see what the charts look like.', demo ? `<button class="btn sm" data-a="demoOff">Remove samples</button>` : `<button class="btn sm" data-a="demoOn">Load samples</button>`)}
     ${row('Erase everything', 'Deletes all workouts, templates and settings on this device.', `<button class="btn sm danger" data-a="eraseAll">Erase</button>`)}
   </div>
-  <h2 class="section-h">Install on iPad</h2><div class="card pad prose">
-    <ol><li>Open Lifting Sanity in <b>Safari</b>.</li><li>Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.</li><li>Open it from your Home Screen. It runs full screen and works without internet.</li></ol>
-    <p class="muted small">Your workouts are stored on this device only. Safari can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.</p>
+  <h2 class="section-h">Install on your phone</h2><div class="card pad prose">
+    <ol><li><b>iPhone or iPad:</b> open Lifting Sanity in <b>Safari</b>, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.</li><li><b>Android:</b> open it in Chrome, tap <b>⋮</b>, then <b>Add to Home screen</b> or <b>Install app</b>.</li><li>Open it from your Home Screen. It runs full screen and works without internet.</li></ol>
+    <p class="muted small">Your workouts are stored on this device only, and nobody else can see them: sharing the link shares the app, not your data. Browsers can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.</p>
   </div>
   <p class="muted small center">Lifting Sanity 1.3 · ${LIB.length} exercises · ${storageOK ? 'saving to this device' : 'storage blocked'}</p>
   <p class="muted small center credits">Illustrations: <a href="https://repdb.co" target="_blank" rel="noopener">Exercise data by RepDB (repdb.co)</a> and <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (Greg Priday, CC BY-SA 4.0) · Instructions: <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a> (MIT)</p>`;
@@ -4384,14 +4440,15 @@ function handleInput(el, ev) {
   if (f === 'libq') { ui.lib.q = el.value; ui.libLimit = PAGE; typed(() => { const l = $('#libList'); if (l) l.innerHTML = libListHTML(); }); }
   else if (f === 'libeq') { ui.lib.eq = el.value; ui.libLimit = PAGE; $('#libList').innerHTML = libListHTML(); }
   else if (f === 'rest' || f === 'bar' || f === 'step') { state.settings[f] = +el.value; save(); }
-  else if (f === 'importFile') {
-    const file = el.files && el.files[0];
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = () => importText(String(r.result));
-    r.readAsText(file);
-    el.value = '';
-  }
+  else if (f === 'importFile') readBackupFile(el);
+}
+function readBackupFile(el) {
+  const file = el.files && el.files[0];
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => importText(String(r.result));
+  r.readAsText(file);
+  el.value = '';
 }
 document.addEventListener('focusin', ev => {
   const el = ev.target;
@@ -4566,6 +4623,7 @@ if (state.active) { ui.woHidden = false; renderWorkout(true); wake(true); }
 renderRest();
 mvWatch();
 requestAnimationFrame(() => { ui.booted = true; placePill(true); });
+if (ui.firstRun && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
 setTimeout(keepCopy, 2000);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // https, or a local copy on this computer (how the tests run it)

@@ -436,8 +436,8 @@ Lever Seated Squat Calf Raise|calves|machine|wr||u
 window.FORGE_PROGRAMS = [
   {
     id: 'fbeod', name: 'Full Body EOD', freq: 'Every other day',
-    about: 'Your full-body machine session from Lyfta: train one day, rest the next. It starts from your last logged weights.',
-    note: 'Weights are from your last Lyfta session. Each rep range starts at the reps you did. Hit the top of the range on every set and the app suggests adding weight.',
+    about: 'A full-body machine session: train one day, rest the next. Seventeen exercises with warm-ups, low rep ranges taken close to failure, and one-side-at-a-time work for arms and calves.',
+    note: 'Low rep ranges, taken close to failure. Hit the top of the range on every set and the app suggests adding weight.',
     days: [
       ['Full Body', [
         { ex: 'Lever Seated Fly', rest: 120, sets: [['W', 72.5, 4], ['N', 80, '5-7', 1], ['N', 80, '5-7', 1]] },

@@ -190,6 +190,26 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .notice p { flex: 1; color: var(--ink-2); }
 .notice b { color: var(--ink); }
 .notice.bad { background: var(--bad-soft); }
+/* the welcome, the first time the app opens on a device */
+.welcome .sheet-h { border-bottom: 0; }
+.welcome-b { display: grid; gap: 18px; width: 100%; max-width: 540px; margin: 0 auto; padding-top: 0; }
+.welcome-mark .mark { display: block; width: 52px; height: 52px; }
+.welcome-h { font: 800 30px/1.1 var(--display); font-stretch: 112%; }
+.welcome-points { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
+.welcome-points li { display: flex; gap: 12px; align-items: flex-start; color: var(--ink-2); line-height: 1.4; }
+.welcome-points li > .i { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
+.welcome-points b { color: var(--ink); }
+.welcome-unit { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 16px; background: var(--panel-2); }
+.welcome-b > .eyebrow { margin-bottom: -8px; }
+.welcome-opts { display: grid; gap: 10px; }
+.welcome-opt { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 16px; border-radius: 18px; background: var(--panel-2); text-align: left; cursor: pointer; }
+.welcome-opt > .i:first-child { flex-shrink: 0; color: var(--accent); }
+.welcome-opt > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.welcome-opt small { font-size: 13px; color: var(--muted); }
+.welcome-opt .chev { flex-shrink: 0; color: var(--muted); }
+.welcome-plans { display: grid; gap: 10px; margin-top: 14px; }
+.welcome-plan { flex-direction: row; align-items: center; gap: 12px; }
+.welcome-plan .tpl-main { flex: 1; min-width: 0; }
 .backup-nudge { flex-wrap: wrap; }
 .backup-nudge p { min-width: 0; flex: 1 1 220px; }
 .nudge-btns { display: flex; gap: 8px; flex-basis: 100%; padding-left: 36px; }
