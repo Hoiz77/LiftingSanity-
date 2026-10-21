@@ -1347,12 +1347,12 @@ function liftView() {
 }
 function tabMotion(ghost, dir) {
   const c = calm(), d = c ? 0 : 28;
-  const anims = [
-    ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dir * d}px)` }], { duration: c ? 120 : 160, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }),
-    $('#view').animate([{ opacity: 0, transform: `translateX(${dir * d}px)` }, { opacity: 1, transform: 'none' }], { duration: c ? 200 : 400, delay: c ? 0 : 60, easing: EASE, fill: 'backwards' })
-  ];
+  // the new page's parts move, not the page itself, so it never pokes out sideways (the page clips them)
+  const parts = [...$('#view').children];
+  const anims = [ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dir * d}px)` }], { duration: c ? 120 : 160, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' })];
+  for (const el of parts) anims.push(el.animate([{ opacity: 0, transform: `translateX(${dir * d}px)` }, { opacity: 1, transform: 'none' }], { duration: c ? 200 : 400, delay: c ? 0 : 60, easing: EASE, fill: 'backwards' }));
   const f = viewFx = { ghost, anims };
-  anims[1].onfinish = () => { if (viewFx === f) endViewFx(); };
+  anims[anims.length - 1].onfinish = () => { if (viewFx === f) endViewFx(); };
 }
 // a part of a page that changes in place (a month in the calendar) slides in from the side it comes from
 function slideIn(el, dir) {
