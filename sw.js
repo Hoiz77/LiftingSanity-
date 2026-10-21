@@ -1,8 +1,9 @@
 /* Lifting Sanity offline helper: keeps the app on the device so it opens at the gym without signal.
    Your workouts live in the app's own storage, not in this cache. */
-const CACHE = 'liftingsanity-v20';
-// exercise illustrations live in their own cache so app updates don't throw them away
+const CACHE = 'liftingsanity-v21';
+// exercise illustrations and fonts live in their own caches so app updates don't throw them away
 const ART = 'liftingsanity-art';
+const FONTS = 'liftingsanity-fonts';
 const SHELL = ['./', 'index.html', 'app.js', 'exercises.js', 'library-extra.js', 'visuals.js', 'science.js', 'y2k.css', 'steps.json', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -13,7 +14,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== ART).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== ART && k !== FONTS).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -22,7 +23,6 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  const keep = res => { if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; };
   if (url.origin === self.location.origin && url.pathname.includes('/art/')) {
     // the app's own drawings: kept with the other illustrations, so an update doesn't throw them away
     e.respondWith(caches.open(ART).then(c => c.match(req).then(m => m || fetch(req).then(res => { if (res && res.ok) c.put(req, res.clone()); return res; }))));
@@ -49,7 +49,7 @@ self.addEventListener('fetch', e => {
       return m || fresh().catch(() => fetch(req));
     }));
   } else if (/(^|\.)fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
-    // fonts rarely change: saved copy first
-    e.respondWith(caches.match(req).then(m => m || fetch(req).then(keep)));
+    // fonts rarely change: saved copy first. The stylesheets are requested with CORS, so a failed answer is never kept
+    e.respondWith(caches.open(FONTS).then(c => c.match(req).then(m => m || fetch(req).then(res => { if (res && res.ok) c.put(req, res.clone()); return res; }))));
   }
 });

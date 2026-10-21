@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&display=swap" media="print" data-font>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&display=swap" media="print" crossorigin="anonymous" data-font>
 <style>
 /* Layout: a tab rail on the left on iPad (a bottom bar on iPhone) beside one working column.
    The live workout is a logbook: exercises down the left, the set sheet on the right.
@@ -130,6 +130,8 @@ p { margin: 0; }
 
 /* ---------- shell ---------- */
 #view { overflow-x: clip; }
+/* the page never scrolls sideways, even while a new page slides in from the side */
+html { overflow-x: clip; }
 /* the Y2K clock strip: only that style shows it (its stylesheet is switched off otherwise, so it's hidden here) */
 #hud { display: none; }
 #tabs {
@@ -141,10 +143,12 @@ p { margin: 0; }
   border-top: 1px solid var(--line);
 }
 .brand { display: none; }
-.tab { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); font: 600 10.5px/1 var(--ui); }
-.tab .i { width: 24px; height: 24px; padding: 4px 16px; box-sizing: content-box; border-radius: 999px; transition: background .2s; }
+.tab { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); font: 600 10.5px/1 var(--ui); transition: color .25s; }
+.tab .i { width: 24px; height: 24px; padding: 4px 16px; box-sizing: content-box; border-radius: 999px; }
 .tab.on { color: var(--accent); }
-.tab.on .i { background: var(--accent-soft); }
+/* the highlight behind the current tab: one shape that glides from tab to tab */
+.tab-pill { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--accent-soft); pointer-events: none; transition: transform .5s cubic-bezier(.32, .72, 0, 1); }
+.tab-pill.still { transition: none; }
 #view {
   max-width: 1000px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -156,7 +160,7 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
   .brand { display: grid; place-items: center; height: 54px; margin-bottom: 10px; }
   .mark { width: 40px; height: 40px; }
   .tab { flex: 0 0 auto; min-height: 66px; border-radius: 16px; font-size: 11.5px; }
-  .tab.on { background: var(--accent-soft); }
+  .tab-pill { border-radius: 16px; }
   .tab .i, .tab.on .i { padding: 0; background: none; }
   #view {
     margin-left: calc(var(--rail) + env(safe-area-inset-left, 0px)); max-width: none;
@@ -367,7 +371,20 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 }
 
 /* ---------- workout ---------- */
-#workout { position: fixed; inset: 0; z-index: 50; background: var(--bg); padding-top: env(safe-area-inset-top, 0px); }
+#workout { position: fixed; inset: 0; z-index: 50; background: var(--bg); padding-top: env(safe-area-inset-top, 0px); transform-origin: 50% 0; }
+/* screen transitions: the workout as a card while it grows out of / shrinks into its bar, with the page dimmed under it */
+#workout.wo-card { border-radius: 38px; overflow: hidden; box-shadow: 0 -10px 40px rgba(0, 0, 0, .25); }
+#woScrim { position: fixed; inset: 0; z-index: 49; background: var(--scrim); pointer-events: none; }
+body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible; }
+/* the page you're leaving, for the moment it fades out */
+.view-ghost { position: fixed; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.view-ghost-in { position: absolute; box-sizing: border-box; }
+.view-ghost .search { background: var(--panel); border-color: var(--line); }
+.view-ghost .chips .chip:not(.on) { background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+/* the exercise card you're leaving, kept inside the workout's scroll area */
+.card-ghost { position: fixed; z-index: 51; overflow: hidden; pointer-events: none; }
+/* one at a time: sideways drags move the card, up and down still scrolls */
+.wo.focus .wo-main { touch-action: pan-y; }
 .wo { height: 100%; display: flex; flex-direction: column; }
 .wo-h { display: flex; align-items: center; gap: 4px; padding: 10px max(12px, env(safe-area-inset-right, 0px)) 6px max(8px, env(safe-area-inset-left, 0px)); }
 .wo-title { flex: 1; min-width: 0; display: grid; padding-left: 4px; }
@@ -622,19 +639,25 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
 
 /* ---------- sheets ---------- */
 .sheet-wrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; }
-.sheet-backdrop { position: absolute; inset: 0; background: var(--scrim); opacity: 0; transition: opacity .22s; }
-.sheet { position: relative; width: 100%; max-width: 640px; max-height: calc(100% - 28px - env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; background: var(--panel); border-radius: 28px 28px 0 0; box-shadow: var(--shadow); padding-bottom: env(safe-area-inset-bottom, 0px); transform: translateY(100%); transition: transform .26s cubic-bezier(.2, .8, .2, 1); }
+.sheet-backdrop { position: absolute; inset: 0; background: var(--scrim); opacity: 0; transition: opacity .34s; }
+.sheet { position: relative; width: 100%; max-width: 640px; max-height: calc(100% - 28px - env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; background: var(--panel); border-radius: 28px 28px 0 0; box-shadow: var(--shadow); padding-bottom: env(safe-area-inset-bottom, 0px); transform: translateY(100%); transform-origin: 50% 0; transition: transform .48s cubic-bezier(.32, .72, 0, 1); }
+.sheet-wrap.out .sheet { transition-duration: .38s; }
+.sheet-wrap.out .sheet-backdrop { transition-duration: .3s; }
 .sheet::before { content: ""; position: absolute; top: 7px; left: 50%; width: 38px; height: 5px; margin-left: -19px; border-radius: 3px; background: var(--line-2); }
 .sheet-wrap.in .sheet { transform: none; }
 .sheet-wrap.in .sheet-backdrop { opacity: 1; }
+/* a sheet with another opened over it steps back */
+.sheet-wrap.in.behind .sheet { transform: translateY(-8px) scale(.94); }
 .sheet-wrap.small .sheet { max-width: 540px; }
 .sheet-wrap.wide .sheet { max-width: 780px; }
 .sheet-wrap.full .sheet { max-width: 940px; height: calc(100% - 20px - env(safe-area-inset-top, 0px)); }
 @media (min-width: 760px) {
   .sheet-wrap { align-items: center; padding: 28px; }
-  .sheet { border-radius: 28px; padding-bottom: 0; max-height: min(880px, 100%); transform: translateY(18px) scale(.985); opacity: 0; transition: transform .22s cubic-bezier(.2, .8, .2, 1), opacity .18s; }
+  .sheet { border-radius: 28px; padding-bottom: 0; max-height: min(880px, 100%); transform: translateY(24px) scale(.97); opacity: 0; transform-origin: 50% 50%; transition: transform .42s cubic-bezier(.32, .72, 0, 1), opacity .24s; }
+  .sheet-wrap.out .sheet { transition-duration: .28s, .2s; }
   .sheet::before { display: none; }
   .sheet-wrap.in .sheet { opacity: 1; }
+  .sheet-wrap.in.behind .sheet { transform: scale(.96); opacity: .7; }
   .sheet-wrap.full .sheet { height: min(900px, 100%); }
 }
 .sheet-h { display: grid; grid-template-columns: minmax(70px, 1fr) auto minmax(70px, 1fr); align-items: center; gap: 8px; padding: 16px 12px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
