@@ -83,9 +83,12 @@
 [data-style="y2k"] body[data-tab="settings"] { --kana: "設定 // システム"; }
 [data-style="y2k"] .num, [data-style="y2k"] .tile b, [data-style="y2k"] .page-h-side b, [data-style="y2k"] .hist-n, [data-style="y2k"] .mbar-v, [data-style="y2k"] .score, [data-style="y2k"] .sci-score b, [data-style="y2k"] .wo-meta, [data-style="y2k"] .cal-d { font-family: var(--lcd); letter-spacing: .02em; }
 [data-style="y2k"] .tile b { font-size: 34px; color: var(--cyan); text-shadow: 0 0 8px rgba(25, 240, 255, .6); }
+[data-style="y2k"] .rv-tile { border-radius: 0; }
+[data-style="y2k"] .rv-tile b { font-family: var(--lcd); }
+[data-style="y2k"] .rv-key { border-radius: 0; }
 
 /* ---------- windows: bevelled panels with a title bar and tiny buttons ---------- */
-[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .exc-setup, .note-ed, .notice, .term, .sheet, .review-list li, .tile) {
+[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .exc-setup, .note-ed, .notice, .term, .sheet, .review-list li, .tile, .rv-tile) {
   border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi); box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .08), 4px 4px 0 rgba(0, 0, 0, .55); background-color: var(--panel); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term, .sheet) { position: relative; padding-top: calc(var(--y2k-pt, 16px) + 22px); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term)::before {
