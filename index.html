@@ -211,6 +211,59 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .welcome-plans { display: grid; gap: 10px; margin-top: 14px; }
 .welcome-plan { flex-direction: row; align-items: center; gap: 12px; }
 .welcome-plan .tpl-main { flex: 1; min-width: 0; }
+.welcome-opt.rec { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.rec-pill { display: inline-block; vertical-align: 1px; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 700 11px/1.5 var(--ui); white-space: nowrap; }
+/* the guide: one question per screen, big choices, then a plan, a tour or the words explained */
+.guide { display: grid; gap: 14px; width: 100%; max-width: 560px; margin: 0 auto; align-content: start; }
+.guide-step { font: 600 13px/1.4 var(--ui); color: var(--muted); }
+.guide-dots { display: flex; gap: 6px; margin-top: -6px; }
+.guide-dots i { flex: 1; height: 4px; border-radius: 2px; background: var(--panel-3); }
+.guide-dots i.done { background: var(--accent); opacity: .5; }
+.guide-dots i.on { background: var(--accent); }
+.guide-h { font: 800 28px/1.15 var(--display); font-stretch: 108%; outline: none; }
+.guide-why { margin-top: -6px; }
+.guide-lead { font-size: 17px; line-height: 1.5; color: var(--ink-2); }
+.guide-opts { display: grid; gap: 10px; margin-top: 4px; }
+.guide-opts.row { grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); }
+.guide-opt { display: grid; gap: 3px; min-height: 64px; padding: 14px 18px; border-radius: 18px; background: var(--panel-2); text-align: start; box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow .15s, background .15s; }
+.guide-opts.row .guide-opt { text-align: center; padding: 14px 8px; }
+.guide-opt b { font-size: 17px; }
+.guide-opt small { font-size: 14px; color: var(--muted); }
+.guide-opt.on { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.guide-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.guide-note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--panel-2); color: var(--ink-2); line-height: 1.45; }
+.guide-note > .i { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
+.guide-plan { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: var(--panel-2); }
+.guide-plan.main { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.guide-plan > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.guide-plan b { font-size: 17px; }
+.guide-set { display: grid; gap: 10px; padding: 14px 16px; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line-2); }
+.guide-set > p:not(.eyebrow) { display: flex; gap: 12px; align-items: flex-start; }
+.guide-set > p > .i { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
+.guide-set > p > span { display: grid; gap: 2px; }
+.guide-set small { color: var(--muted); font-size: 14px; line-height: 1.4; }
+.guide-check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
+.guide-check input { width: 22px; height: 22px; accent-color: var(--accent); }
+.guide-more { display: flex; flex-wrap: wrap; gap: 8px; }
+.guide-card { display: grid; gap: 12px; padding: 18px; border-radius: 20px; background: var(--panel-2); }
+.guide-card .guide-ic { width: 30px; height: 30px; color: var(--accent); }
+.guide-card ul { margin: 0; padding-inline-start: 20px; display: grid; gap: 8px; line-height: 1.5; color: var(--ink-2); }
+.guide-card .guide-note { background: var(--panel); }
+.guide-nav { display: flex; gap: 10px; justify-content: flex-end; }
+.guide-nav .wide { flex: 1; }
+.guide-words { display: grid; gap: 4px; margin: 0; }
+.guide-words div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.guide-words dt { font-weight: 700; }
+.guide-words dd { margin: 2px 0 0; color: var(--ink-2); line-height: 1.45; }
+.welcome-opt > .switch { flex: 0 0 auto; }
+.guide-row { margin-bottom: 4px; }
+/* tips as you go */
+.tip-card { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 16px; padding: 14px 8px 14px 16px; border-radius: 18px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.tip-card > .i { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
+.tip-card > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.tip-card p { color: var(--ink-2); line-height: 1.45; }
+.tip-card .link { justify-self: start; font-size: 14px; }
+.wo-main > .tip-card { max-width: 800px; margin: 4px auto 12px; }
 .backup-nudge { flex-wrap: wrap; }
 .backup-nudge p { min-width: 0; flex: 1 1 220px; }
 .nudge-btns { display: flex; gap: 8px; flex-basis: 100%; padding-inline-start: 36px; }

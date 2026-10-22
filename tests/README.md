@@ -23,6 +23,7 @@ or the page throws an error.
 | File | What it checks |
 | --- | --- |
 | `arabic-options` | In Arabic, exercise names and units/gym terms start as they are; switched to Arabic, the workout, library and plan review show Arabic names, كغ, احتياط and Arabic set letters; search finds an exercise by either name; details keep the English name; scores and saved data don't change; nothing English left with both on. |
+| `guide` | “Set me up” on a new phone: five questions as labelled radio choices with the focus on each question, a plan and settings that fit the answers (and the choice not to use them), Back keeping answers, the six-part tour with notes by experience, the words explained, tips that show once and turn off, Settings → Guide, a plan from the guide keeping your history, and all of it in Arabic. |
 | `welcome` | A new phone opens with the welcome: kg or lb, a ready-made plan (without anyone else's starting weights), building your own, sample workouts, skipping; it never comes back; someone who already has data never sees it. |
 | `arabic` | Switching to العربية turns the app right to left; every screen (tabs, workout, menus, number pad, rest timer, summary, details, plan review, the welcome) is scanned for English that isn't meant to be there; switching back to English. |
 | `selfcheck` | The app's own self-check of its calculation rules: working sets, left/right pairs, warm-ups, 1RM limits, kg ↔ lb, backup validation. |

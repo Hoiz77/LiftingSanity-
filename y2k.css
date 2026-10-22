@@ -88,7 +88,7 @@
 [data-style="y2k"] .rv-key { border-radius: 0; }
 
 /* ---------- windows: bevelled panels with a title bar and tiny buttons ---------- */
-[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .exc-setup, .note-ed, .notice, .term, .sheet, .review-list li, .tile, .rv-tile) {
+[data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .exc-notes, .exc-setup, .note-ed, .notice, .term, .sheet, .review-list li, .tile, .rv-tile, .guide-opt, .guide-plan, .guide-card, .tip-card) {
   border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi); box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .08), 4px 4px 0 rgba(0, 0, 0, .55); background-color: var(--panel); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term, .sheet) { position: relative; padding-top: calc(var(--y2k-pt, 16px) + 22px); }
 [data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term)::before {
@@ -278,3 +278,9 @@
 [dir="rtl"][data-style="y2k"] :is(.card, .upnext, .exc, .tpl-card, .prog, .hist-card, .week, .sci, .term, .sheet, #toast)::before { direction: ltr; text-align: left; }
 [dir="rtl"][data-style="y2k"] .switch span { left: auto; right: 1px; }
 @media (min-width: 760px) { [dir="rtl"][data-style="y2k"] #tabs { border-right: 0; border-left: 2px solid var(--cobalt); } }
+
+/* the guide: square, bevelled choices; the picked one lit */
+[data-style="y2k"] :is(.guide-opt, .guide-plan, .guide-card, .tip-card, .guide-note, .guide-set) { border-radius: 0; }
+[data-style="y2k"] .guide-opt.on { background: var(--titlebar); color: #fff; }
+[data-style="y2k"] .guide-opt.on small { color: #CFE0FF; }
+[data-style="y2k"] .guide-dots i { border-radius: 0; }

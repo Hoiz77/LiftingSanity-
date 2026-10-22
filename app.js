@@ -499,7 +499,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1333,7 +1333,8 @@ function render() {
   document.body.dataset.tab = ui.tab;
   renderTabs();
   const v = $('#view'), shown = imgsBySrc(v);
-  v.innerHTML = VIEWS[ui.tab]();
+  const page = VIEWS[ui.tab](), tip = tipHTML(ui.tab);
+  v.innerHTML = tip ? (page.includes('</header>') ? page.replace('</header>', '</header>' + tip) : tip + page) : page;
   keepImgs(v, shown);
   renderMini();
   requestAnimationFrame(() => drawCharts($('#view')));
@@ -1498,9 +1499,11 @@ function welcomeSheet() {
     return `<article class="tpl-card welcome-plan"><span class="tpl-main"><b>${esc(p.name)}</b><span class="muted">${esc(p.freq || '')} · ${rests ? TN(days, '{n} training day + {r} rest', '{n} training days + {r} rest', { r: rests }) : TN(days, '{n} training day', '{n} training days')}</span><span class="tpl-ex">${esc(p.about || '')}</span></span>
       <button class="btn sm primary" data-a="wPlan" data-id="${p.id}">${T('Use this')}</button></article>`;
   };
+  // "Set me up" runs the guide's questions in this same sheet; backing out of the first one comes back here
+  const G = guideFlow('start', def => { done(); closeSheet(def); }, def => { step = 'start'; refreshSheet(def); });
   openSheet({
     full: true, cls: 'welcome',
-    render: () => step === 'start' ? `${sheetHead('', `<button class="btn ghost sm" data-a="sheetClose">${T('Skip')}</button>`, `<div class="seg sm lang-seg" role="group" aria-label="${T('Language')}">${[['en', 'English'], ['ar', 'العربية']].map(([v, l]) => `<button class="${LANG === v ? 'on' : ''}" data-a="setLang" data-v="${v}" lang="${v}">${l}</button>`).join('')}</div>`)}<div class="sheet-body pad welcome-b">
+    render: () => step === 'guide' ? G.view() : step === 'start' ? `${sheetHead('', `<button class="btn ghost sm" data-a="sheetClose">${T('Skip')}</button>`, `<div class="seg sm lang-seg" role="group" aria-label="${T('Language')}">${[['en', 'English'], ['ar', 'العربية']].map(([v, l]) => `<button class="${LANG === v ? 'on' : ''}" data-a="setLang" data-v="${v}" lang="${v}">${l}</button>`).join('')}</div>`)}<div class="sheet-body pad welcome-b">
         <div class="welcome-mark" aria-hidden="true">${plateMark()}</div>
         <h1 class="welcome-h">${T('Welcome to Lifting Sanity')}</h1>
         <ul class="welcome-points">
@@ -1511,6 +1514,7 @@ function welcomeSheet() {
         <div class="welcome-unit"><b>${T('Weights in')}</b><div class="seg" role="group">${['kg', 'lb'].map(u => `<button class="${state.settings.unit === u ? 'on' : ''}" data-a="wUnit" data-v="${u}" aria-pressed="${state.settings.unit === u}">${term(u)}</button>`).join('')}</div></div>
         <p class="eyebrow">${T('How do you want to start?')}</p>
         <div class="welcome-opts">
+          <button class="welcome-opt rec" data-a="wGuide">${icon('list')}<span><b>${T('Set me up')} <span class="rec-pill">${T('Recommended')}</span></b><small>${T('Five quick questions, then a plan and settings that fit you')}</small></span>${icon('right', 'chev')}</button>
           <button class="welcome-opt" data-a="wPlans">${icon('calendar')}<span><b>${T('Pick a ready-made plan')}</b><small>${T('Push / pull / legs, upper / lower, full body and more')}</small></span>${icon('right', 'chev')}</button>
           <button class="welcome-opt" data-a="wOwn">${icon('edit')}<span><b>${T('Build my own')}</b><small>${T('Your own days and exercises, from a library of {n}', { n: LIB.length.toLocaleString(LOC) })}</small></span>${icon('right', 'chev')}</button>
           <button class="welcome-opt" data-a="wLook">${icon('play')}<span><b>${T('Look around first')}</b><small>${T('With 8 weeks of sample workouts, easy to remove later')}</small></span>${icon('right', 'chev')}</button>
@@ -1521,6 +1525,8 @@ function welcomeSheet() {
         <p class="muted">${T('You can change the exercises, sets and rest in any of them later, or switch plans.')}</p>
         <div class="welcome-plans">${PROGRAMS.map(plan).join('')}</div></div>`,
     actions: {
+      ...G.actions,
+      wGuide: (b, def) => { step = 'guide'; G.begin(def); },
       wUnit: (b, def) => { ACT.setUnit(b); refreshSheet(def); },
       wPlans: (b, def) => { step = 'plans'; refreshSheet(def); },
       wBack: (b, def) => { step = 'start'; refreshSheet(def); },
@@ -1533,9 +1539,226 @@ function welcomeSheet() {
       wOwn: (b, def) => { done(); closeSheet(def); render(); splitEditor(null); },
       wLook: (b, def) => { done(); closeSheet(def); loadSamples(); }
     },
-    onInput: (el, def) => { if (el.dataset.f === 'importFile') { done(); closeSheet(def); readBackupFile(el); } },
+    onInput: (el, def) => { if (el.dataset.f === 'importFile') { done(); closeSheet(def); readBackupFile(el); } else G.onInput(el, def); },
     onClose: () => { if (!state.flags.welcomed) done(); }
   });
+}
+
+/* ============================== Guide ============================== */
+// for new people (and anyone, from Settings → Guide): a few questions, a plan and settings that fit the answers, and
+// three ways to learn the rest: a short tour, a tip the first time each part is opened, or nothing. The questions are
+// remembered (state.profile), so the guide can say what it based things on.
+const GUIDE_Q = () => [
+  { k: 'level', h: T('How long have you been lifting?'), why: T('So the plan, the tips and the words fit where you are.'), opts: [
+    ['new', T('Just starting'), T('Or coming back after a long break')],
+    ['some', T('Up to two years'), T('You know the main lifts')],
+    ['exp', T('More than two years'), T('You plan your own training')]] },
+  { k: 'goal', h: T('What matters most right now?'), why: T('It sets your rest times and which plan comes first.'), opts: [
+    ['muscle', T('Building muscle'), T('Size and shape')],
+    ['strength', T('Getting stronger'), T('Lifting heavier on the big lifts')],
+    ['health', T('Fitness and health'), T('Feeling good and keeping it up')]] },
+  { k: 'days', h: T('How many days a week can you train?'), why: T('Pick what you can keep up most weeks, not your best week.'), opts: [2, 3, 4, 5, 6].map(n => [String(n), String(n), '']) },
+  { k: 'kit', h: T('Where do you train?'), why: T('So every exercise in your plan is one you can do.'), opts: [
+    ['gym', T('In a gym'), T('Barbells, machines and cables')],
+    ['db', T('At home'), T('Dumbbells and a bench')]] },
+  { k: 'learn', h: T('How do you like to learn a new app?'), why: T('You can change this any time in Settings → Guide.'), opts: [
+    ['tour', T('Show me around'), T('A short tour of what the app does')],
+    ['tips', T('Tips as I go'), T('A short tip the first time you open each part')],
+    ['self', T('I’ll explore'), T('No tips; the guide stays in Settings')]] }
+];
+// the answers in a line ("Just starting · Building muscle · 3 days a week · In a gym")
+const guideSaid = a => GUIDE_Q().slice(0, 4).map(q => q.k === 'days' ? (a.days ? TN(+a.days, '{n} day a week', '{n} days a week') : '') : (q.opts.find(o => o[0] === a[q.k]) || [0, ''])[1]).filter(Boolean).join(' · ');
+// the plans that fit the answers, best first
+function guidePlans(a) {
+  const d = +a.days || 3;
+  if (a.kit === 'db') return ['db'];
+  if (a.goal === 'strength') return d >= 4 ? ['phul', '5x5', 'ul'] : ['5x5', 'fb', 'phul'];
+  if (d <= 2) return ['fb', 'fbeod'];
+  if (d === 3) return a.level === 'exp' ? ['ppl', 'fb', 'fbeod'] : ['fb', 'fbeod', 'ppl'];
+  if (d === 4) return a.level === 'new' ? ['ul', 'fbeod'] : ['ul', 'phul', 'fbeod'];
+  if (d === 5) return a.level === 'new' ? ['ul', 'ppl'] : ['ppl', 'ul', 'bro'];
+  return a.level === 'exp' ? ['ppl', 'arnold', 'ul'] : ['ppl', 'ul'];
+}
+const GUIDE_WHY = () => ({
+  fb: T('Every muscle two or three times a week with a few big lifts: the quickest way to learn the movements and build a base.'),
+  fbeod: T('A whole-body session every other day, so a missed day costs little and every muscle still gets worked often.'),
+  ul: T('Upper body one day, lower the next: each muscle twice a week, with time to recover in between.'),
+  ppl: T('Pushing, pulling and legs on separate days: more exercises for each muscle, and twice a week if you train five or six days.'),
+  phul: T('Two heavy days for strength and two lighter days for size, for when you want both.'),
+  '5x5': T('Five sets of five on a few big lifts, adding weight each time you get them all: a simple, proven way to get stronger.'),
+  db: T('Built for a pair of dumbbells and a bench, and works with two to four days a week.'),
+  arnold: T('Chest and back, shoulders and arms, then legs: each twice a week, for experienced lifters training six days.'),
+  bro: T('One or two muscle groups a day, five days a week. Each muscle gets one big day; the plan review shows ways to spread it.')
+});
+// settings that fit the answers: rest by goal, and effort tracking once you can judge it
+const guideSettings = a => ({ rest: a.goal === 'strength' ? 180 : a.goal === 'health' ? 90 : 120, effort: a.level === 'new' ? 'off' : 'rir' });
+const GUIDE_TOUR = () => [
+  { icon: 'check', h: T('Log a set in one tap'), pts: [T('Each set shows what to aim for, from your plan and from last time. Did it? Tap ✓.'), T('Something different? Tap the number and type it on the number pad.'), T('The rest timer starts by itself. −15 and +15 change it.')],
+    note: { new: T('New to this? Start lighter than you think and focus on clean reps. The app suggests when to add weight.'), exp: T('Warm-up, top, back-off, drop and failure sets, supersets and one side at a time are all there: tap a set’s marker or the ⋯ menu.') } },
+  { icon: 'calendar', h: T('A plan that keeps up with you'), pts: [T('Your plan is a list of days. Train shows the next one; tap Start.'), T('Change the exercises, sets, reps and rest in any day, or switch plans. Your history stays.'), T('Plan review checks your week against the research: sets per muscle, effort and rest.')],
+    note: { new: T('Stick with one plan for a couple of months before changing it: that’s when progress shows.'), exp: T('Start a new block when you change plans: the earlier one is kept to compare with.') } },
+  { icon: 'chart', h: T('See your progress'), pts: [T('Records for the heaviest set, estimated 1RM, most reps and volume, marked as they happen.'), T('A chart for every exercise, and your weekly sets per muscle.'), T('A fresh start on one exercise, or a new block, keeps everything that came before.')],
+    note: { new: T('Early on, nearly every week brings a record. They come slower later, and that’s normal.'), exp: T('Estimated 1RM lets you compare sets of different reps; it’s worked out only from sets of 12 reps or fewer.') } },
+  { icon: 'flask', h: T('Learn as you lift'), pts: [T('Every exercise has how-to steps and a picture of the muscles it works.'), T('An estimate of how well it builds muscle, from its mechanics, with the studies behind it or marked as a rule of thumb.'), T('For a machine, say where it feels hardest and the estimate follows.')],
+    note: { new: T('Not sure how to do a lift? Tap its picture during a workout for the steps.'), exp: T('A lower estimate isn’t a reason to drop a lift you progress well on; it’s a hint, not a rule.') } },
+  { icon: 'lock', h: T('Your data stays yours'), pts: [T('No account and nothing sent anywhere. It all stays on this phone and works with no signal.'), T('A copy is kept each day for the last five days, and you can save a backup file any time.'), T('Settings shows when you last backed up, and reminds you now and then.')] },
+  { icon: 'sliders', h: T('Make it yours'), pts: [T('Clean or Y2K style, kg or lb, English or Arabic.'), T('One exercise at a time with big buttons, or all of them in a list.'), T('Settings → Guide brings all of this back, with the words you’ll see explained.')] }
+];
+const GUIDE_WORDS = () => [
+  [T('Working set'), T('A set that counts: the hard sets after your warm-ups. Plans, records and weekly sets use these.')],
+  [T('Warm-up'), T('Lighter sets to get ready. They’re left out of volume, set counts and records.')],
+  [term('RIR'), T('Reps in reserve: how many more reps you could have done. 0 is to failure; 1 to 3 is the usual aim.')],
+  [term('RPE'), T('How hard a set was, out of 10. RPE 8 is about two reps left.')],
+  [T('Est. 1RM'), T('The most you could likely lift once, worked out from a set of up to 12 reps. It lets you compare sets with different reps.')],
+  [T('Volume'), T('Weight times reps, added up. For growth, the number of hard sets per muscle each week matters more.')],
+  [T('Superset'), T('Two exercises done back to back, resting after both. Saves time.')],
+  [T('Top set'), T('Your heaviest set of the day, usually followed by lighter back-off sets.')],
+  [T('Drop set'), T('Straight after a set, take weight off and keep going.')],
+  [T('Progressive overload'), T('Doing a little more over time: more weight, reps or sets. The app suggests the next step.')],
+  [T('Split'), T('Your plan: the days you go through in order.')],
+  [T('Template'), T('One day of your plan: its exercises, sets, reps and rest.')],
+  [T('Block'), T('A stretch of training you look at as a whole. Start a new one when you change plans or come back from a break.')]
+];
+// the guide's steps, shared by the welcome and Settings → Guide; `done(def)` runs when it's finished
+function guideFlow(home, done, exit) {
+  const g = { step: home, i: 0, card: 0, a: Object.assign({}, state.profile || {}), useSet: true };
+  const focusHead = def => setTimeout(() => { const h = def.el && def.el.querySelector('#guideH'); if (h) h.focus({ preventScroll: true }); }, 60);
+  const show = (def, step, extra) => { Object.assign(g, { step }, extra || {}); refreshSheet(def); const b = def.el && def.el.querySelector('.sheet-body'); if (b) b.scrollTop = 0; focusHead(def); };
+  const backBtn = (a = 'gBack') => `<button class="btn ghost sm" data-a="${a}">${T('{icon}Back', { icon: icon('left') })}</button>`;
+  const dots = (n, cur) => `<div class="guide-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k < cur ? 'done' : k === cur ? 'on' : ''}"></i>`).join('')}</div>`;
+  const planCard = (id, main) => {
+    const p = PROGRAMS.find(x => x.id === id); if (!p) return '';
+    const days = p.days.filter(d => !isRest(d)).length;
+    return `<article class="guide-plan${main ? ' main' : ''}"><div><b>${esc(p.name)}</b><span class="muted">${p.freq ? esc(p.freq) : TN(days, '{n} training day', '{n} training days')}</span>${main ? '' : `<p class="muted small">${GUIDE_WHY()[id] || ''}</p>`}</div>
+      <button class="btn sm${main ? ' primary' : ''}" data-a="gUse" data-id="${id}">${main ? T('Use this plan') : T('Use this')}</button></article>`;
+  };
+  const view = () => {
+    const Q = GUIDE_Q();
+    if (g.step === 'q') {
+      const q = Q[g.i];
+      return `${sheetHead('', `<button class="btn ghost sm" data-a="gSkipQ">${T('Skip')}</button>`, backBtn())}
+      <div class="sheet-body pad guide">
+        <p class="guide-step">${T('Question {n} of {total}', { n: g.i + 1, total: Q.length })}</p>${dots(Q.length, g.i)}
+        <h2 class="guide-h" id="guideH" tabindex="-1">${q.h}</h2>
+        <p class="muted guide-why">${q.why}</p>
+        <div class="guide-opts${q.k === 'days' ? ' row' : ''}" role="radiogroup" aria-labelledby="guideH">${q.opts.map(([v, l, sub]) => `<button class="guide-opt${g.a[q.k] === v ? ' on' : ''}" role="radio" aria-checked="${g.a[q.k] === v}" data-a="gAns" data-v="${v}"><b>${l}</b>${sub ? `<small>${sub}</small>` : ''}</button>`).join('')}</div>
+      </div>`;
+    }
+    if (g.step === 'result') {
+      const ids = guidePlans(g.a), set = guideSettings(g.a), lv = g.a.level || 'some';
+      const said = guideSaid(g.a);
+      return `${sheetHead(T('Your plan'), '', backBtn())}
+      <div class="sheet-body pad guide">
+        <p class="guide-step">${T('From your answers: {list}', { list: esc(said) })}</p>
+        <h2 class="guide-h" id="guideH" tabindex="-1">${esc((PROGRAMS.find(p => p.id === ids[0]) || {}).name || '')}</h2>
+        <p class="guide-lead">${GUIDE_WHY()[ids[0]] || ''}</p>
+        ${lv === 'new' ? `<p class="guide-note">${icon('info')}<span>${T('Start lighter than you think and learn each lift. Adding weight comes quickly at first.')}</span></p>` : ''}
+        ${planCard(ids[0], true)}
+        <div class="guide-set" role="group" aria-label="${T('Settings that fit your answers')}">
+          <p class="eyebrow">${T('Settings that fit your answers')}</p>
+          <p>${icon('timer')}<span><b>${T('Rest between sets: {time}', { time: fmtRest(set.rest) })}</b><small>${set.rest >= 180 ? T('Heavy sets need longer rests to do your best on the next one.') : set.rest <= 90 ? T('Shorter rests keep sessions quick; take longer on the big lifts if you need to.') : T('Long enough to do well on the next set, short enough to keep moving.')}</small></span></p>
+          <p>${icon('flame')}<span><b>${set.effort === 'off' ? T('Effort tracking: off for now') : T('Effort tracking: {name}', { name: term('RIR') })}</b><small>${set.effort === 'off' ? T('One thing less to log while you learn. Turn it on in Settings once you can tell how many reps you have left.') : T('After a set, note how many more reps you could have done. It shows how hard you’re really training.')}</small></span></p>
+          <label class="guide-check"><input type="checkbox" data-f="gUseSet" ${g.useSet ? 'checked' : ''}><span>${T('Use these settings')}</span></label>
+        </div>
+        ${ids.length > 1 ? `<p class="eyebrow">${T('Also a good fit')}</p>${ids.slice(1).map(id => planCard(id, false)).join('')}` : ''}
+        <div class="guide-more">
+          <button class="btn ghost" data-a="gOwn">${icon('edit')}${T('Build my own instead')}</button>
+          <button class="btn ghost" data-a="gAll">${icon('calendar')}${T('See every plan')}</button>
+        </div>
+      </div>`;
+    }
+    if (g.step === 'tour') {
+      const T_ = GUIDE_TOUR(), c = T_[g.card], lv = g.a.level === 'new' ? 'new' : g.a.level === 'exp' ? 'exp' : null, last = g.card === T_.length - 1;
+      return `${sheetHead(T('Tour'), `<button class="btn ghost sm" data-a="gEnd">${T('Close')}</button>`, g.card ? backBtn('gPrev') : '')}
+      <div class="sheet-body pad guide">
+        <p class="guide-step">${T('Part {n} of {total}', { n: g.card + 1, total: T_.length })}</p>${dots(T_.length, g.card)}
+        <div class="guide-card">${icon(c.icon, 'guide-ic')}
+          <h2 class="guide-h" id="guideH" tabindex="-1">${c.h}</h2>
+          <ul>${c.pts.map(p => `<li>${p}</li>`).join('')}</ul>
+          ${c.note && (c.note[lv] || (!lv && c.note.new)) ? `<p class="guide-note">${icon('info')}<span>${c.note[lv] || c.note.new}</span></p>` : ''}
+        </div>
+        <div class="guide-nav">${last ? `<button class="btn ghost" data-a="gWords">${T('Words you’ll see')}</button><button class="btn primary" data-a="gEnd">${T('Done')}</button>` : `<button class="btn primary wide" data-a="gNext">${T('Next')}</button>`}</div>
+      </div>`;
+    }
+    if (g.step === 'words') {
+      return `${sheetHead('', `<button class="btn ghost sm" data-a="gEnd">${T('Close')}</button>`, backBtn(home === 'hub' ? 'gHub' : 'gBackTour'))}
+      <div class="sheet-body pad guide">
+        <h2 class="guide-h" id="guideH" tabindex="-1">${T('Words you’ll see')}</h2>
+        <dl class="guide-words">${GUIDE_WORDS().map(([w, d]) => `<div><dt>${w}</dt><dd>${d}</dd></div>`).join('')}</dl>
+      </div>`;
+    }
+    // hub: Settings → Guide
+    const p = state.profile, said = p ? guideSaid(p) : '';
+    return `${sheetHead(T('Guide'))}
+    <div class="sheet-body pad guide">
+      <h2 class="guide-h" id="guideH" tabindex="-1">${T('Get to know Lifting Sanity')}</h2>
+      <p class="muted">${T('Pick whatever suits you; all of it can be opened again here.')}</p>
+      ${said ? `<p class="guide-step">${T('You told us: {list}', { list: esc(said) })}</p>` : ''}
+      <div class="welcome-opts">
+        <button class="welcome-opt" data-a="gStart">${icon('list')}<span><b>${T('Find a plan that fits')}</b><small>${T('Five quick questions, then a plan and settings to match')}</small></span>${icon('right', 'chev')}</button>
+        <button class="welcome-opt" data-a="gTour">${icon('play')}<span><b>${T('Tour of the app')}</b><small>${T('What it does, in six short parts')}</small></span>${icon('right', 'chev')}</button>
+        <button class="welcome-opt" data-a="gWords">${icon('note')}<span><b>${T('Words you’ll see')}</b><small>${T('RIR, 1RM, working sets, supersets and more, in plain words')}</small></span>${icon('right', 'chev')}</button>
+        <button class="welcome-opt" data-a="gTips" aria-pressed="${!!state.flags.tips}">${icon('info')}<span><b>${T('Tips as you go')}</b><small>${state.flags.tips ? T('On: a short tip the first time you open each part') : T('Off: tap to turn on, and see each tip once more')}</small></span><span class="switch${state.flags.tips ? ' on' : ''}" aria-hidden="true"><span></span></span></button>
+      </div>
+    </div>`;
+  };
+  const answer = (def, v) => {
+    const Q = GUIDE_Q(), q = Q[g.i];
+    g.a[q.k] = v; refreshSheet(def);
+    // a moment to see the choice, then on to the next question
+    setTimeout(() => { if (!def.el || !def.el.isConnected) return; if (g.i < Q.length - 1) show(def, 'q', { i: g.i + 1 }); else show(def, 'result'); }, calm() ? 0 : 180);
+  };
+  const finishSetup = (def, id) => {
+    state.profile = Object.assign({}, g.a, { at: Date.now() });
+    if (g.useSet) { const s = guideSettings(g.a); state.settings.rest = s.rest; state.settings.effort = s.effort; }
+    state.flags.tips = g.a.learn === 'tips' ? 1 : 0;
+    if (state.flags.tips) state.flags.tipSeen = {};
+    const p = id && PROGRAMS.find(x => x.id === id);
+    if (p) installProgram(p, true);
+    save(true);
+    if (g.a.learn === 'tour') { show(def, 'tour', { card: 0 }); render(); return; }
+    done(def); render();
+    if (p) toast(T('{name} is your plan. Tap Start when you’re at the gym.', { name: p.name }));
+  };
+  const actions = {
+    gStart: (b, def) => show(def, 'q', { i: 0 }),
+    gAns: (b, def) => answer(def, b.dataset.v),
+    gBack: (b, def) => { if (g.step === 'result') show(def, 'q', { i: GUIDE_Q().length - 1 }); else if (g.i > 0) show(def, 'q', { i: g.i - 1 }); else if (home === 'hub') show(def, 'hub'); else exit(def); },
+    gSkipQ: (b, def) => { const Q = GUIDE_Q(); if (g.i < Q.length - 1) show(def, 'q', { i: g.i + 1 }); else show(def, 'result'); },
+    gUse: (b, def) => finishSetup(def, b.dataset.id),
+    gOwn: (b, def) => { g.a.learn = g.a.learn === 'tour' ? 'self' : g.a.learn; finishSetup(def, null); splitEditor(null); },
+    gAll: (b, def) => { state.profile = Object.assign({}, g.a, { at: Date.now() }); save(); done(def); go_('train'); setTimeout(() => { const el = $$('.section-h').find(h => h.textContent.includes(T('Ready-made splits'))); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 400); },
+    gTour: (b, def) => show(def, 'tour', { card: 0 }),
+    gNext: (b, def) => show(def, 'tour', { card: Math.min(g.card + 1, GUIDE_TOUR().length - 1) }),
+    gPrev: (b, def) => show(def, 'tour', { card: Math.max(0, g.card - 1) }),
+    gWords: (b, def) => show(def, 'words'),
+    gBackTour: (b, def) => show(def, 'tour', { card: GUIDE_TOUR().length - 1 }),
+    gHub: (b, def) => show(def, 'hub'),
+    gEnd: (b, def) => done(def),
+    gTips: (b, def) => { state.flags.tips = state.flags.tips ? 0 : 1; if (state.flags.tips) state.flags.tipSeen = {}; save(); refreshSheet(def); render(); renderWorkout(); }
+  };
+  const onInput = (el, def) => { if (el.dataset.f === 'gUseSet') g.useSet = el.checked; };
+  return { g, view, actions, onInput, focusHead, begin: def => show(def, 'q', { i: 0 }) };
+}
+const go_ = tab => { if (ui.tab !== tab) go(tab); };
+function guideSheet() {
+  const G = guideFlow('hub', def => closeSheet(def), def => closeSheet(def));
+  openSheet({ full: true, cls: 'welcome guide-sheet', render: G.view, actions: G.actions, onInput: G.onInput });
+  const def = sheets[sheets.length - 1]; G.focusHead(def);
+}
+// tips as you go: a short note the first time each part is opened, until it's dismissed (Settings → Guide turns them on)
+const TIPS = () => ({
+  train: [T('This is your plan'), T('The next day is at the top: tap Start when you’re at the gym. Below it are the plan’s review, its days and other plans.')],
+  workout: [T('Logging a set'), T('Tap ✓ when a set went as shown. Tap a number to change it first. Swipe a set sideways to delete it.')],
+  history: [T('Every workout you’ve done'), T('Tap a day in the calendar, or a workout, to see every set. You can edit them or add one you forgot.')],
+  library: [T('All the exercises'), T('Search, or filter by muscle and equipment. Tap one for how-to steps, its growth estimate and your history with it.')],
+  progress: [T('Your progress'), T('Records and charts fill in as you log. Tap a lift for its chart; a fresh start on one exercise is here too.')],
+  settings: [T('Back up now and then'), T('Your data lives only on this phone. Save a backup file to Files or iCloud Drive once in a while.')]
+});
+function tipHTML(id) {
+  if (!state.flags.tips || (state.flags.tipSeen || {})[id]) return '';
+  const t = TIPS()[id]; if (!t) return '';
+  return `<aside class="tip-card" role="note" aria-label="${T('Tip')}">${icon('info')}<div><b>${t[0]}</b><p>${t[1]}</p><button class="link" data-a="tipsOff">${T('Turn tips off')}</button></div><button class="icon-btn" data-a="tipDone" data-id="${id}" aria-label="${T('Got it')}">${icon('x')}</button></aside>`;
 }
 
 /* ============================== Toasts ============================== */
@@ -2431,11 +2654,12 @@ function workoutParts(w) {
     }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">${T('Add exercise')}</span></button></nav>`;
   const cards = !w.ex.length ? [] : focus ? [exCardHTML(w, w.cur, true)] : w.ex.map((x, i) => exCardHTML(w, i, false));
   // what decides the layout: anything else can be updated card by card
-  const key = [focus ? 'f' + w.cur : 'l', w.ex.map(x => x.id).join(','), editing ? 'e' : ''].join('|');
-  return { focus, head, prog, nav, cards, key };
+  const tip = tipHTML('workout');
+  const key = [focus ? 'f' + w.cur : 'l', w.ex.map(x => x.id).join(','), editing ? 'e' : '', tip ? 't' : ''].join('|');
+  return { focus, head, prog, nav, cards, key, tip };
 }
 function workoutHTML(w, P = workoutParts(w)) {
-  let h = `<div class="wo ${P.focus ? 'focus' : 'list'}">${P.head}${P.prog}<div class="wo-body">${P.nav}<div class="wo-main">`;
+  let h = `<div class="wo ${P.focus ? 'focus' : 'list'}">${P.head}${P.prog}<div class="wo-body">${P.nav}<div class="wo-main">${P.tip || ''}`;
   if (!w.ex.length) {
     h += `<div class="wo-empty"><h2>${T('Add your first exercise')}</h2><p class="muted">${TN(LIB.length, 'Search {n} exercises or create your own.', 'Search {n} exercises or create your own.', { n: LIB.length.toLocaleString(LOC) })}</p><button class="btn primary big" data-a="woAddEx">${icon('plus')}${T('Add exercises')}</button></div>`;
   } else {
@@ -3943,6 +4167,9 @@ VIEWS.settings = function () {
   const row = (title, desc, ctl) => `<div class="set-item"><div><b>${title}</b>${desc ? `<p class="muted">${desc}</p>` : ''}</div>${ctl}</div>`;
   const demo = state.workouts.some(w => w.demo);
   return `<header class="page-h"><div><p class="eyebrow">${T('Saved on this device')}</p><h1>${T('Settings')}</h1></div></header>
+  <div class="card list-card guide-row">
+    ${row(T('Guide'), T('A plan that fits you, a tour of the app, the words you’ll see and tips as you go.'), `<button class="btn sm" data-a="openGuide">${icon('info')}${T('Open')}</button>`)}
+  </div>
   <h2 class="section-h">${T('Logging')}</h2><div class="card list-card">
     ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', term('kg')], ['lb', term('lb')]]))}
     ${row(T('Effort'), T('RIR: reps left in the tank. RPE: how hard, out of 10.'), seg('setEffort', s.effort, [['rir', term('RIR')], ['rpe', term('RPE')], ['off', T('Off')]]))}
@@ -4183,6 +4410,9 @@ const ACT = {
   resume: () => { ui.woHidden = false; renderWorkout(); wake(true); },
   nextOpen: () => { ui.nextOpen = !ui.nextOpen; render(); },
   // a new language takes effect on a fresh start of the page (everything is drawn in it from the beginning)
+  openGuide: () => guideSheet(),
+  tipDone: b => { (state.flags.tipSeen = state.flags.tipSeen || {})[b.dataset.id] = 1; save(); render(); renderWorkout(); },
+  tipsOff: () => { state.flags.tips = 0; save(); render(); renderWorkout(); toast(T('Tips are off. Settings → Guide turns them back on.')); },
   setLang: b => { if (b.dataset.v === LANG) return; setLang(b.dataset.v); persist(); location.reload(); },
   setArNames: b => { const on = b.dataset.v === 'ar'; if (on === !!window.AR_NAMES) return; setPref('arNames', on); persist(); location.reload(); },
   setArTerms: b => { const on = b.dataset.v === 'ar'; if (on === !!window.AR_TERMS) return; setPref('arTerms', on); persist(); location.reload(); },
@@ -4724,7 +4954,14 @@ function fitScreen() {
   const out = $('#fitInfo'); if (out) out.textContent = fitLine();
 }
 // the version and what the screen check found, for the bottom of Settings
-const fitLine = () => `v${APP_VERSION} · screen ${fitInfo.screen} · page ${fitInfo.page} · fixed ${fitInfo.box} · ${fitInfo.app ? 'Home Screen app' : 'browser'}${fitInfo.gap ? ` · filled ${fitInfo.gap}` : ''}`;
+// (with every height iOS reports, so a screenshot of it tells what a phone is doing)
+function fitLine() {
+  const probe = css => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;' + css; document.body.append(d); const cs = getComputedStyle(d), r = [d.offsetHeight, parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingBottom) || 0]; d.remove(); return r; };
+  const lvh = probe('height:100lvh')[0], svh = probe('height:100svh')[0], [, st, sb] = probe('height:0;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)');
+  const vv = window.visualViewport ? Math.round(visualViewport.height) : '–';
+  const how = navigator.standalone === true ? 'standalone' : matchMedia('(display-mode: standalone)').matches ? 'display-mode' : 'browser';
+  return `v${APP_VERSION} · screen ${fitInfo.screen} · page ${fitInfo.page} · fixed ${fitInfo.box} · lvh ${lvh} · svh ${svh} · vv ${vv} · safe ${st}/${sb} · ${fitInfo.app ? 'Home Screen app' : 'browser'} (${how})${fitInfo.gap ? ` · filled ${fitInfo.gap}` : ' · nothing filled'}`;
+}
 const fitSoon = (ms = 600) => { clearTimeout(fitT); fitT = setTimeout(fitScreen, ms); };
 document.addEventListener('focusout', () => fitSoon());
 if (window.visualViewport) visualViewport.addEventListener('resize', () => fitSoon(250));

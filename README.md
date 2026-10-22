@@ -43,6 +43,7 @@ A lifting log for iPhone and iPad, made for lifters who already know how to trai
   - In one-at-a-time mode the exercise card follows your finger: let go past a quarter of the way, or flick, for the next or previous one.
   - The number pad and rest timer slide in and out. Pictures on screen stay put when a page redraws, so nothing flashes white.
   - With Reduce Motion on, screens fade instead of moving.
+- **A guide for new people.** On a new phone, **Set me up** asks five quick questions (how long you've been lifting, your goal, days a week, gym or home, how you like to learn), then recommends a plan with why it fits, a couple of others, and settings to match (rest for the goal; effort tracking off while you learn). Then your choice: a six-part tour, a short tip the first time you open each part, or nothing. **Settings → Guide** opens it all again, with the words you'll see (RIR, 1RM, working set, superset, block…) explained.
 - **English or Arabic.** Settings → Language (and on the welcome). In Arabic the whole app reads right to left: the tab rail and the workout list sit on the right, arrows point the other way, and swiping to the next exercise goes the way you read. Numbers stay 0–9, the number pad keeps 1 2 3 left to right, and charts run left to right as in most apps. Everything else is in Arabic, the exercise-science text included. Two more choices, both off to start: exercise names in Arabic (search still finds them by either name, and an exercise's page keeps its English name), and units and gym terms in Arabic (كغ for kg, احتياط for RIR, أقصى رفعة for 1RM, Arabic set letters). How-to steps stay in English. A phone set to Arabic starts in Arabic the first time.
 - **Two styles.** Settings → Style: **Clean** (default) or **Y2K**: cobalt and chrome, pixel and LCD type, bevelled windows, an LCD rest timer, EQ-style bars and a live HUD.
 
@@ -81,7 +82,7 @@ The same link works on iPhone, iPad and Android. The layout adapts to the screen
 
 ## Share it with friends
 
-Send them the link. Each person gets their own copy of the app with an empty log and a welcome that helps them pick a plan; nobody sees anyone else's workouts, because nothing leaves the phone it was logged on. There's no account to make. Tell them to back up now and then from **Settings → Back up**: with no account, that file is the only copy off their phone.
+Send them the link. Each person gets their own copy of the app with an empty log and a welcome that asks a few questions and finds them a plan that fits; nobody sees anyone else's workouts, because nothing leaves the phone it was logged on. There's no account to make. Tell them to back up now and then from **Settings → Back up**: with no account, that file is the only copy off their phone.
 
 Your workouts are saved on each device itself, not online, so the iPad and the iPhone each keep their own log. Make a backup now and then from **Settings → Back up** and keep the file in Files or iCloud Drive. **Restore** loads it on any device, which is also how you move your log from one to the other.
 
