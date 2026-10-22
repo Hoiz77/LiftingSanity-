@@ -28,6 +28,8 @@ function serve(overrides = new Map()) {
 const HOOKED = () => fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8').replace('window.LiftingSanity = {', 'window.__ev = s => eval(s); window.LiftingSanity = {');
 
 let browser = null, site = null;
+// every page error so far, with where it happened, for a test that stops before it can report them
+const seen = [];
 async function open(o = {}) {
   if (!browser) browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
   if (!site) { site = await serve(); module.exports.__site = site; }
@@ -40,7 +42,7 @@ async function open(o = {}) {
   const p = await ctx.newPage();
   p.setDefaultTimeout(5000);
   const errors = [];
-  p.on('pageerror', e => errors.push(e.message));
+  p.on('pageerror', e => { errors.push(e.message); seen.push(`${e.message}${e.stack ? '\n' + e.stack.split('\n').slice(0, 4).join('\n') : ''}`); });
   // the web fonts load only when a test asks (they need the internet); the hosted exercise pictures are left out
   if (!o.fonts) await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.route(/raw\.githubusercontent\.com/, r => r.fulfill({ status: 404, body: '' }));
@@ -76,7 +78,12 @@ async function closeAll() { if (browser) await browser.close(); if (site) await 
 // GitHub's annotation lines can't hold line breaks, and a title can't hold : or ,
 const annot = (s, title) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(title ? /[:,]/g : /$^/, m => m === ':' ? '%3A' : '%2C');
 // a test that stops on an error says so on the run's summary page too
-if (process.env.GITHUB_ACTIONS) for (const ev of ['uncaughtException', 'unhandledRejection']) process.on(ev, e => { console.log(`::error title=${annot(path.basename(process.argv[1] || 'test'), 1)}::${annot((e && e.stack) || e)}`); process.exit(1); });
+if (process.env.GITHUB_ACTIONS) for (const ev of ['uncaughtException', 'unhandledRejection']) process.on(ev, e => {
+  const name = annot(path.basename(process.argv[1] || 'test'), 1);
+  console.log(`::error title=${name}::${annot((e && e.stack) || e)}`);
+  for (const m of seen) console.log(`::error title=${name} page error::${annot(m)}`);
+  process.exit(1);
+});
 
 // pass/fail lines, and a non-zero exit code if anything failed or the page threw an error
 function report(title) {

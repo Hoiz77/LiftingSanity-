@@ -10,10 +10,10 @@ const { open, report, ENGINE } = require('./lib');
   const p = t.p;
   const sheetOpen = () => p.evaluate(() => !!document.querySelector('#sheets .sheet-wrap.in'));
   const closeSheets = async () => { for (let k = 0; k < 4 && await sheetOpen(); k++) { await p.keyboard.press('Escape'); await p.waitForTimeout(450); } };
-  await p.waitForTimeout(700);
-
   // first launch: the welcome, then the guide sets up a plan
-  r.ok(/Welcome to Lifting Sanity/.test(await t.sheetText()), 'first launch opens the welcome');
+  const welcome = await p.waitForFunction(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); return w && /Welcome to Lifting Sanity/.test(w.textContent); }, null, { timeout: 8000 }).then(() => true, () => false);
+  if (!r.ok(welcome, 'first launch opens the welcome', { page: await p.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 300)), errors: t.errors })) return r.done(t);
+  await p.waitForTimeout(400);
   await t.inSheet('[data-a="wUnit"][data-v="kg"]', 250);
   await t.inSheet('[data-a="wGuide"]', 500);
   for (const v of ['new', 'muscle', '3', 'gym', 'self']) await t.inSheet(`[data-a="gAns"][data-v="${v}"]`, 450);
