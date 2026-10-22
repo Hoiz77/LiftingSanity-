@@ -499,7 +499,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -2508,7 +2508,7 @@ function renderWorkout(resetScroll) {
   if (!w || ui.woHidden) {
     if (woFx && woFx.kind === 'rise') woFxEnd();
     const leaving = !el.hidden && !woFx && canMove();
-    document.body.classList.remove('wo-open');
+    document.body.classList.remove('wo-open'); woLock(false);
     ui.kp = null; renderKeypad();
     renderMini(); renderRest();
     if (leaving) woDrop(el);
@@ -2543,7 +2543,7 @@ function renderWorkout(resetScroll) {
   }
   ui.flash = null; ui.flashEx = null;
   el.hidden = false;
-  document.body.classList.add('wo-open');
+  document.body.classList.add('wo-open'); woLock(true);
   const m2 = $('.wo-main', el);
   if (m2) {
     // in the list, starting over (reopening the app, switching layout, adding exercises) lands on the current exercise
@@ -4953,14 +4953,24 @@ function fitScreen() {
   document.documentElement.style.setProperty('--vgap', gap + 'px');
   const out = $('#fitInfo'); if (out) out.textContent = fitLine();
 }
+// while a workout is open the page behind it is held still: it can't scroll or bounce (dragging the rest timer used
+// to move it). In the Home Screen app the workout is also placed as part of the page rather than pinned to the
+// screen, because iOS can keep a hidden toolbar's worth of the bottom where it won't draw pinned things (that was the
+// strip under the workout); it sits where the page is scrolled to, so nothing moves
+function woLock(on) {
+  const root = document.documentElement;
+  if (on === root.classList.contains('wo-lock')) return;
+  if (on) root.style.setProperty('--wo-top', (window.scrollY || 0) + 'px');
+  root.classList.toggle('wo-lock', on);
+}
 // the version and what the screen check found, for the bottom of Settings
 // (with every height iOS reports, so a screenshot of it tells what a phone is doing)
 function fitLine() {
   const probe = css => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;' + css; document.body.append(d); const cs = getComputedStyle(d), r = [d.offsetHeight, parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingBottom) || 0]; d.remove(); return r; };
-  const lvh = probe('height:100lvh')[0], svh = probe('height:100svh')[0], [, st, sb] = probe('height:0;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)');
+  const lvh = probe('height:100lvh')[0], svh = probe('height:100svh')[0], dvh = probe('height:100dvh')[0], [, st, sb] = probe('height:0;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)');
   const vv = window.visualViewport ? Math.round(visualViewport.height) : '–';
   const how = navigator.standalone === true ? 'standalone' : matchMedia('(display-mode: standalone)').matches ? 'display-mode' : 'browser';
-  return `v${APP_VERSION} · screen ${fitInfo.screen} · page ${fitInfo.page} · fixed ${fitInfo.box} · lvh ${lvh} · svh ${svh} · vv ${vv} · safe ${st}/${sb} · ${fitInfo.app ? 'Home Screen app' : 'browser'} (${how})${fitInfo.gap ? ` · filled ${fitInfo.gap}` : ' · nothing filled'}`;
+  return `v${APP_VERSION} · screen ${fitInfo.screen} · page ${fitInfo.page} · fixed ${fitInfo.box} · lvh ${lvh} · svh ${svh} · dvh ${dvh} · vv ${vv} · safe ${st}/${sb} · ${fitInfo.app ? 'Home Screen app' : 'browser'} (${how})${fitInfo.gap ? ` · filled ${fitInfo.gap}` : ' · nothing filled'}`;
 }
 const fitSoon = (ms = 600) => { clearTimeout(fitT); fitT = setTimeout(fitScreen, ms); };
 document.addEventListener('focusout', () => fitSoon());
@@ -4993,6 +5003,7 @@ requestAnimationFrame(() => { ui.booted = true; placePill(true); });
 if (state.flags.newUser && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
 setTimeout(keepCopy, 2000);
 fitSoon(500);
+document.documentElement.classList.toggle('ios-app', homeScreenApp());
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 // https, or a local copy on this computer (how the tests run it)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !inFrame) {

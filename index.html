@@ -459,8 +459,20 @@ html.vfix #restbar, html.vfix #mini, html.vfix #toast { margin-bottom: calc(-1 *
 /* and without the script: in the Home Screen app, iOS's large-viewport height (100lvh) is the screen's, so whatever
    the page box falls short of it is added at the bottom (nothing, on a phone without the problem) */
 @media (display-mode: standalone) {
-  html:not(.vfix) :is(#workout, #woScrim, .view-ghost, .sheet-wrap, #tabs, #keypad) { bottom: min(0px, calc(100% - 100lvh)); }
+  html:not(.vfix):not(.wo-lock) :is(#workout, #woScrim, .view-ghost, .sheet-wrap, #tabs, #keypad) { bottom: min(0px, calc(100% - 100lvh)); }
 }
+/* a workout is open: the page behind holds still (no scrolling, no bounce), and its fixed bars don't start drags */
+html.wo-lock { overflow: hidden; overscroll-behavior: none; }
+html.wo-lock body { overscroll-behavior: none; min-height: calc(var(--wo-top, 0px) + 100lvh); }
+#workout .wo-h, #workout .wo-prog, #restbar, #keypad { touch-action: none; }
+/* iOS 26 Home Screen app: it can keep the bottom of the screen (100lvh − 100dvh, the height of a toolbar that isn't
+   there) out of bounds for pinned things, which showed as a strip under the workout. The open workout is placed as
+   part of the page there, and what floats over it stays above that band. Where there's no such band, this adds 0 */
+html.ios-app.wo-lock #workout { position: absolute; top: var(--wo-top, 0px); right: 0; bottom: auto; left: 0; height: max(100lvh, calc(100vh + var(--vgap, 0px))); }
+html.ios-app body.wo-open #restbar { bottom: max(calc(12px + env(safe-area-inset-bottom, 0px)), calc(100lvh - 100dvh + 8px)); }
+html.ios-app body.wo-open #toast { bottom: max(calc(env(safe-area-inset-bottom, 0px) + 22px), calc(100lvh - 100dvh + 16px)); }
+html.ios-app #keypad { bottom: calc(max(0px, calc(100lvh - 100dvh - env(safe-area-inset-bottom, 0px))) - var(--vgap, 0px)); }
+html.ios-app .sheet { margin-bottom: max(0px, calc(100lvh - 100dvh - env(safe-area-inset-bottom, 0px))); }
 body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible; }
 /* the page you're leaving, for the moment it fades out */
 .view-ghost { position: fixed; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }

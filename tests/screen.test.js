@@ -68,6 +68,31 @@ const fix = p => p.evaluate(() => ({ on: document.documentElement.classList.cont
     await t.ctx.close();
   }
 
+  // the Home Screen app: an open workout is placed as part of the page over a page held still, so iOS draws it all
+  // the way down, and dragging the rest timer can't bounce the page
+  {
+    const t = await open({ width: 393, height: 852 });
+    await t.p.addInitScript(IPHONE, [393, 852]);
+    await t.p.reload(); await t.p.waitForFunction(() => window.LiftingSanity); await t.p.waitForTimeout(600);
+    await t.tab('settings'); await t.click('[data-a="demoOn"]', 600); await t.tab('history');
+    await t.p.evaluate(() => window.scrollTo(0, 600)); await t.p.waitForTimeout(200);
+    const y0 = await t.p.evaluate(() => window.scrollY);
+    await t.tab('train'); await t.p.evaluate(() => window.scrollTo(0, 400)); await t.p.waitForTimeout(200);
+    const y1 = await t.p.evaluate(() => window.scrollY);
+    await t.p.evaluate(() => document.querySelector('[data-a="startDay"]').click()); await t.p.waitForTimeout(900);
+    const w = await t.p.evaluate(() => { const el = document.getElementById('workout'), r = el.getBoundingClientRect(); return { cls: document.documentElement.className, pos: getComputedStyle(el).position, top: Math.round(r.top), h: Math.round(r.height), y: window.scrollY }; });
+    r.ok(/ios-app/.test(w.cls) && /wo-lock/.test(w.cls) && w.pos === 'absolute' && w.top === 0 && w.h === 852, 'in the Home Screen app the open workout is part of the page and covers the screen exactly', w);
+    await t.p.mouse.move(200, 300); await t.p.mouse.wheel(0, 500); await t.p.waitForTimeout(300);
+    r.ok(await t.p.evaluate(y => window.scrollY === y, w.y), 'the page behind can’t be scrolled while the workout is open');
+    await t.ev('startRest(60)'); await t.p.waitForTimeout(500);
+    r.ok(await t.p.evaluate(() => getComputedStyle(document.getElementById('restbar')).touchAction === 'none' && getComputedStyle(document.querySelector('#workout .wo-h')).touchAction === 'none'), 'dragging the rest timer or the header doesn’t move the page');
+    await t.click('[data-a="woMin"]', 900);
+    const after = await t.p.evaluate(() => ({ cls: document.documentElement.className, y: window.scrollY }));
+    r.ok(!/wo-lock/.test(after.cls) && Math.abs(after.y - w.y) < 2 && y0 > 0 && y1 >= 0, 'closing it leaves the page where it was, free to scroll again', { after, w, y1 });
+    pages.push(t);
+    await t.ctx.close();
+  }
+
   // while typing (the keyboard may be up) nothing is moved; it comes back after
   {
     const t = await open({ width: 393, height: 808 });
