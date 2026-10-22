@@ -41,8 +41,9 @@ const day = 864e5;
 
   // deleting a template from inside the split editor, then saving the split
   t = await open(); pages.push(t);
-  await t.ev(`useProgramForTest = PROGRAMS.find(p => p.id === 'ppl')`).catch(() => {});
-  await t.click('[data-a="useProgram"][data-id="ppl"]', 500);
+  await t.click('[data-a="planF"][data-k="all"]', 300).catch(() => {});
+  await t.click('[data-a="planOpen"][data-id="ppl"]', 600);
+  await t.inSheet('[data-a="use"]', 900);
   await t.click('[data-a="splitEdit"]', 500);
   await t.inSheet('[data-a="editDay"][data-i="0"]', 600);
   await t.inSheet('[data-a="del"]', 500);

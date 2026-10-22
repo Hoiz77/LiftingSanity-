@@ -44,7 +44,7 @@ const top = p => p.evaluate(() => { const w = [...document.querySelectorAll('#sh
     exp6: guidePlans({ level: 'exp', goal: 'muscle', days: '6', kit: 'gym' }).join(),
     all: [...new Set(['new', 'some', 'exp'].flatMap(level => ['muscle', 'strength', 'health'].flatMap(goal => ['2', '3', '4', '5', '6'].flatMap(days => ['gym', 'db'].flatMap(kit => guidePlans({ level, goal, days, kit }))))))].every(id => PROGRAMS.some(p => p.id === id))
   })`);
-  r.ok(picks.dumbbells === 'db' && picks.strength4 === 'phul' && picks.strength3 === '5x5' && picks.exp3 === 'ppl' && picks.two === 'fb' && picks.new5 === 'ul' && /^ppl,arnold/.test(picks.exp6) && picks.all, 'plans follow the answers (dumbbells, strength, experience, days), and every pick exists', picks);
+  r.ok(picks.dumbbells === 'db' && picks.strength4 === 'phul' && picks.strength3 === '5x5' && picks.exp3 === 'ulf' && picks.two === 'fb2' && picks.new5 === 'ul' && /^ppl,/.test(picks.exp6) && picks.all, 'plans follow the answers (dumbbells, strength, experience, days), and every pick exists', picks);
 
   // every plan offered, for every combination of answers, against the days chosen: it's built for them, or it says
   // so (naming its days and yours); and when some ready-made plan fits the days, one that fits is offered
@@ -116,7 +116,9 @@ const top = p => p.evaluate(() => { const w = [...document.querySelectorAll('#sh
   // in Arabic: no English left in the guide
   t = await open({ fresh: true }); pages.push(t);
   await t.p.evaluate(() => localStorage.setItem('liftingsanity:lang', 'ar')); await t.p.reload(); await t.p.waitForTimeout(800);
-  const latin = async () => (await top(t.p)).replace(/RIR|RPE|1RM|kg|lb|English|Lifting Sanity|PHUL|Y2K|iCloud Drive|EZ|PPL|EOD/g, '').match(/[A-Za-z]{2,}[A-Za-z ]*/g) || [];
+  // the top sheet's words, leaving out links to studies (their titles stay in English, as everywhere in the app)
+  const words = p => p.evaluate(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); if (!w) return ''; const c = w.cloneNode(true); c.querySelectorAll('a[href^="http"]').forEach(a => a.remove()); return c.textContent.replace(/\s+/g, ' ').trim(); });
+  const latin = async () => (await words(t.p)).replace(/RIR|RPE|1RM|kg|lb|English|Lifting Sanity|PHUL|PHAT|Y2K|iCloud Drive|EZ|PPL|EOD/g, '').match(/[A-Za-z]{2,}[A-Za-z ]*/g) || [];
   const left = [];
   await t.inSheet('[data-a="wGuide"]', 500); left.push(...await latin());
   for (const v of ['new', 'health', '2', 'gym', 'tour']) { await t.inSheet(`[data-a="gAns"][data-v="${v}"]`, 450); left.push(...await latin()); }

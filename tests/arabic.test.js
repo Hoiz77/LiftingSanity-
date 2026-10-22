@@ -3,7 +3,7 @@
 const { open, report } = require('./lib');
 // words that stay as they are in Arabic: units, abbreviations (1RM shows up as RM), names of things and plans, the
 // English choice in the language setting
-const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive)$/;
+const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|PHAT|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive)$/;
 const ENGLISH = (names) => {
   const skip = '.steps, .refs, .credits, #hud, .term, .sci-ref, a[href^="http"], input, textarea, svg, [hidden], .lang-seg, [lang="en"]';
   const out = new Set();
@@ -46,6 +46,12 @@ const ENGLISH = (names) => {
   await t.tab('train'); await t.click('[data-a="planReview"]', 800);
   for (let y = 0; y < 5; y++) { left.push(...await scan('plan review')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }
   await p.keyboard.press('Escape'); await p.waitForTimeout(500);
+  // a ready-made plan's page, in its machine version, and the switch between versions on your split
+  await t.ev(`ui.planF = { days: 0, level: '' }; render();`);
+  await t.click('[data-a="planOpen"][data-id="ap"]', 800); await t.inSheet('[data-a="ver"][data-v="machine"]', 400);
+  for (let y = 0; y < 6; y++) { left.push(...await scan('plan page')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }
+  await t.inSheet('[data-a="use"]', 900);
+  await t.click('[data-a="splitVersion"]', 600); left.push(...await scan('version switch')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.start();
   left.push(...await scan('workout'));
   await t.click('#workout [data-a="woMenu"]', 500); left.push(...await scan('workout menu')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
