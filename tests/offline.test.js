@@ -1,4 +1,5 @@
-// the installed app: opens with no signal, keeps working, and a new version waits until you tap Reload
+// the installed app: opens with no signal, keeps working; a new version found as it starts switches over by itself,
+// one that arrives while you use it waits until you tap Reload
 const { open, report } = require('./lib');
 (async () => {
   const r = report('Offline and updates (service worker)');
@@ -24,18 +25,31 @@ const { open, report } = require('./lib');
   const lib = require('./lib');
   const overrides = lib.__site ? lib.__site.overrides : null;
   if (!overrides) { r.ok(false, 'test server overrides available'); await r.done(t); return; }
-  overrides.set('sw.js', fs.readFileSync(path.join(lib.ROOT, 'sw.js'), 'utf8').replace(/liftingsanity-v\d+/, 'liftingsanity-vTEST'));
-  overrides.set('app.js', fs.readFileSync(path.join(lib.ROOT, 'app.js'), 'utf8').replace('window.LiftingSanity = {', 'window.__newVersion = true; window.LiftingSanity = {'));
+  const swText = fs.readFileSync(path.join(lib.ROOT, 'sw.js'), 'utf8'), appText = fs.readFileSync(path.join(lib.ROOT, 'app.js'), 'utf8');
+  const version = (tag, flag) => { overrides.set('sw.js', swText.replace(/liftingsanity-v\d+/, 'liftingsanity-' + tag)); overrides.set('app.js', appText.replace('window.LiftingSanity = {', `window.${flag} = true; window.LiftingSanity = {`)); };
+  // one that's found while the app is starting switches over by itself, keeping the open workout
+  version('vTEST', '__newVersion');
   await p.reload();
+  // (the page reloads itself while this waits)
+  const has = () => p.evaluate(() => !!window.__newVersion).catch(() => false);
+  for (let k = 0; k < 30 && !(await has()); k++) await p.waitForTimeout(300);
+  await p.waitForFunction(() => window.LiftingSanity).catch(() => {}); await p.waitForTimeout(500);
+  const nv = await p.evaluate(() => ({ newCode: !!window.__newVersion, workout: !!(window.LiftingSanity && window.LiftingSanity.state.active) }));
+  r.ok(nv.newCode && nv.workout, 'a new version found while the app starts switches over by itself, and the open workout is still there', nv);
+  // one that arrives later, while you're using it, waits until you tap Reload
+  await p.waitForTimeout(6500);
+  await p.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  version('vTEST2', '__newVersion2');
+  await p.evaluate(async () => { const reg = await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); });
   let toast = '';
-  for (let k = 0; k < 25 && !/updated/.test(toast); k++) { await p.waitForTimeout(300); toast = (await t.text('#toast')) || ''; }
-  r.ok(/updated/.test(toast) && !(await p.evaluate(() => window.__newVersion)), 'a new version is offered, and nothing changes until you tap Reload', toast);
+  for (let k = 0; k < 30 && !/updated/.test(toast); k++) { await p.waitForTimeout(300); toast = (await t.text('#toast')) || ''; }
+  r.ok(/updated/.test(toast) && !(await p.evaluate(() => window.__newVersion2)), 'a new version that arrives while you use the app is offered, and nothing changes until you tap Reload', toast);
   await Promise.all([p.waitForEvent('load'), p.evaluate(() => document.querySelector('#toast button').click())]);
   await p.waitForFunction(() => window.LiftingSanity); await p.waitForTimeout(500);
-  const nv = await p.evaluate(() => ({ newCode: !!window.__newVersion, workout: !!(window.LiftingSanity && window.LiftingSanity.state.active) }));
-  r.ok(nv.newCode && nv.workout, 'after Reload the new version runs, and the open workout is still there', nv);
+  const nv2 = await p.evaluate(() => ({ newCode: !!window.__newVersion2, workout: !!(window.LiftingSanity && window.LiftingSanity.state.active) }));
+  r.ok(nv2.newCode && nv2.workout, 'after Reload the new version runs, and the open workout is still there', nv2);
   const after = await p.evaluate(async () => (await caches.keys()).join(','));
-  r.ok(/vTEST/.test(after) && !/liftingsanity-v\d/.test(after.replace('vTEST', '')), 'the old version’s files are cleared out', after);
+  r.ok(/vTEST2/.test(after) && !/liftingsanity-v\d/.test(after.replace(/vTEST2?/g, '')) && !/vTEST(,|$)/.test(after), 'the old versions’ files are cleared out', after);
   overrides.clear();
   await r.done(t);
 })();

@@ -499,7 +499,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -4691,7 +4691,7 @@ window.addEventListener('resize', () => {
 // bottom edge reach down to the real edge. What it finds is shown at the bottom of Settings.
 let fitTried = 0, fitT, fitProbe = null;
 const fitInfo = { app: false, screen: '', page: '', box: '', gap: 0 };
-const homeScreenApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+const homeScreenApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)').matches;
 // the box that fixed things (the workout, the tab bar) are placed in, measured directly
 function pageBox() {
   if (!fitProbe || !fitProbe.isConnected) { fitProbe = document.createElement('div'); fitProbe.style.cssText = 'position:fixed;inset:0;visibility:hidden;pointer-events:none;z-index:-1'; document.body.append(fitProbe); }
@@ -4760,8 +4760,16 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 // https, or a local copy on this computer (how the tests run it)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !inFrame) {
   // a new version installs in the background; offer to switch to it (the saved copy keeps opening instantly until then)
+  // one that arrives while the app is starting, before you've touched anything, switches over at once (your data is
+  // saved first and the open workout comes back), so fixes reach you the next time you open the app
   const hadWorker = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) toast(T('Lifting Sanity has been updated.'), { label: T('Reload'), fn: () => { persist(); location.reload(); } }); });
+  let touched = false;
+  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => { touched = true; }, { once: true, passive: true });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadWorker) return;
+    if (!touched && performance.now() < 6000) { persist(); location.reload(); return; }
+    toast(T('Lifting Sanity has been updated.'), { label: T('Reload'), fn: () => { persist(); location.reload(); } });
+  });
   navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => setTimeout(warmArt, 3000)).catch(() => {});
 }
 

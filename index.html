@@ -403,6 +403,11 @@ body.has-mini:not(.wo-open) #restbar { bottom: calc(var(--tabbar) + env(safe-are
    bottom edge reaches down to the real edge, and what floats above it moves down with it */
 html.vfix #workout, html.vfix #woScrim, html.vfix .view-ghost, html.vfix .sheet-wrap, html.vfix #tabs, html.vfix #keypad, html.vfix body::after { bottom: calc(-1 * var(--vgap)); }
 html.vfix #restbar, html.vfix #mini, html.vfix #toast { margin-bottom: calc(-1 * var(--vgap)); }
+/* and without the script: in the Home Screen app, iOS's large-viewport height (100lvh) is the screen's, so whatever
+   the page box falls short of it is added at the bottom (nothing, on a phone without the problem) */
+@media (display-mode: standalone) {
+  html:not(.vfix) :is(#workout, #woScrim, .view-ghost, .sheet-wrap, #tabs, #keypad) { bottom: min(0px, calc(100% - 100lvh)); }
+}
 body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible; }
 /* the page you're leaving, for the moment it fades out */
 .view-ghost { position: fixed; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
