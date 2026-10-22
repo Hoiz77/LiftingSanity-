@@ -73,6 +73,11 @@ async function open(o = {}) {
 }
 async function closeAll() { if (browser) await browser.close(); if (site) await site.close(); browser = null; site = null; }
 
+// GitHub's annotation lines can't hold line breaks, and a title can't hold : or ,
+const annot = (s, title) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(title ? /[:,]/g : /$^/, m => m === ':' ? '%3A' : '%2C');
+// a test that stops on an error says so on the run's summary page too
+if (process.env.GITHUB_ACTIONS) for (const ev of ['uncaughtException', 'unhandledRejection']) process.on(ev, e => { console.log(`::error title=${annot(path.basename(process.argv[1] || 'test'), 1)}::${annot((e && e.stack) || e)}`); process.exit(1); });
+
 // pass/fail lines, and a non-zero exit code if anything failed or the page threw an error
 function report(title) {
   const fails = [];
@@ -82,12 +87,16 @@ function report(title) {
     ok(cond, label, detail) {
       n++;
       if (cond) console.log(`  ✓ ${label}`);
-      else { fails.push(label); console.log(`  ✗ ${label}${detail !== undefined ? '\n      ' + JSON.stringify(detail).slice(0, 600) : ''}`); }
+      else {
+        fails.push(label); console.log(`  ✗ ${label}${detail !== undefined ? '\n      ' + JSON.stringify(detail).slice(0, 600) : ''}`);
+        // on GitHub Actions a failed check is also shown on the run's summary page
+        if (process.env.GITHUB_ACTIONS) console.log(`::error title=${annot(title, 1)}::${annot(label + (detail !== undefined ? ' ' + JSON.stringify(detail).slice(0, 600) : ''))}`);
+      }
       return !!cond;
     },
     async done(...pages) {
       const errs = pages.flatMap(t => t.errors || []);
-      for (const e of errs) { fails.push('page error'); console.log(`  ✗ page error: ${e}`); }
+      for (const e of errs) { fails.push('page error'); console.log(`  ✗ page error: ${e}`); if (process.env.GITHUB_ACTIONS) console.log(`::error title=${annot(title, 1)}::${annot('page error: ' + e)}`); }
       console.log(`  ${n - fails.length + errs.length}/${n} passed${errs.length ? `, ${errs.length} page error${errs.length > 1 ? 's' : ''}` : ''}`);
       await closeAll();
       process.exitCode = fails.length ? 1 : 0;
