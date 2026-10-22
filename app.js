@@ -87,11 +87,16 @@ function loadSteps() {
   return stepsLoading;
 }
 const PROGRAMS = window.FORGE_PROGRAMS;
+// the machine version's swaps, by exercise id: barbell and dumbbell lifts for machines that do the same job
+const MACHINE_SWAPS = new Map(Object.entries(window.FORGE_MACHINE_SWAPS || {}).map(([k, v]) => [slug(k), v.map(slug).filter(id => LIB_MAP.has(id))]));
+const lineEx = line => slug(line.split('|')[0].trim());
 // ready-made plans in the chosen language: their names, notes and day names (the exercises keep their names)
 for (const p of PROGRAMS) {
   p.name = T(p.name); p.about = T(p.about); p.freq = T(p.freq);
-  if (p.note) p.note = T(p.note);
+  for (const k of ['note', 'short', 'why']) if (p[k]) p[k] = T(p[k]);
   for (const d of p.days) if (Array.isArray(d)) d[0] = T(d[0]);
+  // a machine version when the plan has lifts to swap (not the plan for home)
+  p.machine = p.kit !== 'home' && p.days.some(d => Array.isArray(d) && typeof d[1] === 'string' && d[1].trim().split('\n').some(l => MACHINE_SWAPS.has(lineEx(l))));
 }
 
 /* ============================== Utilities ============================== */
@@ -499,7 +504,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -618,10 +623,13 @@ const scoreOf = id => { const a = sciOf(id); return a ? a.score : null; };
 const studied = id => { const a = sciOf(id); return !!(a && a.evidence && a.evidence.length); };
 const scorePill = id => { const v = scoreOf(id), st = v != null && studied(id); return v == null ? '' : `<span class="score ${v >= 9 ? 'hi' : v >= 7 ? 'good' : v >= 5 ? 'ok' : 'lo'}${st ? ' studied' : ''}" title="${st ? T('Growth estimate {v}/10, from the mechanics; studies on this kind of exercise are in its details', { v }) : T('Growth estimate {v}/10, from the mechanics', { v })}">${v}</span>`; };
 // the best-rated exercises for a muscle, best first; ones with pictures win ties
+// exercises the ready-made plans use, in either version: the common names, preferred among equally rated ones
+let planEx = null;
+const inPlans = id => (planEx = planEx || new Set(PROGRAMS.filter(p => !p.own).flatMap(p => p.days.filter(d => Array.isArray(d) && typeof d[1] === 'string').flatMap(d => d[1].trim().split('\n').map(lineEx))).flatMap(id => [id, ...(MACHINE_SWAPS.get(id) || [])]))).has(id);
 function bestFor(m, n = 3, not = null, min = 0) {
   const used = new Set(state.workouts.flatMap(w => w.ex.map(x => x.exId)));
   return allExercises().filter(e => e.m === m && e.id !== not && (scoreOf(e.id) || 0) > min)
-    .sort((a, b) => (scoreOf(b.id) - scoreOf(a.id)) || (!!artOf(b.id) - !!artOf(a.id)) || (used.has(b.id) - used.has(a.id)))
+    .sort((a, b) => (scoreOf(b.id) - scoreOf(a.id)) || (inPlans(b.id) - inPlans(a.id)) || (!!artOf(b.id) - !!artOf(a.id)) || (used.has(b.id) - used.has(a.id)))
     .slice(0, n);
 }
 const refLink = k => { const r = SCI && SCI.REFS[k]; return r ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a>` : ''; };
@@ -765,7 +773,8 @@ function parseSetSpec(spec) {
   }
   return out;
 }
-function programDay(name, spec, from, note) {
+// machine: the machine version, where each swapped exercise remembers its free-weight one (free) for switching back
+function programDay(name, spec, from, note, machine) {
   const ex = [];
   if (Array.isArray(spec)) {
     for (const e of spec) {
@@ -783,12 +792,17 @@ function programDay(name, spec, from, note) {
     }
     return { id: uid(), name, note: note || '', ex, from, created: Date.now() };
   }
-  for (const line of spec.trim().split('\n')) {
+  const lines = spec.trim().split('\n');
+  // a swap never repeats an exercise the day already has; the next choice is used instead
+  const used = new Set(lines.map(lineEx).filter(id => !machine || !MACHINE_SWAPS.has(id)));
+  for (const line of lines) {
     const [exName, sets, reps, rir, rest] = line.split('|').map(s => s.trim());
     const id = slug(exName);
     if (!LIB_MAP.has(id)) continue;
+    const to = machine ? (MACHINE_SWAPS.get(id) || []).find(c => !used.has(c)) : null;
+    if (to) used.add(to);
     ex.push({
-      exId: id, rest: +rest || 90, note: '', ss: null,
+      exId: to || id, rest: +rest || 90, note: '', ss: null, ...(to ? { free: id } : {}),
       sets: parseSetSpec(sets).map(t => ({ t, tr: t === 'W' ? '' : reps, trir: t === 'W' || rir === '' ? null : +rir }))
     });
   }
@@ -796,14 +810,37 @@ function programDay(name, spec, from, note) {
 }
 const isRest = d => d === 'rest';
 // keepWeights: the starting weights written into a plan are one person's; only the split first made for them keeps them
-function installProgram(p, makeActive, keepWeights) {
-  const days = p.days.map(d => isRest(d) ? 'rest' : programDay(d[0], d[1], p.name, p.note));
+// version 'machine': the plan's machine version, for people new to lifting
+function installProgram(p, makeActive, keepWeights, version) {
+  const machine = version === 'machine' && p.machine;
+  const days = programDays(p, machine);
   if (!keepWeights) for (const d of days) if (!isRest(d)) for (const x of d.ex) for (const st of x.sets) delete st.tw;
   state.templates.push(...days.filter(d => !isRest(d)));
   const split = { id: uid(), name: p.name, days: days.map(d => isRest(d) ? 'rest' : d.id), pos: 0, programId: p.id };
+  if (machine) split.version = 'machine';
   state.splits.push(split);
   if (makeActive) state.activeSplit = split.id;
   return split;
+}
+// a plan's days as templates, without adding them anywhere (installing does that; a preview just shows them)
+const programDays = (p, machine) => p.days.map(d => isRest(d) ? 'rest' : programDay(d[0], d[1], p.name, p.note, machine));
+// the split with this plan in this version, if there is one
+const splitOfPlan = (p, version) => state.splits.find(s => s.programId === p.id && (s.version || 'free') === (version || 'free'));
+// switches a split between free weights and machines in place: each swapped exercise remembers the other, so switching
+// back gives the same exercises; sets, reps, rest and notes stay as they are
+function setSplitVersion(sp, version) {
+  for (const id of new Set(sp.days.filter(d => !isRest(d)))) {
+    const t = tplById(id);
+    if (!t) continue;
+    const used = new Set(t.ex.map(x => x.exId));
+    for (const x of t.ex) {
+      if (version !== 'machine') { if (x.free) { x.exId = x.free; delete x.free; } continue; }
+      if (x.free) continue;
+      const to = (MACHINE_SWAPS.get(x.exId) || []).find(c => !used.has(c));
+      if (to) { used.add(to); x.free = x.exId; x.exId = to; }
+    }
+  }
+  if (version === 'machine') sp.version = 'machine'; else delete sp.version;
 }
 const tplById = id => state.templates.find(t => t.id === id);
 // take day i out of a split, keeping "up next" on the same day (or the day after, if it was this one)
@@ -1494,11 +1531,7 @@ function renderMini() {
 function welcomeSheet() {
   let step = 'start';
   const done = () => { state.flags.welcomed = 1; save(true); };
-  const plan = p => {
-    const days = p.days.filter(d => !isRest(d)).length, rests = p.days.length - days;
-    return `<article class="tpl-card welcome-plan"><span class="tpl-main"><b>${esc(p.name)}</b><span class="muted">${esc(p.freq || '')} · ${rests ? TN(days, '{n} training day + {r} rest', '{n} training days + {r} rest', { r: rests }) : TN(days, '{n} training day', '{n} training days')}</span><span class="tpl-ex">${esc(p.about || '')}</span></span>
-      <button class="btn sm primary" data-a="wPlan" data-id="${p.id}">${T('Use this')}</button></article>`;
-  };
+
   // "Set me up" runs the guide's questions in this same sheet; backing out of the first one comes back here
   const G = guideFlow('start', def => { done(); closeSheet(def); }, def => { step = 'start'; refreshSheet(def); });
   openSheet({
@@ -1523,19 +1556,18 @@ function welcomeSheet() {
       </div>`
       : `${sheetHead(T('Pick a plan'), '', `<button class="btn ghost sm" data-a="wBack">${T('{icon}Back', { icon: icon('left') })}</button>`)}<div class="sheet-body pad">
         <p class="muted">${T('You can change the exercises, sets and rest in any of them later, or switch plans.')}</p>
-        <div class="welcome-plans">${PROGRAMS.map(plan).join('')}</div></div>`,
+        ${planBrowser()}</div>`,
     actions: {
       ...G.actions,
       wGuide: (b, def) => { step = 'guide'; G.begin(def); },
       wUnit: (b, def) => { ACT.setUnit(b); refreshSheet(def); },
       wPlans: (b, def) => { step = 'plans'; refreshSheet(def); },
       wBack: (b, def) => { step = 'start'; refreshSheet(def); },
-      wPlan: (b, def) => {
-        const p = PROGRAMS.find(x => x.id === b.dataset.id);
-        installProgram(p, true);
-        done(); closeSheet(def); render();
+      planOpen: (b, def) => planSheet(b.dataset.id, { onUse: (p, v, d2) => {
+        installProgram(p, true, false, v);
+        done(); closeSheet(d2); closeSheet(def); render();
         toast(T('{name} is your plan. Tap Start when you’re at the gym.', { name: p.name }));
-      },
+      } }),
       wOwn: (b, def) => { done(); closeSheet(def); render(); splitEditor(null); },
       wLook: (b, def) => { done(); closeSheet(def); loadSamples(); }
     },
@@ -1569,14 +1601,15 @@ const GUIDE_Q = () => [
 // the answers in a line ("Just starting · Building muscle · 3 days a week · In a gym")
 const guideSaid = a => GUIDE_Q().slice(0, 4).map(q => q.k === 'days' ? (a.days ? TN(+a.days, '{n} day a week', '{n} days a week') : '') : (q.opts.find(o => o[0] === a[q.k]) || [0, ''])[1]).filter(Boolean).join(' · ');
 // the days a week each ready-made plan is built for
-const PLAN_DAYS = { fb: [3], fbeod: [3, 4], ul: [4], ppl: [3, 6], phul: [4], '5x5': [3], db: [2, 3, 4], arnold: [6], bro: [5] };
-// the plans for each goal and level, best first (5×5 and PHUL are the strength plans; Bro and Arnold come up as
-// plans that use five or six days)
+const PLAN_DAYS = Object.fromEntries(PROGRAMS.map(p => [p.id, p.week || [3]]));
+// the plans for each goal and level, best first (5×5, PHUL and PHAT are the strength plans; the rest come up as plans
+// that use the days you have)
 const PLAN_PREFS = {
-  strength: { new: ['5x5', 'phul', 'fb', 'ul'], some: ['5x5', 'phul', 'ul', 'fb'], exp: ['phul', '5x5', 'ul', 'ppl'] },
-  muscle: { new: ['fb', 'ul', 'fbeod', 'ppl'], some: ['ul', 'fb', 'ppl', 'fbeod', 'phul'], exp: ['ppl', 'ul', 'phul', 'arnold', 'fb'] },
-  health: { new: ['fb', 'fbeod', 'ul'], some: ['fb', 'fbeod', 'ul', 'ppl'], exp: ['ul', 'fb', 'ppl', 'fbeod'] }
+  strength: { new: ['5x5', 'fb', 'fb2', 'ulf', 'ul'], some: ['phul', '5x5', 'ul', 'ulppl', 'ap', 'ulf', 'fb2'], exp: ['phul', 'phat', '5x5', 'ul', 'ul6', 'ap6', 'ulppl', 'fb2'] },
+  muscle: { new: ['fb', 'fb2', 'ulf', 'ul'], some: ['ul', 'ulf', 'ap', 'tl', 'ulppl', 'ppl', 'fb', 'fb2'], exp: ['ulf', 'ppl', 'ul', 'ap', 'ulppl', 'ul6', 'ap6', 'arnold', 'tl', 'fb2'] },
+  health: { new: ['fb', 'fb2', 'ulf', 'ul'], some: ['fb', 'ulf', 'ul', 'fb2'], exp: ['ul', 'ulf', 'fb', 'ap', 'fb2'] }
 };
+const STRENGTH_PLANS = new Set(['5x5', 'phul', 'phat']);
 const fitsDays = (id, n) => PLAN_DAYS[id].includes(n);
 // "3", "3 or 4", "2 to 4"
 const daysText = ds => ds.length === 1 ? String(ds[0]) : ds.length === 2 ? T('{a} or {b}', { a: ds[0], b: ds[1] }) : T('{a} to {b}', { a: ds[0], b: ds[ds.length - 1] });
@@ -1600,30 +1633,21 @@ function guidePick(a) {
   // closest to the days wanted; on two days, whole-body plans first (each session works everything); on a tie, one
   // that can use all the days, then the goal's order
   const near = (id, n) => Math.min(...PLAN_DAYS[id].map(x => Math.abs(x - n)));
-  const whole = id => (id === 'fb' || id === 'fbeod' || id === '5x5' ? 0 : 1);
+  const whole = id => (['fb', 'fb2', 'fbeod', '5x5'].includes(id) ? 0 : 1);
   const rank = (id, n) => [n < 3 ? whole(id) : 0, near(id, n), PLAN_DAYS[id].some(v => v >= n) ? 0 : 1];
   const cmp = n => (x, y) => { const a = rank(x, n), b = rank(y, n); return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; };
   const best = (ids, n) => ids.find(id => fitsDays(id, n)) || [...ids].sort(cmp(n))[0];
   // for strength, the strength plans come first even when they're built for fewer days (and say why)
-  const main = best(goal === 'strength' ? prefs.filter(id => id === '5x5' || id === 'phul') : prefs, want);
+  const main = best(goal === 'strength' ? prefs.filter(id => STRENGTH_PLANS.has(id)) : prefs, want);
   // then one that uses every day you have, if the first doesn't, and the next best for the goal
-  const every = fitsDays(main, d) ? null : [...prefs, 'ppl', 'fbeod', 'ul', 'bro', 'arnold'].find(id => id !== main && fitsDays(id, d) && (level === 'exp' || (id !== 'bro' && id !== 'arnold')));
+  const suits = id => LEVEL_RANK[(PROGRAMS.find(x => x.id === id) || {}).level || 'some'] <= LEVEL_RANK[level];
+  const every = fitsDays(main, d) ? null : [...prefs, 'ppl', 'ul', 'ulppl', 'ul6', 'ap6', 'bro', 'arnold'].find(id => id !== main && fitsDays(id, d) && suits(id));
   const rest = prefs.filter(id => id !== main && id !== every).sort((x, y) => (fitsDays(y, want) ? 1 : 0) - (fitsDays(x, want) ? 1 : 0) || (want < 3 ? whole(x) - whole(y) : 0));
   const alts = [every, ...rest.filter(id => fitsDays(id, want)), ...rest].filter((id, i, all) => id && all.indexOf(id) === i).slice(0, 2);
   return [main, ...alts].map(id => ({ id, note: note(id) }));
 }
 const guidePlans = a => guidePick(a).map(p => p.id);
-const GUIDE_WHY = () => ({
-  fb: T('Every muscle two or three times a week with a few big lifts: the quickest way to learn the movements and build a base.'),
-  fbeod: T('A whole-body session every other day, so a missed day costs little and every muscle still gets worked often.'),
-  ul: T('Upper body one day, lower the next: each muscle twice a week, with time to recover in between.'),
-  ppl: T('Pushing, pulling and legs on separate days: more exercises for each muscle, and twice a week if you train five or six days.'),
-  phul: T('Two heavy days for strength and two lighter days for size, for when you want both.'),
-  '5x5': T('Five sets of five on a few big lifts, adding weight each time you get them all: a simple, proven way to get stronger.'),
-  db: T('Built for a pair of dumbbells and a bench, and works with two to four days a week.'),
-  arnold: T('Chest and back, shoulders and arms, then legs: each twice a week, for experienced lifters training six days.'),
-  bro: T('One or two muscle groups a day, five days a week. Each muscle gets one big day; the plan review shows ways to spread it.')
-});
+const GUIDE_WHY = () => Object.fromEntries(PROGRAMS.map(p => [p.id, p.why || '']));
 // settings that fit the answers: rest by goal, and effort tracking once you can judge it
 const guideSettings = a => ({ rest: a.goal === 'strength' ? 180 : a.goal === 'health' ? 90 : 120, effort: a.level === 'new' ? 'off' : 'rir' });
 const GUIDE_TOUR = () => [
@@ -1660,11 +1684,13 @@ function guideFlow(home, done, exit) {
   const show = (def, step, extra) => { Object.assign(g, { step }, extra || {}); refreshSheet(def); const b = def.el && def.el.querySelector('.sheet-body'); if (b) b.scrollTop = 0; focusHead(def); };
   const backBtn = (a = 'gBack') => `<button class="btn ghost sm" data-a="${a}">${T('{icon}Back', { icon: icon('left') })}</button>`;
   const dots = (n, cur) => `<div class="guide-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k < cur ? 'done' : k === cur ? 'on' : ''}"></i>`).join('')}</div>`;
+  // someone just starting at a gym gets each plan's machine version
+  const versionOf = p => p.machine && g.a.level === 'new' && g.a.kit !== 'db' ? 'machine' : 'free';
   const planCard = (id, main, note) => {
     const p = PROGRAMS.find(x => x.id === id); if (!p) return '';
-    const days = p.days.filter(d => !isRest(d)).length;
-    return `<article class="guide-plan${main ? ' main' : ''}"><div><b>${esc(p.name)}</b><span class="muted">${p.freq ? esc(p.freq) : TN(days, '{n} training day', '{n} training days')}</span>${main ? '' : `<p class="muted small">${GUIDE_WHY()[id] || ''}</p>`}${note ? `<p class="small guide-days" data-days-note>${icon('calendar', 'inline')} ${note}</p>` : ''}</div>
-      <button class="btn sm${main ? ' primary' : ''}" data-a="gUse" data-id="${id}">${main ? T('Use this plan') : T('Use this')}</button></article>`;
+    const days = p.days.filter(d => !isRest(d)).length, v = versionOf(p);
+    return `<article class="guide-plan${main ? ' main' : ''}"><div><b>${esc(p.name)}</b><span class="muted">${p.freq ? esc(p.freq) : TN(days, '{n} training day', '{n} training days')}${v === 'machine' ? ` · ${T('Machine version')}` : ''}</span>${main ? '' : `<p class="muted small">${GUIDE_WHY()[id] || ''}</p>`}${note ? `<p class="small guide-days" data-days-note>${icon('calendar', 'inline')} ${note}</p>` : ''}</div>
+      <div class="guide-plan-btns"><button class="btn sm${main ? ' primary' : ''}" data-a="gUse" data-id="${id}" data-v="${v}">${main ? T('Use this plan') : T('Use this')}</button><button class="btn sm ghost" data-a="gSee" data-id="${id}" data-v="${v}" aria-label="${T('See {name}', { name: esc(p.name) })}">${T('See the plan')}</button></div></article>`;
   };
   const view = () => {
     const Q = GUIDE_Q();
@@ -1688,6 +1714,7 @@ function guideFlow(home, done, exit) {
         <p class="guide-lead">${GUIDE_WHY()[ids[0]] || ''}</p>
         ${pick[0].note ? `<p class="guide-note days" data-days-note>${icon('calendar')}<span>${pick[0].note}</span></p>` : ''}
         ${lv === 'new' ? `<p class="guide-note">${icon('info')}<span>${T('Start lighter than you think and learn each lift. Adding weight comes quickly at first.')}</span></p>` : ''}
+        ${versionOf(PROGRAMS.find(p => p.id === ids[0]) || {}) === 'machine' ? `<p class="guide-note machine" data-machine-note>${icon('dumbbell')}<span>${T('This is the machine version: machines and cables in place of barbell, dumbbell and pull-up lifts while you learn. Muscle grows about as well either way ({ref}). Move to free weights in one tap from your split when you’re ready.', { ref: refLink('haugen2023') })}</span></p>` : ''}
         ${planCard(ids[0], true)}
         <div class="guide-set" role="group" aria-label="${T('Settings that fit your answers')}">
           <p class="eyebrow">${T('Settings that fit your answers')}</p>
@@ -1743,13 +1770,14 @@ function guideFlow(home, done, exit) {
     // a moment to see the choice, then on to the next question
     setTimeout(() => { if (!def.el || !def.el.isConnected) return; if (g.i < Q.length - 1) show(def, 'q', { i: g.i + 1 }); else show(def, 'result'); }, calm() ? 0 : 180);
   };
-  const finishSetup = (def, id) => {
+  const finishSetup = (def, id, version) => {
     state.profile = Object.assign({}, g.a, { at: Date.now() });
+    ui.planF = null; // the plan list starts from the new answers
     if (g.useSet) { const s = guideSettings(g.a); state.settings.rest = s.rest; state.settings.effort = s.effort; }
     state.flags.tips = g.a.learn === 'tips' ? 1 : 0;
     if (state.flags.tips) state.flags.tipSeen = {};
     const p = id && PROGRAMS.find(x => x.id === id);
-    if (p) installProgram(p, true);
+    if (p) { const have = splitOfPlan(p, version); if (have) state.activeSplit = have.id; else installProgram(p, true, false, version); }
     save(true);
     if (g.a.learn === 'tour') { show(def, 'tour', { card: 0 }); render(); return; }
     done(def); render();
@@ -1760,9 +1788,10 @@ function guideFlow(home, done, exit) {
     gAns: (b, def) => answer(def, b.dataset.v),
     gBack: (b, def) => { if (g.step === 'result') show(def, 'q', { i: GUIDE_Q().length - 1 }); else if (g.i > 0) show(def, 'q', { i: g.i - 1 }); else if (home === 'hub') show(def, 'hub'); else exit(def); },
     gSkipQ: (b, def) => { const Q = GUIDE_Q(); if (g.i < Q.length - 1) show(def, 'q', { i: g.i + 1 }); else show(def, 'result'); },
-    gUse: (b, def) => finishSetup(def, b.dataset.id),
+    gUse: (b, def) => finishSetup(def, b.dataset.id, b.dataset.v),
+    gSee: (b, def) => planSheet(b.dataset.id, { version: b.dataset.v, onUse: (p, v, d2) => { closeSheet(d2); finishSetup(def, p.id, v); } }),
     gOwn: (b, def) => { g.a.learn = g.a.learn === 'tour' ? 'self' : g.a.learn; finishSetup(def, null); splitEditor(null); },
-    gAll: (b, def) => { state.profile = Object.assign({}, g.a, { at: Date.now() }); save(); done(def); go_('train'); setTimeout(() => { const el = $$('.section-h').find(h => h.textContent.includes(T('Ready-made splits'))); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 400); },
+    gAll: (b, def) => { state.profile = Object.assign({}, g.a, { at: Date.now() }); ui.planF = null; save(); done(def); go_('train'); setTimeout(() => { const el = $('#plans'); if (el) el.scrollIntoView({ behavior: calm() ? 'auto' : 'smooth' }); }, 400); },
     gTour: (b, def) => show(def, 'tour', { card: 0 }),
     gNext: (b, def) => show(def, 'tour', { card: Math.min(g.card + 1, GUIDE_TOUR().length - 1) }),
     gPrev: (b, def) => show(def, 'tour', { card: Math.max(0, g.card - 1) }),
@@ -2065,6 +2094,14 @@ function installHint() {
   const how = ios ? T('Tap the Share button, then <b>Add to Home Screen</b>.') : android ? T('Open the browser’s <b>⋮</b> menu, then <b>Add to Home screen</b> or <b>Install app</b>.') : T('It’s made for your phone: open this page there and add it to your Home Screen.');
   return `<div class="notice">${icon('share')}<p>${T('<b>Add Lifting Sanity to your Home Screen.</b> {how} It opens full screen, works offline and keeps your data safe from the browser’s cleanup.', { how })}</p><button class="icon-btn" data-a="dismissInstall" aria-label="${T('Hide this tip')}">${icon('x')}</button></div>`;
 }
+// for a ready-made plan: which version it is, and the way to the other one
+function splitVersionLine(split) {
+  const p = split.programId && PROGRAMS.find(x => x.id === split.programId);
+  if (!p || !p.machine) return '';
+  return split.version === 'machine'
+    ? `<p class="split-ver">${T('Machine version')} · <button class="link" data-a="splitVersion" data-id="${split.id}">${T('Move to free weights')}</button></p>`
+    : `<p class="split-ver">${T('Free weights')} · <button class="link" data-a="splitVersion" data-id="${split.id}">${T('Switch to machines')}</button></p>`;
+}
 function splitCard(split) {
   const days = split.days.map(d => isRest(d) ? 'rest' : tplById(d) || null);
   const n = days.length, trainDays = days.filter(d => d && !isRest(d)).length, restDays = days.filter(isRest).length;
@@ -2078,7 +2115,7 @@ function splitCard(split) {
     : `<p class="eyebrow accent">${T('Up next · Day {day} of {n}', { day: pos + 1, n })}</p><h3>${esc(t.name)}</h3><div class="facts"><span>${icon('dumbbell')}${TN(t.ex.length, '{n} exercises', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(t), '{n} working sets', '{n} working sets', { n: trimNum(tplWorkingSets(t), 1) })}</span><span>${icon('clock')}${TN(est, 'about {n} min', 'about {n} min')}</span><span>${icon('calendar')}${last ? T('last done {when}', { when: relDay(last.start) }) : T('not done yet')}</span></div>`;
   const strip = t ? t.ex.filter(x => artOf(x.exId) || photos.get(x.exId)).slice(0, 4) : [];
   return `<section class="split">
-    <div class="split-h"><div><p class="eyebrow">${restDays ? TN(trainDays, 'Your split · {n} training day + {r} rest', 'Your split · {n} training days + {r} rest', { r: restDays }) : TN(trainDays, 'Your split · {n} training day', 'Your split · {n} training days')}</p><h2>${esc(split.name)}</h2></div>
+    <div class="split-h"><div><p class="eyebrow">${restDays ? TN(trainDays, 'Your split · {n} training day + {r} rest', 'Your split · {n} training days + {r} rest', { r: restDays }) : TN(trainDays, 'Your split · {n} training day', 'Your split · {n} training days')}</p><h2>${esc(split.name)}</h2>${splitVersionLine(split)}</div>
       <div class="split-actions"><button class="btn sm review-btn" data-a="planReview" data-id="${split.id}">${icon('flask')}${T('Review')}</button><button class="btn sm" data-a="splitSwitch">${icon('swap')}${T('Change')}</button><button class="btn sm" data-a="splitEdit" data-id="${split.id}">${icon('edit')}${T('Edit')}</button></div></div>
     ${t ? `<div class="upnext ${st.state === 'due' ? '' : 'resting'}">
       ${strip.length >= 3 ? `<div class="strip" aria-hidden="true">${strip.map(x => thumb(x.exId, 'tile')).join('')}</div>` : ''}
@@ -2098,7 +2135,7 @@ function splitCard(split) {
 const MAJOR = ['chest', 'lats', 'upperback', 'frontdelts', 'sidedelts', 'reardelts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs'];
 const COMPOUND = new Set(['pressHorizontal', 'pressVertical', 'row', 'pullVertical', 'squat', 'hinge']);
 function planStats(split, perWeek) {
-  const tpls = split.days.filter(d => !isRest(d)).map(tplById).filter(Boolean);
+  const tpls = split.tpls || split.days.filter(d => !isRest(d)).map(tplById).filter(Boolean);
   const each = tpls.length ? perWeek / tpls.length : 0; // how often each training day comes round in a week
   const sets = {}, days = {}, ex = [];
   for (const t of tpls) {
@@ -2120,88 +2157,93 @@ function guessPerWeek(split) {
   const recent = state.workouts.filter(w => w.start > Date.now() - 28 * DAY).length / 4;
   return recent >= 1 ? Math.round(recent) : Math.min(train, 4);
 }
-function planReview(split) {
-  let perWeek = guessPerWeek(split);
+// the review's points for a split trained `perWeek` times a week, grouped by topic: { st, topics }; each point is
+// { kind: fix | tip | good, text, refs } and says what it rests on: studies (linked) or a rule of thumb
+function reviewTopics(split, perWeek) {
+  const st = planStats(split, perWeek);
+  const topics = [];
+  let cur = null;
+  const topic = (title, about) => topics.push(cur = { title, about, items: [], after: '' });
+  const say = (kind, text, refs = []) => cur.items.push({ kind, text, refs });
+  const name = m => esc(MUSCLES[m].toLowerCase());
+  // in Arabic each item is set apart, so a list of English names still reads from right to left
+  const list = a => a.map(x => RTL ? `<bdi>${x}</bdi>` : x).join(T(', '));
+  // exercise names as links that wrap like words, so a full stop after a long name stays with it
+  const exLink = e => `<a class="link" role="button" tabindex="0" data-a="openEx" data-id="${e.id}">${esc(e.name)}</a>`;
+  const best = m => { const b = bestFor(m, 1)[0]; return b ? exLink(b) : ''; };
+  const trained = MAJOR.filter(m => (st.sets[m] || 0) > 0), none = MAJOR.filter(m => !(st.sets[m] > 0));
+  const helperOnly = trained.filter(m => !st.days[m]);
+  // every muscle covered
+  topic(T('Every muscle covered'), T('Each major muscle should have at least one exercise aimed at it. Muscles that only help in other exercises get less work than it looks.'));
+  for (const m of none) say('fix', T('Nothing works the {muscle}, not even as a helper. A highly rated exercise for them: {ex}.', { muscle: name(m), ex: best(m) }));
+  if (helperOnly.length) say('tip', T('Only worked as a helper, in exercises aimed at other muscles: {list}. An exercise aimed at them would grow them more, for example {ex}.', { list: list(helperOnly.map(m => T('{muscle} ({n} sets a week, each helper set counted as half)', { muscle: name(m), n: trimNum(st.sets[m], 1) }))), ex: helperOnly.map(best).filter(Boolean).slice(0, 2).join(T(' or ')) }), ['pelland2026']);
+  if (!none.length && !helperOnly.length) say('good', T('Every major muscle has an exercise aimed at it.'));
+  // weekly sets
+  topic(T('Weekly sets per muscle'), T('How many hard sets each muscle gets in a week: the biggest single driver of growth. 10 to 20 is a common target.'));
+  const low = trained.filter(m => st.sets[m] < 10), inRange = trained.filter(m => st.sets[m] >= 10 && st.sets[m] <= 20), high = trained.filter(m => st.sets[m] > 20);
+  const withSets = ms => list(ms.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`));
+  if (low.length) say('tip', T('Under 10 sets a week: {list}. That still builds muscle, but more sets would likely build more. One more working set on an exercise adds about {n} sets a week for its muscle.', { list: withSets(low), n: trimNum(st.each, 1) }), ['schoenfeld2017', 'pelland2026']);
+  if (inRange.length) say('good', T('10 to 20 sets a week: {list}.', { list: list(inRange.map(name)) }), ['schoenfeld2017']);
+  if (high.length) say('good', T('Over 20 sets a week: {list}. More can still help as long as you recover and keep the effort high, with smaller returns.', { list: withSets(high) }), ['pelland2026']);
+  const muscles = Object.entries(st.sets).filter(([m, v]) => v > 0 && MUSCLES[m]).sort((a, b) => b[1] - a[1]);
+  const maxV = Math.max(22, ...muscles.map(([, v]) => v));
+  if (muscles.length) cur.after = `<div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
+    <p class="muted small rv-note">${T('Working sets a week. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far ({ref}). Shaded band: 10 to 20 sets.', { ref: refLink('pelland2026') })}</p>`;
+  // frequency
+  topic(T('How often each muscle is trained'), T('Spreading a muscle’s sets over two or more days a week helps a little. The weekly total matters more.'));
+  const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
+  if (once.length) say('tip', T('Trained directly about once a week: {list}. Splitting the same sets over two sessions tends to help a little.', { list: list(once.map(name)) }), ['schoenfeld2016f', 'pelland2026']);
+  else if (trained.length > helperOnly.length) say('good', T('Every muscle you aim an exercise at is trained about {n} times a week or more.', { n: trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1) }), ['schoenfeld2016f']);
+  // effort
+  topic(T('Effort'), T('How close to failure your working sets end. RIR is the reps you could still have done.'));
+  const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
+  if (rirs.length) {
+    const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length, lo = Math.min(...rirs), hi = Math.max(...rirs);
+    const aim = lo === hi ? TN(lo, 'Working sets aim to stop {n} rep short of failure.', 'Working sets aim to stop {n} reps short of failure.') : T('Working sets aim to stop {lo} to {hi} reps short of failure.', { lo, hi });
+    if (avg <= 3) say('good', `${aim} ${T('Close to failure is where growth is best; going all the way on every set is optional.')}`, ['robinson2024', 'refalo2023']);
+    else say('tip', `${aim} ${T('Growth tends to improve as sets end closer to failure; try 0 to 3 reps short.')}`, ['robinson2024']);
+  } else say('tip', T('No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.'), ['robinson2024']);
+  // exercise choice
+  topic(T('Exercise choice'), T('Some versions of an exercise grew muscle more than others in direct comparisons. Scores are estimates from each exercise’s mechanics.'));
+  const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
+  const names = re => st.ex.filter(o => re.test((o.e.en || o.e.name).toLowerCase())).map(o => esc(o.e.name));
+  if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', T('Triceps only get pushdowns ({names}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try {ex}.', { names: list(names(/push ?down|press ?down/)), ex: best('triceps') }), ['maeo2023']);
+  if (pats.has('triOverhead')) say('good', T('Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.'), ['maeo2023']);
+  const curls = st.ex.filter(o => o.a && o.a.pattern === 'legCurl');
+  if (curls.some(o => /seated/.test((o.e.en || o.e.name).toLowerCase()))) say('good', T('Seated leg curls: the version that grew the hamstrings more than lying curls.'), ['maeo2021']);
+  else if (curls.length) say('tip', T('Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).'), ['maeo2021']);
+  const calves = st.ex.filter(o => o.a && o.a.pattern === 'calf');
+  if (calves.length && calves.every(o => /seated|squat calf/.test((o.e.en || o.e.name).toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
+  if (pats.has('legExt')) say('tip', T('Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.'), ['pedrosa2022']);
+  if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', T('Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.'), ['plotkin2023']);
+  if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', T('Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: {ex}.', { ex: best('quads') }), ['plotkin2023']);
+  const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
+  for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', T('{name} rates {score}/10 on its mechanics ({title}). A higher-rated swap for the {muscle}: {ex} ({best}/10).', { name: esc(o.e.name), score: o.a.score, title: esc(T(o.a.title).toLowerCase()), muscle: name(o.e.m), ex: exLink(b), best: scoreOf(b.id) })); }
+  const strong = st.ex.filter(o => o.a && o.a.score >= 9);
+  if (strong.length) say('good', T('{n} of your {total} exercises rate 9 or 10 out of 10 on their mechanics: {list}.', { n: strong.length, total: st.ex.length, list: list(strong.slice(0, 6).map(o => esc(o.e.name))) + (strong.length > 6 ? '…' : '') }));
+  // rest
+  topic(T('Rest between sets'), T('Longer rests on the big lifts let you do more reps on the next set.'));
+  const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
+  if (shortRest.length) say('tip', T('Rest under 2 minutes on big lifts: {list}. Longer rests (about 3 minutes) gave more growth in trained men.', { list: list(shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['schoenfeld2016r']);
+  else if (st.ex.some(o => o.a && COMPOUND.has(o.a.pattern))) say('good', T('The big lifts get at least 2 minutes of rest.'), ['schoenfeld2016r']);
+  // session length
+  topic(T('Workout length'), T('Effort tends to drop late in very long sessions.'));
+  const long = st.tpls.map(t => [t, estMinutes(t)]).filter(([, min]) => min > 75);
+  for (const [t, min] of long) say('tip', T('{name} takes about {n} minutes. Pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.', { name: esc(t.name), n: min }));
+  if (!long.length && st.tpls.length) say('good', T('Each day takes about {n} minutes or less.', { n: Math.max(...st.tpls.map(estMinutes)) }));
+  // balance
+  topic(T('Push and pull balance'), T('Similar amounts of pushing and pulling keep the shoulders balanced.'));
+  const sum_ = ms => ms.reduce((a, m) => a + (st.sets[m] || 0), 0);
+  const push = sum_(['chest', 'frontdelts', 'triceps']), pull = sum_(['lats', 'upperback', 'reardelts', 'biceps']);
+  if (push && pull) { const r = push / pull; const v = { push: trimNum(push, 0), pull: trimNum(pull, 0) }; if (r > 1.5 || r < 0.67) say('tip', T('Pushing and pulling are uneven: about {push} pushing sets for {pull} pulling sets a week. Closer to 1:1 is a common target.', v)); else say('good', T('Pushing and pulling are balanced: {push} and {pull} sets a week.', v)); }
+  return { st, topics };
+}
+// split can be a plan not used yet ({ name, days, tpls }); perWeek: how often it's meant to be trained
+function planReview(split, perWeek = guessPerWeek(split)) {
   openSheet({
     full: true,
     render: () => {
-      const st = planStats(split, perWeek);
-      // the points, grouped by topic; each says what it rests on: studies (linked) or a rule of thumb from mechanics and common practice
-      const topics = [];
-      let cur = null;
-      const topic = (title, about) => topics.push(cur = { title, about, items: [], after: '' });
-      const say = (kind, text, refs = []) => cur.items.push({ kind, text, refs });
-      const name = m => esc(MUSCLES[m].toLowerCase());
-      // in Arabic each item is set apart, so a list of English names still reads from right to left
-      const list = a => a.map(x => RTL ? `<bdi>${x}</bdi>` : x).join(T(', '));
-      // exercise names as links that wrap like words, so a full stop after a long name stays with it
-      const exLink = e => `<a class="link" role="button" tabindex="0" data-a="openEx" data-id="${e.id}">${esc(e.name)}</a>`;
-      const best = m => { const b = bestFor(m, 1)[0]; return b ? exLink(b) : ''; };
-      const trained = MAJOR.filter(m => (st.sets[m] || 0) > 0), none = MAJOR.filter(m => !(st.sets[m] > 0));
-      const helperOnly = trained.filter(m => !st.days[m]);
-      // every muscle covered
-      topic(T('Every muscle covered'), T('Each major muscle should have at least one exercise aimed at it. Muscles that only help in other exercises get less work than it looks.'));
-      for (const m of none) say('fix', T('Nothing works the {muscle}, not even as a helper. A highly rated exercise for them: {ex}.', { muscle: name(m), ex: best(m) }));
-      if (helperOnly.length) say('tip', T('Only worked as a helper, in exercises aimed at other muscles: {list}. An exercise aimed at them would grow them more, for example {ex}.', { list: list(helperOnly.map(m => T('{muscle} ({n} sets a week, each helper set counted as half)', { muscle: name(m), n: trimNum(st.sets[m], 1) }))), ex: helperOnly.map(best).filter(Boolean).slice(0, 2).join(T(' or ')) }), ['pelland2026']);
-      if (!none.length && !helperOnly.length) say('good', T('Every major muscle has an exercise aimed at it.'));
-      // weekly sets
-      topic(T('Weekly sets per muscle'), T('How many hard sets each muscle gets in a week: the biggest single driver of growth. 10 to 20 is a common target.'));
-      const low = trained.filter(m => st.sets[m] < 10), inRange = trained.filter(m => st.sets[m] >= 10 && st.sets[m] <= 20), high = trained.filter(m => st.sets[m] > 20);
-      const withSets = ms => list(ms.map(m => `${name(m)} (${trimNum(st.sets[m], 1)})`));
-      if (low.length) say('tip', T('Under 10 sets a week: {list}. That still builds muscle, but more sets would likely build more. One more working set on an exercise adds about {n} sets a week for its muscle.', { list: withSets(low), n: trimNum(st.each, 1) }), ['schoenfeld2017', 'pelland2026']);
-      if (inRange.length) say('good', T('10 to 20 sets a week: {list}.', { list: list(inRange.map(name)) }), ['schoenfeld2017']);
-      if (high.length) say('good', T('Over 20 sets a week: {list}. More can still help as long as you recover and keep the effort high, with smaller returns.', { list: withSets(high) }), ['pelland2026']);
-      const muscles = Object.entries(st.sets).filter(([m, v]) => v > 0 && MUSCLES[m]).sort((a, b) => b[1] - a[1]);
-      const maxV = Math.max(22, ...muscles.map(([, v]) => v));
-      if (muscles.length) cur.after = `<div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
-        <p class="muted small rv-note">${T('Working sets a week. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far ({ref}). Shaded band: 10 to 20 sets.', { ref: refLink('pelland2026') })}</p>`;
-      // frequency
-      topic(T('How often each muscle is trained'), T('Spreading a muscle’s sets over two or more days a week helps a little. The weekly total matters more.'));
-      const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
-      if (once.length) say('tip', T('Trained directly about once a week: {list}. Splitting the same sets over two sessions tends to help a little.', { list: list(once.map(name)) }), ['schoenfeld2016f', 'pelland2026']);
-      else if (trained.length > helperOnly.length) say('good', T('Every muscle you aim an exercise at is trained about {n} times a week or more.', { n: trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1) }), ['schoenfeld2016f']);
-      // effort
-      topic(T('Effort'), T('How close to failure your working sets end. RIR is the reps you could still have done.'));
-      const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
-      if (rirs.length) {
-        const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length, lo = Math.min(...rirs), hi = Math.max(...rirs);
-        const aim = lo === hi ? TN(lo, 'Working sets aim to stop {n} rep short of failure.', 'Working sets aim to stop {n} reps short of failure.') : T('Working sets aim to stop {lo} to {hi} reps short of failure.', { lo, hi });
-        if (avg <= 3) say('good', `${aim} ${T('Close to failure is where growth is best; going all the way on every set is optional.')}`, ['robinson2024', 'refalo2023']);
-        else say('tip', `${aim} ${T('Growth tends to improve as sets end closer to failure; try 0 to 3 reps short.')}`, ['robinson2024']);
-      } else say('tip', T('No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.'), ['robinson2024']);
-      // exercise choice
-      topic(T('Exercise choice'), T('Some versions of an exercise grew muscle more than others in direct comparisons. Scores are estimates from each exercise’s mechanics.'));
-      const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
-      const names = re => st.ex.filter(o => re.test((o.e.en || o.e.name).toLowerCase())).map(o => esc(o.e.name));
-      if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', T('Triceps only get pushdowns ({names}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try {ex}.', { names: list(names(/push ?down|press ?down/)), ex: best('triceps') }), ['maeo2023']);
-      if (pats.has('triOverhead')) say('good', T('Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.'), ['maeo2023']);
-      const curls = st.ex.filter(o => o.a && o.a.pattern === 'legCurl');
-      if (curls.some(o => /seated/.test((o.e.en || o.e.name).toLowerCase()))) say('good', T('Seated leg curls: the version that grew the hamstrings more than lying curls.'), ['maeo2021']);
-      else if (curls.length) say('tip', T('Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).'), ['maeo2021']);
-      const calves = st.ex.filter(o => o.a && o.a.pattern === 'calf');
-      if (calves.length && calves.every(o => /seated|squat calf/.test((o.e.en || o.e.name).toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
-      if (pats.has('legExt')) say('tip', T('Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.'), ['pedrosa2022']);
-      if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', T('Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.'), ['plotkin2023']);
-      if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', T('Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: {ex}.', { ex: best('quads') }), ['plotkin2023']);
-      const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
-      for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', T('{name} rates {score}/10 on its mechanics ({title}). A higher-rated swap for the {muscle}: {ex} ({best}/10).', { name: esc(o.e.name), score: o.a.score, title: esc(T(o.a.title).toLowerCase()), muscle: name(o.e.m), ex: exLink(b), best: scoreOf(b.id) })); }
-      const strong = st.ex.filter(o => o.a && o.a.score >= 9);
-      if (strong.length) say('good', T('{n} of your {total} exercises rate 9 or 10 out of 10 on their mechanics: {list}.', { n: strong.length, total: st.ex.length, list: list(strong.slice(0, 6).map(o => esc(o.e.name))) + (strong.length > 6 ? '…' : '') }));
-      // rest
-      topic(T('Rest between sets'), T('Longer rests on the big lifts let you do more reps on the next set.'));
-      const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
-      if (shortRest.length) say('tip', T('Rest under 2 minutes on big lifts: {list}. Longer rests (about 3 minutes) gave more growth in trained men.', { list: list(shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['schoenfeld2016r']);
-      else if (st.ex.some(o => o.a && COMPOUND.has(o.a.pattern))) say('good', T('The big lifts get at least 2 minutes of rest.'), ['schoenfeld2016r']);
-      // session length
-      topic(T('Workout length'), T('Effort tends to drop late in very long sessions.'));
-      const long = st.tpls.map(t => [t, estMinutes(t)]).filter(([, min]) => min > 75);
-      for (const [t, min] of long) say('tip', T('{name} takes about {n} minutes. Pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.', { name: esc(t.name), n: min }));
-      if (!long.length && st.tpls.length) say('good', T('Each day takes about {n} minutes or less.', { n: Math.max(...st.tpls.map(estMinutes)) }));
-      // balance
-      topic(T('Push and pull balance'), T('Similar amounts of pushing and pulling keep the shoulders balanced.'));
-      const sum_ = ms => ms.reduce((a, m) => a + (st.sets[m] || 0), 0);
-      const push = sum_(['chest', 'frontdelts', 'triceps']), pull = sum_(['lats', 'upperback', 'reardelts', 'biceps']);
-      if (push && pull) { const r = push / pull; const v = { push: trimNum(push, 0), pull: trimNum(pull, 0) }; if (r > 1.5 || r < 0.67) say('tip', T('Pushing and pulling are uneven: about {push} pushing sets for {pull} pulling sets a week. Closer to 1:1 is a common target.', v)); else say('good', T('Pushing and pulling are balanced: {push} and {pull} sets a week.', v)); }
+      const { st, topics } = reviewTopics(split, perWeek);
       // what to show
       const RANK = { fix: 0, tip: 1, good: 2 }, MARK = { fix: 'x', tip: 'info', good: 'check' };
       const shown = topics.filter(t => t.items.length);
@@ -2252,14 +2294,137 @@ function tplCard(t) {
     <div class="tpl-btns"><button class="btn sm primary" data-a="tplStart" data-id="${t.id}">${icon('play')}${T('Start')}</button><button class="icon-btn" data-a="tplMenu" data-id="${t.id}" aria-label="${T('More for {name}', { name: esc(t.name) })}">${icon('dots')}</button></div></article>`;
 }
 function programLibrary() {
-  return `<section class="section"><h2 class="section-h">${T('Ready-made splits')}</h2><p class="muted section-sub">${T('Each one adds its days as templates you can change. Your current split and history stay as they are.')}</p>
-    <div class="prog-grid">${PROGRAMS.map(p => {
-      const inst = state.splits.find(s => s.programId === p.id);
-      const active = inst && inst.id === state.activeSplit;
-      return `<article class="prog"><div><p class="eyebrow">${esc(p.freq)}</p><h3>${esc(p.name)}</h3><p class="muted">${esc(p.about)}</p>
-        <p class="prog-days">${p.days.map(d => `<span>${esc(isRest(d) ? T('Rest') : d[0])}</span>`).join('')}</p></div>
-        ${active ? `<span class="pill good">${icon('check')}${T('Your split')}</span>` : `<button class="btn sm" data-a="useProgram" data-id="${p.id}">${inst ? T('Switch to this split') : T('Use this split')}</button>`}</article>`;
-    }).join('')}</div></section>`;
+  return `<section class="section" id="plans"><h2 class="section-h">${T('Ready-made splits')}</h2><p class="muted section-sub">${T('Each one adds its days as templates you can change. Your current split and history stay as they are.')}</p>${planBrowser()}</section>`;
+}
+/* ----- ready-made plans: a list to narrow down by days and experience, and a page for each before you use it ----- */
+const LEVEL_RANK = { new: 0, some: 1, exp: 2 };
+const LEVEL_NAME = () => ({ new: T('Good first plan'), some: T('Some experience'), exp: T('Experienced') });
+// minutes a session, shortest and longest day
+const planMins = new Map();
+function planMinutes(p) {
+  if (!planMins.has(p.id)) { const m = programDays(p, false).filter(d => !isRest(d)).map(estMinutes); planMins.set(p.id, [Math.min(...m), Math.max(...m)]); }
+  return planMins.get(p.id);
+}
+const minText = ([a, b]) => a === b ? TN(a, 'about {n} min', 'about {n} min') : T('{a} to {b} min', { a, b });
+// what the list shows: starts from the guide's answers when there are some
+function planFilter() {
+  if (!ui.planF) { const a = state.profile || {}; ui.planF = { days: +a.days || 0, level: a.level || '' }; }
+  return ui.planF;
+}
+// a plan fits a level when it's for that much experience or less
+const planFits = (p, f) => (!f.days || (p.week || []).includes(f.days)) && (!f.level || LEVEL_RANK[p.level || 'some'] <= LEVEL_RANK[f.level]);
+function planBrowser() {
+  const f = planFilter();
+  const top = state.profile ? guidePlans(state.profile)[0] : null;
+  const list = PROGRAMS.filter(p => planFits(p, f)).sort((a, b) => (b.id === top) - (a.id === top));
+  const chip = (k, v, label) => `<button class="chip${f[k] === v ? ' on' : ''}" data-a="planF" data-k="${k}" data-v="${v}" aria-pressed="${f[k] === v}">${label}</button>`;
+  return `<div class="plan-filter">
+    <div class="pf-row" role="group" aria-labelledby="pfDays"><span class="pf-l" id="pfDays">${T('Days a week')}</span><div class="chips wrap">${chip('days', 0, T('Any'))}${[2, 3, 4, 5, 6].map(n => chip('days', n, String(n))).join('')}</div></div>
+    <div class="pf-row" role="group" aria-labelledby="pfLevel"><span class="pf-l" id="pfLevel">${T('Experience')}</span><div class="chips wrap">${chip('level', '', T('Any'))}${[['new', T('Just starting')], ['some', T('Up to two years')], ['exp', T('More than two years')]].map(([v, l]) => chip('level', v, l)).join('')}</div></div>
+  </div>
+  <p class="muted small pf-count" role="status">${list.length ? TN(list.length, '{n} plan fits', '{n} plans fit') : T('No plan fits both. Try another number of days, or see them all.')}</p>
+  ${list.length ? `<div class="prog-grid">${list.map(p => planCard(p, p.id === top)).join('')}</div>` : `<button class="btn" data-a="planF" data-k="all">${T('Show all plans')}</button>`}`;
+}
+function planCard(p, rec) {
+  const inst = state.splits.find(s => s.programId === p.id), active = inst && inst.id === state.activeSplit;
+  return `<article class="prog${rec ? ' rec' : ''}"><div>
+    <p class="eyebrow">${esc(p.freq)}</p>
+    <h3>${esc(p.name)}${rec ? ` <span class="rec-pill">${T('Fits your answers')}</span>` : ''}</h3>
+    <p class="muted">${esc(p.short || p.about)}</p>
+    <p class="prog-facts"><span class="pill lv-${p.level || 'some'}">${esc(LEVEL_NAME()[p.level || 'some'])}</span><span class="pill">${icon('clock')}${minText(planMinutes(p))}</span>${p.kit === 'home' ? `<span class="pill">${T('At home')}</span>` : p.machine ? `<span class="pill">${T('Machines or free weights')}</span>` : ''}</p>
+    <p class="prog-days">${p.days.map(d => `<span>${esc(isRest(d) ? T('Rest') : d[0])}</span>`).join('')}</p></div>
+    <div class="prog-btns">${active ? `<span class="pill good">${icon('check')}${T('Your split')}</span>` : ''}<button class="btn sm${active ? '' : ' primary'}" data-a="planOpen" data-id="${p.id}" aria-label="${T('See {name}', { name: esc(p.name) })}">${T('See the plan')}</button></div></article>`;
+}
+// the training days a week could fall on, Monday first
+const WEEK_ON = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 4, 5], 6: [0, 1, 2, 3, 4, 5] };
+const MAIN_MUSCLES = ['chest', 'lats', 'upperback', 'quads', 'hamstrings', 'glutes'];
+// the page for one plan: who it's for, the week, its days in either version, how it's built and why, then use it.
+// opts.onUse(p, version, def) replaces what Use does (the welcome finishes itself too)
+function planSheet(id, opts = {}) {
+  const p = PROGRAMS.find(x => x.id === id);
+  if (!p) return;
+  const f = planFilter(), a = state.profile || {};
+  // the machine version for someone new, or the version already in use
+  let v = !p.machine ? 'free' : opts.version || (splitOfPlan(p, 'machine') && !splitOfPlan(p) ? 'machine' : a.level === 'new' && a.kit !== 'db' ? 'machine' : 'free');
+  const n = [f.days, +a.days].find(x => x && (p.week || []).includes(x)) || (p.week || [3])[0];
+  const days = () => programDays(p, v === 'machine');
+  openSheet({
+    full: true, cls: 'plan-sheet', focus: '#planH',
+    render: () => {
+      const ds = days(), train = ds.filter(d => !isRest(d));
+      const st = planStats({ tpls: train }, n);
+      const main = MAIN_MUSCLES.filter(m => st.sets[m] > 0);
+      const lo = Math.round(Math.min(...main.map(m => st.sets[m]))), hi = Math.round(Math.max(...main.map(m => st.sets[m])));
+      const often = Math.min(...main.map(m => st.days[m] || 0));
+      const strength = (p.goals || [])[0] === 'strength';
+      const mins = train.map(estMinutes);
+      const inUse = splitOfPlan(p, v), active = inUse && inUse.id === state.activeSplit;
+      const wk = new Date(2024, 0, 1); // a Monday
+      const week = ds.some(isRest) ? '' : `<h3 class="sub-h">${TN(n, 'A week on {n} day could look like this', 'A week on {n} days could look like this')}</h3>
+        <ol class="plan-week">${Array.from({ length: 7 }, (_, i) => { const on = WEEK_ON[n] && WEEK_ON[n].indexOf(i); const d = new Date(wk); d.setDate(d.getDate() + i);
+          return `<li class="${on >= 0 ? 'on' : ''}"><b>${esc(dfmt(d.getTime(), { weekday: 'short' }))}</b><span>${on >= 0 ? esc(train[on % train.length].name) : T('Rest')}</span></li>`; }).join('')}</ol>`;
+      const why = [
+        [T('{lo} to {hi} hard sets a week for each main muscle: enough to keep growing, with time to recover.', { lo, hi }), ['schoenfeld2017', 'pelland2026']],
+        often >= 1.5 ? [TN(Math.floor(often), 'Each main muscle is trained {n} time a week or more.', 'Each main muscle is trained {n} times a week or more.'), ['schoenfeld2016f']] : [T('Each muscle is trained once a week. Studies favour twice, with the same sets spread over two days.'), ['schoenfeld2016f']],
+        [T('Working sets stop 1 to 2 reps short of failure, small exercises 0 to 1: close enough to grow well without wearing you down.'), ['robinson2024', 'refalo2023']],
+        strength ? [T('3 to 5 reps on the main lifts, because heavy sets build the most strength, and more reps on the rest for size.'), ['lopez2021']] : [T('6 to 12 reps on the big lifts and 10 to 20 on small ones: muscle grows about as well anywhere in that range when sets are hard.'), ['lopez2021']],
+        [T('2 to 3 minutes of rest on the big lifts and about a minute on small ones, so each set can be a good one.'), ['schoenfeld2016r', 'singer2024']]
+      ];
+      return `${sheetHead(esc(p.name))}
+      <div class="sheet-body pad plan-d">
+        <p class="eyebrow">${esc(p.freq)} · ${esc(LEVEL_NAME()[p.level || 'some'])}</p>
+        <h2 class="big-title" id="planH" tabindex="-1">${esc(p.name)}</h2>
+        <p class="plan-lead">${esc(p.short || '')}</p>
+        <p class="muted">${esc(p.about)}</p>
+        ${p.machine ? `<div class="plan-ver"><p class="pv-l" id="pvL">${T('Version')}</p><div class="seg" role="group" aria-labelledby="pvL">${[['free', T('Free weights')], ['machine', T('Machines')]].map(([k, l]) => `<button class="${v === k ? 'on' : ''}" data-a="ver" data-v="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div>
+          <p class="muted small">${v === 'machine' ? T('Machines and cables in place of barbell, dumbbell and pull-up lifts, so you can learn each movement and push hard safely. Muscle grows about as well either way ({ref}). Move to free weights in one tap from your split when you’re ready.', { ref: refLink('haugen2023') }) : T('Barbells, dumbbells and pull-ups for the big lifts. New to lifting? The machine version is easier to learn and builds muscle about as well ({ref}).', { ref: refLink('haugen2023') })}</p></div>` : ''}
+        <div class="tiles plan-tiles"><div class="tile"><span>${T('Days a week')}</span><b>${esc(p.week ? daysText(p.week) : '')}</b></div><div class="tile"><span>${T('A session')}</span><b>${esc(minText([Math.min(...mins), Math.max(...mins)]))}</b></div><div class="tile"><span>${T('Sets per muscle a week')}</span><b>${lo === hi ? lo : `${lo}–${hi}`}</b></div></div>
+        ${week}
+        <h3 class="sub-h">${TN(train.length, 'The {n} day', 'The {n} days')}</h3>
+        ${train.map(t => `<section class="plan-day"><h4>${esc(t.name)}<small>${TN(estMinutes(t), 'about {n} min', 'about {n} min')}</small></h4><ol class="ex-preview">${t.ex.map(x => `<li><span>${thumb(x.exId, 'sm')}<span class="exn"><b>${esc(getEx(x.exId).name)}</b><small>${esc(scheme(x.sets))}${x.free ? ` · ${T('instead of {name}', { name: esc(getEx(x.free).name) })}` : ''}</small></span></span></li>`).join('')}</ol></section>`).join('')}
+        <h3 class="sub-h">${T('How it’s built')}</h3>
+        <ul class="review-list plan-why">${why.map(([text, refs]) => `<li class="good">${icon('check')}<div class="rv-txt"><p>${text}</p><p class="rv-src"><span class="basis study">${icon('flask')}${T('Studies')}</span>${refs.map(refLink).join('<span class="dot"> · </span>')}</p></div></li>`).join('')}</ul>
+        <button class="btn ghost wide" data-a="review">${icon('flask')}${T('Full review against the research')}</button>
+        <div class="row-btns plan-use">${active ? `<span class="pill good">${icon('check')}${T('This is your split')}</span>` : `<button class="btn primary big" data-a="use">${inUse ? T('Switch to this plan') : T('Use this plan')}</button>`}</div>
+      </div>`;
+    },
+    actions: {
+      ver: (b, def) => { v = b.dataset.v; refreshSheet(def); },
+      review: () => { const ds = days(); planReview({ name: p.name, days: ds.map(d => isRest(d) ? d : d.id), tpls: ds.filter(d => !isRest(d)) }, ds.some(isRest) ? Math.round(ds.filter(d => !isRest(d)).length * 7 / ds.length * 10) / 10 : n); },
+      use: (b, def) => (opts.onUse || usePlan)(p, v, def)
+    }
+  });
+}
+// makes a plan your split: the one you have in that version, or a new one
+function usePlan(p, version, def) {
+  const have = splitOfPlan(p, version);
+  if (have) state.activeSplit = have.id; else installProgram(p, true, false, version);
+  save();
+  if (def) closeSheet(def);
+  render(); window.scrollTo({ top: 0, behavior: calm() ? 'auto' : 'smooth' });
+  toast(T('{name} is now your split.', { name: p.name }));
+}
+// moving a split between machines and free weights, after saying what changes
+function splitVersionSheet(sp) {
+  const p = PROGRAMS.find(x => x.id === sp.programId);
+  if (!p || !p.machine) return;
+  const to = sp.version === 'machine' ? 'free' : 'machine';
+  const pairs = [];
+  for (const id of new Set(sp.days.filter(d => !isRest(d)))) {
+    const t = tplById(id); if (!t) continue;
+    const used = new Set(t.ex.map(x => x.exId));
+    for (const x of t.ex) {
+      const other = to === 'free' ? x.free : !x.free && (MACHINE_SWAPS.get(x.exId) || []).find(c => !used.has(c));
+      if (other) { if (to === 'machine') used.add(other); const k = `${getEx(x.exId).name} → ${getEx(other).name}`; if (!pairs.includes(k)) pairs.push(k); }
+    }
+  }
+  confirmSheet({
+    title: to === 'free' ? T('Move to free weights?') : T('Switch to machines?'),
+    text: !pairs.length ? T('Nothing in {name} has another version to switch to.', { name: esc(sp.name) }) : to === 'free' ? T('The machines in {name} go back to their free-weight lifts. Sets, reps and rest stay, and the history of every exercise is kept.', { name: esc(sp.name) }) : T('The barbell, dumbbell and pull-up lifts in {name} become machines. Sets, reps and rest stay, and the history of every exercise is kept.', { name: esc(sp.name) }),
+    extra: pairs.length ? `<ul class="swap-list">${pairs.map(k => `<li>${esc(k)}</li>`).join('')}</ul><p class="muted small">${T('You can switch back the same way.')}</p>` : '',
+    ok: to === 'free' ? T('Move to free weights') : T('Switch to machines'),
+    onOk: () => { if (!pairs.length) return; setSplitVersion(sp, to); save(); render(); toast(to === 'free' ? T('{name} now uses free weights.', { name: sp.name }) : T('{name} now uses machines.', { name: sp.name })); }
+  });
 }
 function tplPreviewSheet(tplId, splitId, day) {
   openSheet({
@@ -2498,7 +2663,7 @@ function tplExFromWorkout(w, oldTpl) {
   return w.ex.map(x => {
     const old = oldTpl ? oldTpl.ex.find(o => o.exId === x.exId) : null;
     return {
-      exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: old ? old.note || '' : '',
+      exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: old ? old.note || '' : '', ...(old && old.free ? { free: old.free } : {}),
       sets: x.sets.map((s, j) => {
         const os = old ? old.sets[j] : null;
         const t = { t: s.t, tr: s.tr || (os && os.tr) || (hasReps(getEx(x.exId).k) && s.t !== 'W' ? String(recReps(x, s) || '') : ''), trir: s.trir ?? (os ? os.trir : null) };
@@ -3770,7 +3935,7 @@ function templateEditor(tplId, opts = {}) {
             refreshSheet(def);
           }] : null,
           hasReps(getEx(x.exId).k) ? [tplUni(x) ? T('Log both sides together') : T('Log left and right separately'), 'side', () => { x.uni = !tplUni(x); x.sets = tplSides(x.sets, x.uni); refreshSheet(def); }] : null,
-          [T('Replace exercise'), 'swap', () => pickExercises({ single: true, title: T('Replace with'), onPick: ([id]) => { x.exId = id; refreshSheet(def); } })],
+          [T('Replace exercise'), 'swap', () => pickExercises({ single: true, title: T('Replace with'), onPick: ([id]) => { x.exId = id; delete x.free; refreshSheet(def); } })],
           [T('Remove from template'), 'trash', () => { d.ex.splice(i, 1); refreshSheet(def); }, { danger: true }]
         ]);
       },
@@ -4463,13 +4628,17 @@ const ACT = {
   newTpl: () => templateEditor(null),
   splitSwitch: () => splitSwitcher(),
   splitEdit: b => splitEditor(b.dataset.id),
-  useProgram: b => {
-    const p = PROGRAMS.find(x => x.id === b.dataset.id);
-    const inst = state.splits.find(s => s.programId === p.id);
-    if (inst) state.activeSplit = inst.id; else installProgram(p, true);
-    save(); render(); window.scrollTo({ top: 0, behavior: 'smooth' });
-    toast(T('{name} is now your split.', { name: p.name }));
+  planF: b => {
+    const f = planFilter(), k = b.dataset.k, v = b.dataset.v;
+    if (k === 'all') { f.days = 0; f.level = ''; } else f[k] = k === 'days' ? +v : v;
+    const def = sheetFor(b);
+    if (def) refreshSheet(def); else render();
+    // the same choice keeps the focus after the list is drawn again
+    const again = $(`${def ? `[data-sheet="${def.id}"] ` : '#view '}[data-a="planF"][data-k="${k === 'all' ? 'days' : k}"][data-v="${k === 'all' ? 0 : v}"]`);
+    if (again) again.focus();
   },
+  planOpen: b => planSheet(b.dataset.id),
+  splitVersion: b => splitVersionSheet(splitById(b.dataset.id)),
   // workout
   woMin: () => { ui.woHidden = true; render(); renderWorkout(); },
   woRename: () => renameWorkout(),

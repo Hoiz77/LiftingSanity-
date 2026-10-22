@@ -208,9 +208,6 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .welcome-opt > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .welcome-opt small { font-size: 13px; color: var(--muted); }
 .welcome-opt .chev { flex-shrink: 0; color: var(--muted); }
-.welcome-plans { display: grid; gap: 10px; margin-top: 14px; }
-.welcome-plan { flex-direction: row; align-items: center; gap: 12px; }
-.welcome-plan .tpl-main { flex: 1; min-width: 0; }
 .welcome-opt.rec { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .rec-pill { display: inline-block; vertical-align: 1px; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: 700 11px/1.5 var(--ui); white-space: nowrap; }
 /* the guide: one question per screen, big choices, then a plan, a tour or the words explained */
@@ -403,6 +400,43 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .prog .muted { font-size: 14px; }
 .prog-days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .prog-days span { font: 600 12px var(--ui); padding: 4px 9px; border-radius: 999px; background: var(--panel-2); color: var(--ink-2); }
+/* ready-made plans: the filter, the cards, and each plan's page */
+.plan-filter { display: grid; gap: 10px; margin: 0 0 6px; }
+.pf-row { display: grid; gap: 6px; }
+.pf-l { font: 600 12px/1.3 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pf-count { margin: 4px 0 12px; }
+.prog.rec { box-shadow: var(--hi), inset 0 0 0 1.5px var(--accent); }
+.prog h3 .rec-pill { vertical-align: 4px; }
+.prog-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.prog-facts .pill { min-height: 24px; font-size: 12px; }
+.prog-facts .i { width: 13px; height: 13px; }
+.pill.lv-new { background: var(--good-soft); color: var(--good); }
+.prog-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#planH { outline: none; }
+.plan-lead { font-size: 18px; line-height: 1.4; margin: 6px 0 8px; }
+.plan-ver { display: grid; gap: 8px; margin: 16px 0 4px; padding: 14px; border-radius: 18px; background: var(--panel-2); }
+.plan-ver .seg { justify-self: start; }
+.plan-ver p { margin: 0; line-height: 1.45; }
+.pv-l { font: 600 12px/1.3 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.plan-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.plan-tiles .tile { padding: 10px 12px; }
+.plan-tiles .tile b { font-size: 18px; }
+.plan-week { list-style: none; padding: 0; margin: 4px 0 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.plan-week li { display: grid; gap: 3px; justify-items: center; text-align: center; padding: 8px 2px; border-radius: 12px; background: var(--panel-2); color: var(--muted); font-size: 11px; line-height: 1.2; min-width: 0; }
+.plan-week li b { font: 700 12px var(--ui); color: var(--ink-2); }
+.plan-week li span { overflow-wrap: anywhere; }
+.plan-week li.on { background: var(--accent-soft); color: var(--accent); }
+.plan-week li.on b { color: var(--accent); }
+.plan-day { margin-top: 12px; }
+.plan-day h4 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin: 0 0 2px; font-size: 17px; }
+.plan-day h4 small { color: var(--muted); font: 500 13px var(--ui); white-space: nowrap; }
+.plan-why { margin-top: 6px; }
+.plan-use { position: sticky; bottom: 0; padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--panel) 30%); }
+.plan-use .btn.big { flex: 1; }
+.split-ver { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.split-ver .link { font-size: 13px; }
+.swap-list { margin: 10px 0; padding-inline-start: 18px; display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); }
+.guide-plan-btns { display: grid; gap: 6px; justify-items: stretch; }
 
 /* ---------- mini bar, toast, rest timer ---------- */
 #mini { position: fixed; z-index: 35; left: 12px; right: 12px; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 10px); max-width: 620px; margin: 0 auto; }

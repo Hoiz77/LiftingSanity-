@@ -432,10 +432,637 @@ Lever Seated Squat Calf Raise|calves|machine|wr||u
    sets: "2w+3" = 2 warm-ups then 3 working, "3+1d" = 3 working then a drop set,
    letters: w warm-up, t top set, b back-off, d drop, f failure, a AMRAP, p partials, m myo-reps.
    A day can also list each set as [type, starting weight in kg, target reps, target RIR, side L/R],
-   and 'rest' in a split's days is a rest day. */
+   and 'rest' in a split's days is a rest day.
+   Each plan also says who it's for: week (the days a week it's built for), level (new, some or exp: the least
+   experience it suits), goals (muscle, strength, health), kit (gym or home), short (one plain line) and why (why it
+   suits someone). How they're built, checked by the plan review and tests/plans.test.js:
+   - 10 to 20 hard sets a week for most muscles, fewer in the plans for beginners (Schoenfeld 2017, Pelland 2026)
+   - each muscle on two or more days a week, except the Bro Split (Schoenfeld 2016)
+   - working sets 1 to 2 reps short of failure, isolation 0 to 1 (Robinson 2024, Refalo 2023)
+   - 6 to 12 reps on big lifts and 10 to 20 on small ones: growth is similar across rep ranges taken close to failure,
+     and heavy sets build the most strength (Lopez 2021); the strength plans go heavier
+   - at least 2 minutes' rest on big lifts (Schoenfeld 2016)
+   - exercise choice from the mechanics and direct comparisons: overhead triceps work, seated leg curls, standing
+     calf raises, cable lateral raises, incline or preacher curls
+   - about 75 minutes a session at most */
 window.FORGE_PROGRAMS = [
   {
-    id: 'fbeod', name: 'Full Body EOD', freq: 'Every other day',
+    id: 'fb', name: 'Full Body', freq: '3 days a week', week: [3], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'gym',
+    short: 'The whole body every session, with a rest day in between.',
+    about: 'Three different full-body days. Every muscle is trained two or three times a week with a few big lifts and some smaller ones, so you learn the movements quickly and recover between sessions.',
+    why: 'Every muscle two or three times a week with a few big lifts: the quickest way to learn the movements and build a base.',
+    days: [
+      ['Full Body A', `
+Back Squat|2w+3|6-10|2|180
+Barbell Bench Press|1w+3|6-10|2|180
+Lat Pulldown|3|8-12|2|120
+Seated Leg Curl|2|10-15|1|90
+Cable Lateral Raise|3|12-20|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60
+Standing Calf Raise|2|10-15|1|60`],
+      ['Full Body B', `
+Romanian Deadlift|1w+3|8-10|2|150
+Incline Dumbbell Press|3|8-12|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Leg Extension|2|10-15|1|75
+Face Pull|2|12-20|1|60
+Incline Dumbbell Curl|2|10-15|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Full Body C', `
+Leg Press|1w+3|8-12|2|150
+Dumbbell Bench Press|2|8-12|2|120
+Seated Cable Row|3|10-12|2|120
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Barbell Hip Thrust|2|8-12|2|120
+Cable Lateral Raise|2|12-20|1|60
+Standing Calf Raise|2|10-15|1|60
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'fb2', name: 'Full Body ×2', freq: '2 days a week', week: [2], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'gym',
+    short: 'Two longer full-body sessions a week, for when time is short.',
+    about: 'Two full-body days, each training every major muscle with a big lift and a smaller one. Two good sessions a week build real muscle and strength, especially in the first year.',
+    why: 'Two sessions that each train the whole body, so every muscle still gets worked twice a week.',
+    days: [
+      ['Full Body A', `
+Back Squat|2w+3|6-10|2|180
+Barbell Bench Press|1w+3|6-10|2|180
+Lat Pulldown|3|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Cable Lateral Raise|2|12-20|1|60
+Incline Dumbbell Curl|2|10-15|1|60
+Standing Calf Raise|2|10-15|1|60`],
+      ['Full Body B', `
+Romanian Deadlift|1w+3|8-10|2|150
+Incline Dumbbell Press|3|8-12|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Leg Press|2|10-15|2|150
+Barbell Hip Thrust|2|8-12|2|120
+Face Pull|2|12-20|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'ulf', name: 'Upper / Lower / Full', freq: '3 days a week', week: [3], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'gym',
+    short: 'An upper-body day, a lower-body day, then one for everything.',
+    about: 'Three days: upper body, lower body, then a full-body day that trains everything again. Each muscle twice a week, with more exercises per muscle than a plain full-body plan.',
+    why: 'Upper, lower, then full body: each muscle twice a week in three sessions, with room for more exercises than a full-body plan.',
+    days: [
+      ['Upper', `
+Barbell Bench Press|2w+3|6-10|2|180
+Pull-Up|1w+3|6-10|2|150
+Incline Dumbbell Press|2|8-12|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60
+Incline Dumbbell Curl|2|10-15|1|60`],
+      ['Lower', `
+Back Squat|2w+3|6-10|2|180
+Romanian Deadlift|3|8-10|2|150
+Leg Extension|2|10-15|1|75
+Seated Leg Curl|3|10-15|1|90
+Standing Calf Raise|3|10-15|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Full Body', `
+Leg Press|1w+3|8-12|2|150
+Dumbbell Bench Press|3|8-12|2|150
+Lat Pulldown|3|8-12|2|120
+Barbell Hip Thrust|3|8-12|2|120
+Seated Leg Curl|2|10-15|1|90
+Cable Lateral Raise|3|12-20|1|60
+Face Pull|2|12-20|1|60`]
+    ]
+  },
+  {
+    id: 'ul', name: 'Upper / Lower', freq: '4 days a week', week: [4], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'gym',
+    short: 'Upper body one day, lower body the next, twice a week.',
+    about: 'Two upper and two lower days: a heavier day and a higher-rep day for each. Every muscle twice a week.',
+    why: 'Upper body one day, lower the next: each muscle twice a week, with time to recover in between.',
+    days: [
+      ['Upper A', `
+Barbell Bench Press|2w+3|6-8|2|180
+Cable Crossover|2|12-15|1|60
+Barbell Row|3|6-10|2|150
+Seated Cable Row|2|10-12|2|120
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Cable Lateral Raise|4|12-20|1|60
+Skull Crusher|2|10-12|1|75
+EZ-Bar Preacher Curl|2|10-12|1|60`],
+      ['Lower A', `
+Back Squat|2w+3|6-8|2|180
+Romanian Deadlift|3|8-10|2|150
+Leg Extension|2|10-15|1|75
+Seated Leg Curl|3|10-15|1|90
+Standing Calf Raise|3|8-12|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Upper B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Pec Deck|2|12-15|1|60
+Chest-Supported Dumbbell Row|3|10-12|2|120
+Neutral-Grip Lat Pulldown|3|8-12|2|120
+Cable Lateral Raise|4|12-20|1|60
+Face Pull|3|12-20|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60
+Incline Dumbbell Curl|2|10-15|1|60`],
+      ['Lower B', `
+Hack Squat|1w+3|8-12|2|150
+Barbell Hip Thrust|3|8-12|2|120
+Bulgarian Split Squat|2|8-12|2|120
+Lying Leg Curl|3|10-15|1|90
+Seated Calf Raise|3|12-15|1|60
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'tl', name: 'Torso / Limbs', freq: '4 days a week', week: [4], level: 'some', goals: ['muscle'], kit: 'gym',
+    short: 'Chest, back and shoulders one day; legs and arms the next.',
+    about: 'Torso days train chest, back, shoulders and abs; limb days train legs and arms. Like upper / lower, but the arms move to the leg days, so upper-body days are shorter and the arms are trained fresh.',
+    why: 'Chest, back and shoulders one day, legs and arms the next: arms get trained fresh, and each muscle twice a week.',
+    days: [
+      ['Torso A', `
+Barbell Bench Press|2w+3|6-10|2|180
+Barbell Row|3|6-10|2|150
+Lat Pulldown|3|8-12|2|120
+Cable Crossover|2|12-15|1|60
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Limbs A', `
+Back Squat|2w+3|6-10|2|180
+Seated Leg Curl|3|10-15|1|90
+Barbell Hip Thrust|2|8-12|2|120
+Leg Extension|2|10-15|1|75
+Incline Dumbbell Curl|3|10-15|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60
+Standing Calf Raise|3|10-15|1|60`],
+      ['Torso B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Pull-Up|1w+3|6-10|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Pec Deck|2|12-15|1|60
+Cable Lateral Raise|3|12-20|1|60
+Face Pull|3|12-20|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Limbs B', `
+Romanian Deadlift|1w+3|8-10|2|150
+Hack Squat|3|8-12|2|150
+Leg Extension|2|10-15|1|75
+Lying Leg Curl|2|10-15|1|90
+EZ-Bar Preacher Curl|3|10-12|1|60
+Skull Crusher|3|10-12|1|75
+Seated Calf Raise|3|12-15|1|60`]
+    ]
+  },
+  {
+    id: 'ap', name: 'Anterior / Posterior', freq: '4 days a week', week: [4], level: 'some', goals: ['muscle', 'strength'], kit: 'gym',
+    short: 'The front of the body one day, the back of the body the next.',
+    about: 'Anterior days train the front: chest, front of the shoulders, quads, biceps and abs. Posterior days train the back: back, rear shoulders, hamstrings, glutes, triceps and calves. Each muscle twice a week, and each day mixes upper and lower body.',
+    why: 'Front of the body one day, back of the body the next: each muscle twice a week, and every day mixes upper and lower body so no day is too tiring.',
+    days: [
+      ['Anterior A', `
+Barbell Bench Press|2w+3|6-10|2|180
+Back Squat|2w+3|6-10|2|180
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Cable Crossover|2|12-15|1|60
+Leg Extension|2|10-15|1|75
+Cable Lateral Raise|3|12-20|1|60
+Incline Dumbbell Curl|2|10-15|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Posterior A', `
+Romanian Deadlift|2w+3|8-10|2|150
+Pull-Up|1w+3|6-10|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Face Pull|2|12-20|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60
+Standing Calf Raise|3|10-15|1|60`],
+      ['Anterior B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Hack Squat|1w+3|8-12|2|150
+Dumbbell Bench Press|2|10-12|2|120
+Pec Deck|2|12-15|1|60
+Bulgarian Split Squat|2|8-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+EZ-Bar Preacher Curl|2|10-12|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Posterior B', `
+Lat Pulldown|1w+3|8-12|2|120
+Barbell Hip Thrust|3|8-12|2|120
+Seated Cable Row|3|10-12|2|120
+Lying Leg Curl|3|10-15|1|90
+Reverse Pec Deck|2|12-20|1|60
+Skull Crusher|2|10-12|1|75
+Seated Calf Raise|3|12-15|1|60`]
+    ]
+  },
+  {
+    id: 'pp', name: 'Push / Pull', freq: '4 days a week', week: [4], level: 'some', goals: ['muscle', 'strength'], kit: 'gym',
+    short: 'Every pushing muscle one day, every pulling muscle the next, legs included.',
+    about: 'Push days: chest, shoulders, triceps, quads and calves. Pull days: back, rear shoulders, biceps, hamstrings and glutes. Each muscle twice a week; arms go with the muscles they help.',
+    why: 'Pushing muscles one day, pulling muscles the next, legs included: each muscle twice a week, and arms are worked alongside the lifts they help.',
+    days: [
+      ['Push A', `
+Barbell Bench Press|2w+3|6-10|2|180
+Back Squat|2w+3|6-10|2|180
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Leg Extension|2|10-15|1|75
+Cable Lateral Raise|3|12-20|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60
+Standing Calf Raise|3|10-15|1|60`],
+      ['Pull A', `
+Romanian Deadlift|1w+3|8-10|2|150
+Pull-Up|1w+3|6-10|2|150
+Barbell Row|3|6-10|2|150
+Seated Leg Curl|3|10-15|1|90
+Face Pull|3|12-20|1|60
+Incline Dumbbell Curl|3|10-15|1|60`],
+      ['Push B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Leg Press|1w+3|10-15|2|150
+Pec Deck|2|12-15|1|60
+Cable Crossover|2|12-15|1|60
+Cable Lateral Raise|3|12-20|1|60
+Skull Crusher|2|10-12|1|75
+Seated Calf Raise|3|12-15|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Pull B', `
+Lat Pulldown|1w+3|8-12|2|120
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Barbell Hip Thrust|3|8-12|2|120
+Lying Leg Curl|3|10-15|1|90
+Reverse Pec Deck|2|12-20|1|60
+Hammer Curl|2|10-15|1|60
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'phul', name: 'PHUL', freq: '4 days a week', week: [4], level: 'some', goals: ['strength', 'muscle'], kit: 'gym',
+    short: 'Two heavy days for strength and two lighter days for size.',
+    about: 'Power Hypertrophy Upper Lower: two heavy days of 3 to 5 reps on the big lifts for strength, and two days of 8 to 15 reps for size.',
+    why: 'Two heavy days for strength and two lighter days for size, for when you want both.',
+    days: [
+      ['Upper Power', `
+Barbell Bench Press|2w+3|3-5|2|180
+Barbell Row|3|3-5|2|180
+Pull-Up|3|5-8|2|150
+Overhead Press|2|5-8|2|150
+Cable Lateral Raise|2|12-20|1|60
+Skull Crusher|2|6-10|1|90
+Barbell Curl|2|6-10|1|75
+Face Pull|2|12-20|1|60`],
+      ['Lower Power', `
+Back Squat|2w+3|3-5|2|180
+Deadlift|1w+2|3-5|2|180
+Leg Press|3|8-12|2|150
+Seated Leg Curl|3|6-10|1|90
+Standing Calf Raise|3|6-10|1|60`],
+      ['Upper Hypertrophy', `
+Incline Dumbbell Press|3|8-12|2|150
+Cable Crossover|2|12-15|1|60
+Pec Deck|2|10-15|1|60
+Seated Cable Row|3|8-12|2|120
+Lat Pulldown|3|10-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+Reverse Pec Deck|2|12-20|1|60
+Incline Dumbbell Curl|2|10-15|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60`],
+      ['Lower Hypertrophy', `
+Front Squat|1w+3|8-12|2|150
+Barbell Hip Thrust|3|8-12|2|120
+Leg Extension|3|10-15|1|75
+Seated Leg Curl|3|10-15|1|90
+Seated Calf Raise|3|10-15|1|60
+Cable Crunch|3|10-15|1|60`]
+    ]
+  },
+  {
+    id: '5x5', name: '5×5 Strength', freq: '3 days a week', week: [3], level: 'new', goals: ['strength'], kit: 'gym',
+    short: 'Five sets of five on the big lifts, a little heavier each time.',
+    about: 'Alternate A and B. Add weight every session you get all five sets of five. A few smaller exercises at the end cover what the big lifts miss.',
+    why: 'Five sets of five on a few big lifts, adding weight each time you get them all: a simple, proven way to get stronger.',
+    days: [
+      ['Workout A', `
+Back Squat|2w+5|5|2|180
+Barbell Bench Press|2w+5|5|2|180
+Barbell Row|5|5|2|150
+Face Pull|2|12-20|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Workout B', `
+Back Squat|2w+5|5|2|180
+Overhead Press|2w+5|5|2|180
+Deadlift|2w+1|5|2|180
+Lat Pulldown|3|8-12|2|120
+Cable Lateral Raise|2|12-20|1|60
+Standing Calf Raise|3|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'ulppl', name: 'Upper / Lower + PPL', freq: '5 days a week', week: [5], level: 'some', goals: ['muscle', 'strength'], kit: 'gym',
+    short: 'Upper, lower, then push, pull and legs: five days.',
+    about: 'An upper and a lower day, heavier, then push, pull and legs, with more reps. Each muscle twice a week across five sessions.',
+    why: 'Upper and lower, then push, pull and legs: five days with each muscle twice a week, mixing heavier and lighter work.',
+    days: [
+      ['Upper', `
+Barbell Bench Press|2w+3|6-10|2|180
+Barbell Row|3|6-10|2|150
+Lat Pulldown|3|8-12|2|120
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+Skull Crusher|2|10-12|1|75
+EZ-Bar Preacher Curl|2|10-12|1|60`],
+      ['Lower', `
+Back Squat|2w+3|6-10|2|180
+Romanian Deadlift|3|8-10|2|150
+Seated Leg Curl|3|10-15|1|90
+Leg Extension|2|10-15|1|75
+Standing Calf Raise|3|10-15|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Push', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Dumbbell Bench Press|3|10-12|2|120
+Pec Deck|3|12-15|1|60
+Cable Lateral Raise|4|12-20|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60`],
+      ['Pull', `
+Pull-Up|1w+3|6-10|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Seated Cable Row|2|10-12|2|120
+Face Pull|3|12-20|1|60
+Incline Dumbbell Curl|3|10-15|1|60
+Hammer Curl|2|10-15|1|60`],
+      ['Legs', `
+Hack Squat|1w+3|8-12|2|150
+Barbell Hip Thrust|3|8-12|2|120
+Leg Extension|3|10-15|1|75
+Lying Leg Curl|3|10-15|1|90
+Seated Calf Raise|3|12-15|1|60
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'phat', name: 'PHAT', freq: '5 days a week', week: [5], level: 'exp', goals: ['strength', 'muscle'], kit: 'gym',
+    short: 'Two heavy days, then three days of higher reps for size.',
+    about: 'Power Hypertrophy Adaptive Training: heavy upper and lower days for strength, then back and shoulders, legs, and chest and arms with more reps. Each muscle twice a week, once heavy and once lighter.',
+    why: 'A heavy day and a lighter day for every muscle each week: strength and size together, for experienced lifters with five days.',
+    days: [
+      ['Upper Power', `
+Barbell Bench Press|2w+3|3-5|2|180
+Barbell Row|3|3-5|2|180
+Pull-Up|2|6-10|2|150
+Seated Dumbbell Shoulder Press|2|6-10|2|150
+Cable Lateral Raise|2|12-20|1|60
+Skull Crusher|2|6-10|1|90
+Barbell Curl|2|6-10|1|75`],
+      ['Lower Power', `
+Back Squat|2w+3|3-5|2|180
+Hack Squat|2|6-10|2|150
+Romanian Deadlift|2|5-8|2|150
+Seated Leg Curl|2|6-10|1|90
+Standing Calf Raise|3|6-10|1|60`],
+      ['Back & Shoulders', `
+Lat Pulldown|1w+3|8-12|2|120
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Seated Cable Row|2|10-15|2|120
+Cable Lateral Raise|4|12-20|1|60
+Face Pull|3|12-20|1|60`],
+      ['Legs', `
+Front Squat|1w+3|8-12|2|150
+Barbell Hip Thrust|3|8-12|2|120
+Leg Extension|3|10-15|1|75
+Seated Leg Curl|3|10-15|1|90
+Seated Calf Raise|3|12-15|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Chest & Arms', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Dumbbell Bench Press|2|10-12|2|120
+Pec Deck|2|12-15|1|60
+Incline Dumbbell Curl|3|10-15|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60
+Bayesian Cable Curl|2|10-15|1|60
+Rope Pushdown|2|12-15|1|60`]
+    ]
+  },
+  {
+    id: 'bro', name: 'Bro Split', freq: '5 days a week', week: [5], level: 'some', goals: ['muscle'], kit: 'gym',
+    short: 'One muscle group a day, five days a week.',
+    about: 'Chest, back, shoulders, arms and legs each get their own day, with lots of sets. Each muscle is trained once a week: studies favour twice, so the other plans with five days spread the same work better.',
+    why: 'One or two muscle groups a day, five days a week. Each muscle gets one big day; the plan review shows ways to spread it.',
+    days: [
+      ['Chest', `
+Barbell Bench Press|2w+3|6-10|2|180
+Incline Dumbbell Press|3|8-12|2|150
+Machine Chest Press|2|10-12|2|120
+Pec Deck|3|12-15|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Back', `
+Pull-Up|1w+3|6-10|2|150
+Barbell Row|3|6-10|2|150
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Lat Pulldown|2|10-12|2|120
+Machine Pullover|2|10-15|1|75`],
+      ['Shoulders', `
+Seated Dumbbell Shoulder Press|2w+3|8-12|2|150
+Cable Lateral Raise|4|12-20|1|60
+Machine Lateral Raise|3|12-20|1|60
+Reverse Pec Deck|3|12-20|1|60
+Face Pull|3|12-20|1|60
+Cable Crunch|3|10-15|1|60`],
+      ['Arms', `
+EZ-Bar Preacher Curl|3|8-12|1|75
+Overhead Cable Triceps Extension|3|10-15|1|75
+Incline Dumbbell Curl|3|10-15|1|60
+Skull Crusher|3|8-12|1|75
+Hammer Curl|2|10-15|1|60
+Rope Pushdown|2|12-15|1|60`],
+      ['Legs', `
+Back Squat|2w+3|6-10|2|180
+Romanian Deadlift|3|8-10|2|150
+Leg Press|2|10-15|2|150
+Barbell Hip Thrust|2|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Leg Extension|2|12-15|1|75
+Standing Calf Raise|4|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'ppl', name: 'Push / Pull / Legs', freq: '3 or 6 days a week', week: [3, 6], level: 'some', goals: ['muscle'], kit: 'gym',
+    short: 'Pushing muscles, pulling muscles, then legs. Best run twice a week.',
+    about: 'The classic split. Run the three days in order. On six days a week each muscle is trained twice; on three days, once, with fewer sets.',
+    why: 'Pushing, pulling and legs on separate days: more exercises for each muscle, and twice a week if you train five or six days.',
+    days: [
+      ['Push', `
+Barbell Bench Press|2w+3|6-10|2|180
+Incline Dumbbell Press|3|8-12|2|150
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Pec Deck|2|12-15|1|60
+Cable Lateral Raise|4|12-20|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60`],
+      ['Pull', `
+Pull-Up|1w+3|6-10|2|150
+Barbell Row|3|6-10|2|150
+Seated Cable Row|2|10-12|2|120
+Face Pull|3|12-20|1|60
+Incline Dumbbell Curl|3|10-15|1|60
+Hammer Curl|2|10-15|1|60`],
+      ['Legs', `
+Back Squat|2w+3|6-10|2|180
+Romanian Deadlift|3|8-10|2|150
+Barbell Hip Thrust|2|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Leg Extension|2|12-15|1|75
+Standing Calf Raise|4|10-15|1|60
+Cable Crunch|3|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'ul6', name: 'Upper / Lower ×6', freq: '6 days a week', week: [6], level: 'exp', goals: ['muscle', 'strength'], kit: 'gym',
+    short: 'Upper and lower body in turn, six shorter sessions a week.',
+    about: 'Three upper and three lower days, each a little different. Every muscle is trained about three times a week with fewer sets each time, so sessions stay short.',
+    why: 'Six shorter sessions, upper and lower in turn: each muscle about three times a week, so no session has to be long.',
+    days: [
+      ['Upper A', `
+Barbell Bench Press|2w+3|6-10|2|180
+Pull-Up|3|6-10|2|150
+Cable Lateral Raise|4|12-20|1|60
+Overhead Cable Triceps Extension|2|10-15|1|60
+Incline Dumbbell Curl|2|10-15|1|60`],
+      ['Lower A', `
+Back Squat|2w+3|6-10|2|180
+Seated Leg Curl|3|10-15|1|90
+Standing Calf Raise|3|10-15|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Upper B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Pec Deck|2|12-15|1|60
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Seated Dumbbell Shoulder Press|2|8-12|2|120
+Face Pull|3|12-20|1|60
+Bayesian Cable Curl|2|10-15|1|60`],
+      ['Lower B', `
+Romanian Deadlift|1w+3|8-10|2|150
+Barbell Hip Thrust|3|8-12|2|120
+Leg Extension|3|10-15|1|75
+Seated Calf Raise|3|12-15|1|60`],
+      ['Upper C', `
+Dumbbell Bench Press|3|8-12|2|150
+Lat Pulldown|3|8-12|2|120
+Seated Cable Row|2|10-12|2|120
+Cable Lateral Raise|3|12-20|1|60
+Reverse Pec Deck|2|12-20|1|60
+Skull Crusher|2|10-12|1|75`],
+      ['Lower C', `
+Hack Squat|1w+3|8-12|2|150
+Lying Leg Curl|3|10-15|1|90
+Bulgarian Split Squat|2|8-12|2|120
+Cable Crunch|2|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'ap6', name: 'Anterior / Posterior ×6', freq: '6 days a week', week: [6], level: 'exp', goals: ['muscle', 'strength'], kit: 'gym',
+    short: 'Front and back of the body in turn, six shorter sessions a week.',
+    about: 'Three anterior days (chest, front of the shoulders, quads, biceps, abs) and three posterior days (back, rear shoulders, hamstrings, glutes, triceps, calves), each a little different. Every muscle two or three times a week, with short sessions.',
+    why: 'Front and back of the body in turn, six days: each muscle two or three times a week in short sessions.',
+    days: [
+      ['Anterior A', `
+Barbell Bench Press|2w+3|6-10|2|180
+Back Squat|2w+3|6-10|2|180
+Cable Crossover|2|12-15|1|60
+Cable Lateral Raise|3|12-20|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Posterior A', `
+Romanian Deadlift|2w+3|8-10|2|150
+Pull-Up|1w+3|6-10|2|150
+Face Pull|3|12-20|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60`],
+      ['Anterior B', `
+Incline Dumbbell Press|1w+3|8-12|2|150
+Leg Press|1w+3|10-15|2|150
+Leg Extension|2|10-15|1|75
+Incline Dumbbell Curl|3|10-15|1|60`],
+      ['Posterior B', `
+Chest-Supported Dumbbell Row|3|8-12|2|120
+Barbell Hip Thrust|3|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Standing Calf Raise|3|10-15|1|60`],
+      ['Anterior C', `
+Seated Dumbbell Shoulder Press|1w+3|8-12|2|120
+Hack Squat|1w+3|8-12|2|150
+Pec Deck|3|12-15|1|60
+Cable Lateral Raise|3|12-20|1|60
+EZ-Bar Preacher Curl|2|10-12|1|60
+Cable Crunch|2|10-15|1|60`],
+      ['Posterior C', `
+Lat Pulldown|3|8-12|2|120
+Seated Cable Row|3|10-12|2|120
+Lying Leg Curl|3|10-15|1|90
+Reverse Pec Deck|2|12-20|1|60
+Skull Crusher|2|10-12|1|75
+Seated Calf Raise|3|12-15|1|60`]
+    ]
+  },
+  {
+    id: 'arnold', name: 'Arnold Split', freq: '6 days a week', week: [6], level: 'exp', goals: ['muscle'], kit: 'gym',
+    short: 'Chest and back, shoulders and arms, then legs. Twice a week.',
+    about: 'Chest and back together, shoulders and arms together, then legs. Run it twice a week: each muscle twice, with a lot of sets.',
+    why: 'Chest and back, shoulders and arms, then legs: each twice a week, for experienced lifters training six days.',
+    days: [
+      ['Chest & Back', `
+Barbell Bench Press|1w+3|6-10|2|180
+Pull-Up|1w+3|6-10|2|150
+Incline Dumbbell Press|3|8-12|2|150
+Barbell Row|3|8-12|2|150
+Chest-Supported Dumbbell Row|2|10-12|2|120
+Pec Deck|2|12-15|1|60`],
+      ['Shoulders & Arms', `
+Seated Dumbbell Shoulder Press|1w+3|8-12|2|150
+Cable Lateral Raise|4|12-20|1|60
+Face Pull|3|12-20|1|60
+Incline Dumbbell Curl|3|10-15|1|60
+Overhead Cable Triceps Extension|3|10-15|1|60
+EZ-Bar Preacher Curl|2|10-12|1|60
+Skull Crusher|2|10-12|1|75`],
+      ['Legs', `
+Back Squat|2w+3|6-10|2|180
+Romanian Deadlift|3|8-10|2|150
+Barbell Hip Thrust|2|8-12|2|120
+Seated Leg Curl|3|10-15|1|90
+Leg Extension|2|12-15|1|75
+Standing Calf Raise|3|10-15|1|60
+Cable Crunch|3|10-15|1|60`]
+    ]
+  },
+  {
+    id: 'db', name: 'Dumbbells Only', freq: '2 to 4 days a week', week: [2, 3, 4], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'home',
+    short: 'Two full-body days with just dumbbells and a bench.',
+    about: 'Needs just dumbbells and a bench. Good for home or a crowded gym. Alternate A and B, two to four days a week.',
+    why: 'Built for a pair of dumbbells and a bench, and works with two to four days a week.',
+    days: [
+      ['Dumbbell A', `
+Goblet Squat|1w+3|10-15|2|120
+Dumbbell Bench Press|3|8-12|2|120
+Dumbbell Row|3|10-12|2|120
+Dumbbell Shoulder Press|2|10-12|2|120
+Dumbbell Leg Curl|3|10-15|1|75
+Dumbbell Hip Thrust|2|10-15|2|90
+Incline Dumbbell Curl|2|10-15|1|60
+Single-Leg Calf Raise|2|10-15|1|60`],
+      ['Dumbbell B', `
+Dumbbell Romanian Deadlift|1w+3|10-12|2|120
+Bulgarian Split Squat|3|8-12|2|120
+Incline Dumbbell Press|3|8-12|2|120
+Chest-Supported Dumbbell Row|3|10-12|2|120
+Dumbbell Lateral Raise|3|12-20|1|60
+Overhead Dumbbell Extension|2|10-15|1|60
+Dead Bug|2|10-12|2|45`]
+    ]
+  },
+  {
+    id: 'fbeod', name: 'Full Body EOD', freq: 'Every other day', week: [3, 4], level: 'some', goals: ['muscle'], kit: 'gym', own: true,
+    short: 'One long full-body machine session, then a rest day.',
+    why: 'A whole-body session every other day, so a missed day costs little and every muscle still gets worked often.',
     about: 'A full-body machine session: train one day, rest the next. Seventeen exercises with warm-ups, low rep ranges taken close to failure, and one-side-at-a-time work for arms and calves.',
     note: 'Low rep ranges, taken close to failure. Hit the top of the range on every set and the app suggests adding weight.',
     days: [
@@ -460,230 +1087,32 @@ window.FORGE_PROGRAMS = [
       ]],
       'rest'
     ]
-  },
-  {
-    id: 'ppl', name: 'Push / Pull / Legs', freq: '3 or 6 days a week',
-    about: 'The classic split. Run the three days in order, once or twice a week.',
-    days: [
-      ['Push', `
-Barbell Bench Press|2w+3|5-8|2|180
-Incline Dumbbell Press|3|8-12|2|120
-Seated Dumbbell Shoulder Press|3|8-12|2|120
-Cable Lateral Raise|3+1d|12-15|1|60
-Rope Pushdown|3|10-15|1|60
-Overhead Cable Triceps Extension|2|12-15|1|60`],
-      ['Pull', `
-Pull-Up|1w+3|6-10|2|150
-Barbell Row|3|6-10|2|150
-Seated Cable Row|3|10-12|2|90
-Face Pull|3|15-20|1|60
-Barbell Curl|3|8-12|1|75
-Hammer Curl|2|10-15|1|60`],
-      ['Legs', `
-Back Squat|2w+3|5-8|2|180
-Romanian Deadlift|3|8-10|2|150
-Leg Press|3|10-15|2|120
-Lying Leg Curl|3|10-15|1|90
-Leg Extension|2+1d|12-15|1|60
-Standing Calf Raise|4|10-15|1|60`]
-    ]
-  },
-  {
-    id: 'ul', name: 'Upper / Lower', freq: '4 days a week',
-    about: 'Two upper and two lower days: a heavier day and a higher-rep day for each.',
-    days: [
-      ['Upper A', `
-Barbell Bench Press|2w+4|4-6|2|180
-Barbell Row|4|6-8|2|150
-Overhead Press|3|6-8|2|150
-Lat Pulldown|3|8-12|2|90
-EZ-Bar Curl|2|10-12|1|60
-Skull Crusher|2|10-12|1|60`],
-      ['Lower A', `
-Back Squat|2w+4|4-6|2|180
-Romanian Deadlift|3|6-8|2|150
-Bulgarian Split Squat|3|8-10|2|90
-Seated Leg Curl|3|10-12|1|75
-Standing Calf Raise|4|8-12|1|60
-Hanging Leg Raise|3|10-15|1|60`],
-      ['Upper B', `
-Incline Dumbbell Press|3|8-12|2|120
-Chest-Supported Dumbbell Row|3|10-12|2|90
-Machine Shoulder Press|3|10-12|2|90
-Neutral-Grip Lat Pulldown|3|10-12|2|90
-Dumbbell Lateral Raise|3|12-20|1|60
-Cable Curl|3|12-15|1|60
-Rope Pushdown|3|12-15|1|60`],
-      ['Lower B', `
-Deadlift|2w+3|3-5|2|180
-Hack Squat|3|8-12|2|120
-Barbell Hip Thrust|3|8-12|2|90
-Lying Leg Curl|3|10-15|1|75
-Leg Extension|3|12-15|1|60
-Seated Calf Raise|4|12-15|1|60`]
-    ]
-  },
-  {
-    id: 'fb', name: 'Full Body', freq: '3 days a week',
-    about: 'Every session hits the whole body. Leave a rest day between sessions.',
-    days: [
-      ['Full Body A', `
-Back Squat|2w+3|5-8|2|180
-Barbell Bench Press|1w+3|5-8|2|150
-Seated Cable Row|3|8-12|2|90
-Dumbbell Lateral Raise|3|12-15|1|60
-Plank|3|45s||60`],
-      ['Full Body B', `
-Deadlift|2w+3|3-5|2|180
-Overhead Press|1w+3|6-8|2|150
-Pull-Up|3|6-10|2|120
-Walking Lunge|3|10-12|2|90
-Hammer Curl|2|10-12|1|60`],
-      ['Full Body C', `
-Leg Press|1w+3|10-12|2|120
-Incline Dumbbell Press|3|8-12|2|120
-Lat Pulldown|3|10-12|2|90
-Barbell Hip Thrust|3|8-12|2|90
-Rope Pushdown|2|12-15|1|60
-Cable Crunch|3|12-15|1|60`]
-    ]
-  },
-  {
-    id: 'bro', name: 'Bro Split', freq: '5 days a week',
-    about: 'One body part a day, lots of volume for each.',
-    days: [
-      ['Chest', `
-Barbell Bench Press|2w+4|6-10|2|150
-Incline Dumbbell Press|3|8-12|2|120
-Machine Chest Press|3|10-12|1|90
-Cable Crossover|3|12-15|1|60
-Chest Dip|2|8-12|1|90`],
-      ['Back', `
-Deadlift|2w+3|5|2|180
-Pull-Up|3|6-10|2|120
-T-Bar Row|3|8-12|2|90
-Lat Pulldown|3|10-12|1|90
-Straight-Arm Pulldown|3|12-15|1|60
-Barbell Shrug|3|10-12|1|60`],
-      ['Shoulders', `
-Overhead Press|2w+4|6-8|2|150
-Arnold Press|3|8-12|2|90
-Dumbbell Lateral Raise|3+1d|12-20|1|60
-Reverse Pec Deck|3|12-15|1|60
-Face Pull|3|15|1|60
-Dumbbell Shrug|3|12|1|60`],
-      ['Arms', `
-EZ-Bar Curl|4|8-12|1|75
-Close-Grip Bench Press|4|6-10|2|120
-Incline Dumbbell Curl|3|10-12|1|60
-Overhead Cable Triceps Extension|3|10-12|1|60
-Hammer Curl|3|10-12|1|60
-Rope Pushdown|2+1d|12-15|1|60
-Barbell Wrist Curl|2|15|1|45`],
-      ['Legs', `
-Back Squat|2w+4|6-10|2|180
-Leg Press|3|10-12|2|120
-Romanian Deadlift|3|8-10|2|120
-Leg Extension|3|12-15|1|60
-Seated Leg Curl|3|10-12|1|60
-Standing Calf Raise|4|10-15|1|60`]
-    ]
-  },
-  {
-    id: 'arnold', name: 'Arnold Split', freq: '6 days a week',
-    about: 'Chest and back together, shoulders and arms together, then legs. Run it twice a week.',
-    days: [
-      ['Chest & Back', `
-Barbell Bench Press|1w+4|6-10|2|120
-Pull-Up|4|8-10|2|120
-Incline Dumbbell Press|3|8-12|2|90
-Barbell Row|3|8-12|2|90
-Dumbbell Fly|3|10-12|1|60
-Dumbbell Pullover|3|10-12|1|60`],
-      ['Shoulders & Arms', `
-Overhead Press|1w+4|6-10|2|120
-Dumbbell Lateral Raise|4|10-15|1|60
-Barbell Curl|3|8-12|1|75
-Close-Grip Bench Press|3|8-12|2|90
-Dumbbell Curl|3|10-12|1|60
-Skull Crusher|3|10-12|1|60
-Barbell Wrist Curl|2|15|1|45`],
-      ['Legs', `
-Back Squat|2w+4|6-10|2|180
-Leg Press|3|10-12|2|120
-Lying Leg Curl|3|10-12|1|75
-Stiff-Leg Deadlift|3|8-10|2|120
-Walking Lunge|2|12|1|90
-Standing Calf Raise|5|10-15|1|60`]
-    ]
-  },
-  {
-    id: 'phul', name: 'PHUL', freq: '4 days a week',
-    about: 'Power Hypertrophy Upper Lower: two heavy days for strength, two pump days for size.',
-    days: [
-      ['Upper Power', `
-Barbell Bench Press|2w+3|3-5|2|180
-Barbell Row|3|3-5|2|180
-Overhead Press|3|5-8|2|150
-Lat Pulldown|3|6-10|2|90
-Barbell Curl|2|6-10|1|75
-Skull Crusher|2|6-10|1|75`],
-      ['Lower Power', `
-Back Squat|2w+3|3-5|2|180
-Deadlift|1w+3|3-5|2|180
-Leg Press|3|10-15|2|120
-Lying Leg Curl|3|6-10|1|75
-Standing Calf Raise|4|6-10|1|60`],
-      ['Upper Hypertrophy', `
-Incline Barbell Bench Press|3|8-12|2|120
-Pec Deck|3|8-12|1|60
-Seated Cable Row|3|8-12|2|90
-Dumbbell Row|3|8-12|2|90
-Dumbbell Lateral Raise|3|8-12|1|60
-Incline Dumbbell Curl|3|8-12|1|60
-Rope Pushdown|3|8-12|1|60`],
-      ['Lower Hypertrophy', `
-Front Squat|1w+3|8-12|2|150
-Walking Lunge|3|8-12|2|90
-Leg Extension|3|10-15|1|60
-Seated Leg Curl|3|10-15|1|60
-Seated Calf Raise|3|8-12|1|60
-Cable Crunch|3|10-15|1|60`]
-    ]
-  },
-  {
-    id: '5x5', name: '5×5 Strength', freq: '3 days a week',
-    about: 'Alternate A and B. Add weight every session you get all five sets of five.',
-    days: [
-      ['Workout A', `
-Back Squat|2w+5|5||180
-Barbell Bench Press|2w+5|5||180
-Barbell Row|5|5||150`],
-      ['Workout B', `
-Back Squat|2w+5|5||180
-Overhead Press|2w+5|5||180
-Deadlift|2w+1|5||180`]
-    ]
-  },
-  {
-    id: 'db', name: 'Dumbbells Only', freq: '2 to 4 days a week',
-    about: 'Needs just dumbbells and a bench. Good for home or a crowded gym.',
-    days: [
-      ['Dumbbell A', `
-Goblet Squat|3|10-15|2|90
-Dumbbell Bench Press|3|8-12|2|90
-Dumbbell Row|3|10-12|2|75
-Dumbbell Shoulder Press|3|10-12|2|75
-Dumbbell Curl|2|12|1|60
-Plank|3|45s||45`],
-      ['Dumbbell B', `
-Dumbbell Romanian Deadlift|3|10-12|2|90
-Bulgarian Split Squat|3|8-12|2|75
-Push-Up|3a|AMRAP||75
-Chest-Supported Dumbbell Row|3|10-12|2|75
-Dumbbell Lateral Raise|3|12-15|1|60
-Overhead Dumbbell Extension|2|12|1|60
-Dead Bug|3|10||45`]
-    ]
   }
 ];
+
+/* The machine version of a plan, for people new to lifting: barbell, dumbbell and bodyweight lifts that take skill
+   and balance are swapped for a machine or cable that does the same job, first choice first (the next one is used
+   when the first is already in that day). Muscle grows about the same on either (Haugen 2023); smaller free-weight
+   exercises and cables stay. Full Body EOD is machines already and the dumbbell plan is for home. */
+window.FORGE_MACHINE_SWAPS = {
+  'Barbell Bench Press': ['Machine Chest Press', 'Plate-Loaded Chest Press', 'Smith Machine Bench Press'],
+  'Dumbbell Bench Press': ['Machine Chest Press', 'Plate-Loaded Chest Press', 'Smith Machine Bench Press'],
+  'Incline Dumbbell Press': ['Incline Machine Chest Press', 'Smith Machine Incline Press'],
+  'Incline Barbell Bench Press': ['Incline Machine Chest Press', 'Smith Machine Incline Press'],
+  'Seated Dumbbell Shoulder Press': ['Machine Shoulder Press', 'Smith Machine Shoulder Press'],
+  'Overhead Press': ['Machine Shoulder Press', 'Smith Machine Shoulder Press'],
+  'Pull-Up': ['Lat Pulldown', 'Machine Lat Pulldown', 'Assisted Pull-Up'],
+  'Barbell Row': ['Machine Row', 'Chest-Supported T-Bar Row', 'Iso-Lateral Machine Row', 'Seated Cable Row'],
+  'Chest-Supported Dumbbell Row': ['Chest-Supported T-Bar Row', 'Machine Row', 'Iso-Lateral Machine Row', 'Seated Cable Row'],
+  'Back Squat': ['Leg Press', 'Hack Squat', 'Pendulum Squat'],
+  'Front Squat': ['Hack Squat', 'Pendulum Squat', 'Leg Press'],
+  'Bulgarian Split Squat': ['Single-Leg Leg Press', 'Leg Press', 'Hack Squat'],
+  'Romanian Deadlift': ['Smith Machine Romanian Deadlift', 'Back Extension Machine'],
+  'Deadlift': ['Smith Machine Romanian Deadlift', 'Back Extension Machine'],
+  'Barbell Hip Thrust': ['Machine Hip Thrust', 'Smith Machine Hip Thrust'],
+  'Skull Crusher': ['Overhead Cable Triceps Extension', 'Single-Arm Overhead Cable Extension', 'Rope Pushdown'],
+  'Barbell Curl': ['Cable Curl', 'Machine Bicep Curl'],
+  'EZ-Bar Preacher Curl': ['Machine Preacher Curl', 'Cable Curl'],
+  'Incline Dumbbell Curl': ['Bayesian Cable Curl', 'Machine Preacher Curl', 'Cable Curl'],
+  'Hammer Curl': ['Rope Hammer Curl']
+};

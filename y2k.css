@@ -83,6 +83,7 @@
 [data-style="y2k"] body[data-tab="settings"] { --kana: "設定 // システム"; }
 [data-style="y2k"] .num, [data-style="y2k"] .tile b, [data-style="y2k"] .page-h-side b, [data-style="y2k"] .hist-n, [data-style="y2k"] .mbar-v, [data-style="y2k"] .score, [data-style="y2k"] .sci-score b, [data-style="y2k"] .wo-meta, [data-style="y2k"] .cal-d { font-family: var(--lcd); letter-spacing: .02em; }
 [data-style="y2k"] .tile b { font-size: 34px; color: var(--cyan); text-shadow: 0 0 8px rgba(25, 240, 255, .6); }
+[data-style="y2k"] .plan-tiles .tile b { font-size: 22px; }
 [data-style="y2k"] .rv-tile { border-radius: 0; }
 [data-style="y2k"] .rv-tile b { font-family: var(--lcd); }
 [data-style="y2k"] .rv-key { border-radius: 0; }
