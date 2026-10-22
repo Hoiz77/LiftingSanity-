@@ -498,6 +498,8 @@ function pickPhoto(exId) {
 /* ============================== State ============================== */
 
 const KEY = 'liftingsanity:data:v1';
+// shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
+const APP_VERSION = 28;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -3977,7 +3979,8 @@ VIEWS.settings = function () {
     <p class="muted small">${T('Your workouts are stored on this device only, and nobody else can see them: sharing the link shares the app, not your data. Browsers can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.')}</p>
   </div>
   <p class="muted small center">Lifting Sanity 1.3 · ${TN(LIB.length, '{n} exercise', '{n} exercises')} · ${storageOK ? T('saving to this device') : T('storage blocked')}</p>
-  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })}</p>`;
+  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })}</p>
+  <p class="muted small center fit-info" id="fitInfo" lang="en" dir="ltr">${(screenGap(), fitLine())}</p>`;
 };
 function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
@@ -4682,17 +4685,26 @@ window.addEventListener('resize', () => {
     fitScreen();
   }, 150);
 });
-// iPhone Home Screen app: after the keyboard has been up, iOS can leave the page shorter than the screen until the app
-// is closed, which showed as a dark strip under the workout and the tab bar. Taking the page out of layout for a moment
-// makes iOS measure it again; while it's still short, the parts on the bottom edge reach down to the real edge
-let fitTried = 0, fitT;
+// iPhone Home Screen app: iOS can lay the page out shorter than the screen (after the keyboard has been up, and on
+// some phones by the height of the status bar), which showed as a dark strip under the workout and the tab bar.
+// Taking the page out of layout for a moment makes iOS measure it again; while it's still short, the parts on the
+// bottom edge reach down to the real edge. What it finds is shown at the bottom of Settings.
+let fitTried = 0, fitT, fitProbe = null;
+const fitInfo = { app: false, screen: '', page: '', box: '', gap: 0 };
+const homeScreenApp = () => navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+// the box that fixed things (the workout, the tab bar) are placed in, measured directly
+function pageBox() {
+  if (!fitProbe || !fitProbe.isConnected) { fitProbe = document.createElement('div'); fitProbe.style.cssText = 'position:fixed;inset:0;visibility:hidden;pointer-events:none;z-index:-1'; document.body.append(fitProbe); }
+  return { w: fitProbe.offsetWidth, h: fitProbe.offsetHeight };
+}
 function screenGap() {
-  if (navigator.standalone !== true) return 0;
+  const box = pageBox(), long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height), land = box.w > box.h;
+  Object.assign(fitInfo, { app: homeScreenApp(), screen: `${land ? long : short}×${land ? short : long}`, page: `${innerWidth}×${innerHeight}`, box: `${box.w}×${box.h}` });
+  if (!fitInfo.app) return 0;
   const el = document.activeElement;
   if (el && el.matches('input:not([readonly]), textarea:not([readonly]), [contenteditable]')) return 0; // the keyboard may be up
-  const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height), land = innerWidth > innerHeight;
-  if (Math.abs(innerWidth - (land ? long : short)) > 1) return 0; // not the whole width, e.g. an iPad window beside another app
-  const gap = (land ? short : long) - innerHeight;
+  if (Math.abs(box.w - (land ? long : short)) > 1) return 0; // not the whole width, e.g. an iPad window beside another app
+  const gap = (land ? short : long) - Math.min(box.h, innerHeight);
   return gap > 0 && gap < 160 ? gap : 0;
 }
 function fitScreen() {
@@ -4706,9 +4718,13 @@ function fitScreen() {
     gap = screenGap();
   }
   if (!gap) fitTried = 0;
+  fitInfo.gap = gap;
   document.documentElement.classList.toggle('vfix', gap > 0);
   document.documentElement.style.setProperty('--vgap', gap + 'px');
+  const out = $('#fitInfo'); if (out) out.textContent = fitLine();
 }
+// the version and what the screen check found, for the bottom of Settings
+const fitLine = () => `v${APP_VERSION} · screen ${fitInfo.screen} · page ${fitInfo.page} · fixed ${fitInfo.box} · ${fitInfo.app ? 'Home Screen app' : 'browser'}${fitInfo.gap ? ` · filled ${fitInfo.gap}` : ''}`;
 const fitSoon = (ms = 600) => { clearTimeout(fitT); fitT = setTimeout(fitScreen, ms); };
 document.addEventListener('focusout', () => fitSoon());
 if (window.visualViewport) visualViewport.addEventListener('resize', () => fitSoon(250));

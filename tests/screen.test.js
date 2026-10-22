@@ -1,4 +1,5 @@
-// the iPhone Home Screen app when iOS leaves the page shorter than the screen (it can after the keyboard has been up):
+// the iPhone Home Screen app when iOS leaves the page shorter than the screen (after the keyboard has been up, or by
+// the status bar's height):
 // the workout, tab bar, sheets and number pad still reach the bottom edge, the floating bars move down with it, and
 // nothing changes in a browser tab, in an iPad window beside another app, or once the page is full height again
 const { open, report } = require('./lib');
@@ -40,6 +41,29 @@ const fix = p => p.evaluate(() => ({ on: document.documentElement.classList.cont
     await t.p.setViewportSize({ width: 393, height: 852 }); await t.p.waitForTimeout(500);
     const g = await fix(t.p);
     r.ok(!g.on && g.gap === '0px', `${style}: once the page is full height again nothing is moved`, JSON.stringify(g));
+    pages.push(t);
+    await t.ctx.close();
+  }
+
+  // short by the status bar's height (59pt), on a phone that says it's a Home Screen app only through display-mode
+  {
+    const t = await open({ width: 393, height: 793, settings: { style: 'y2k' } });
+    await t.p.addInitScript(([w, h]) => {
+      Object.defineProperty(screen, 'width', { get: () => w }); Object.defineProperty(screen, 'height', { get: () => h });
+      const mm = window.matchMedia.bind(window);
+      window.matchMedia = q => /display-mode: standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : mm(q);
+    }, [393, 852]);
+    await t.p.reload(); await t.p.waitForFunction(() => window.LiftingSanity); await t.p.waitForTimeout(800);
+    const f = await fix(t.p);
+    r.ok(f.on && f.gap === '59px', 'a page short by the status bar’s height is noticed, with display-mode as the only sign of a Home Screen app', JSON.stringify(f));
+    await t.start(); await t.p.waitForTimeout(400);
+    const wo = await box(t.p, '#workout');
+    r.ok(wo && wo.bottom === 852, 'and the workout reaches the bottom edge', JSON.stringify(wo));
+    await t.click('[data-a="woMin"]', 600); await t.tab('settings');
+    const line = await t.text('#fitInfo');
+    r.ok(/screen 393×852/.test(line) && /page 393×793/.test(line) && /Home Screen app/.test(line) && /filled 59/.test(line), 'the bottom of Settings says what the screen check found', line);
+    const sw = require('fs').readFileSync(require('path').join(__dirname, '..', 'sw.js'), 'utf8').match(/liftingsanity-v(\d+)/)[1];
+    r.ok(line.startsWith(`v${sw} `), 'the version shown is the offline cache’s version', { line, sw });
     pages.push(t);
     await t.ctx.close();
   }
