@@ -46,12 +46,33 @@ const top = p => p.evaluate(() => { const w = [...document.querySelectorAll('#sh
   })`);
   r.ok(picks.dumbbells === 'db' && picks.strength4 === 'phul' && picks.strength3 === '5x5' && picks.exp3 === 'ppl' && picks.two === 'fb' && picks.new5 === 'ul' && /^ppl,arnold/.test(picks.exp6) && picks.all, 'plans follow the answers (dumbbells, strength, experience, days), and every pick exists', picks);
 
+  // every plan offered, for every combination of answers, against the days chosen: it's built for them, or it says
+  // so (naming its days and yours); and when some ready-made plan fits the days, one that fits is offered
+  const all = await t.ev(`(() => { const out = []; for (const level of ['new', 'some', 'exp']) for (const goal of ['muscle', 'strength', 'health']) for (const days of ['2', '3', '4', '5', '6']) for (const kit of ['gym', 'db']) out.push({ level, goal, days: +days, kit, pick: guidePick({ level, goal, days, kit }).map(p => ({ id: p.id, note: p.note, ds: PLAN_DAYS[p.id] })) }); return { out, ids: Object.keys(PLAN_DAYS).sort().join(), programs: PROGRAMS.map(p => p.id).sort().join() }; })()`);
+  r.ok(all.ids === all.programs, 'every ready-made plan has the days a week it’s built for', all);
+  const unexplained = all.out.flatMap(c => c.pick.filter(p => !p.ds.includes(c.days) && !(p.note && p.note.includes(String(c.days)) && [p.ds[0], p.ds[p.ds.length - 1]].every(n => p.note.includes(String(n))))).map(p => `${c.level}/${c.goal}/${c.days}/${c.kit} → ${p.id}`));
+  r.ok(all.out.length === 90 && !unexplained.length, 'in all 90 combinations of answers, every plan offered is built for the days chosen or says so, with its days and yours', unexplained.slice(0, 8));
+  const DAYS = { fb: [3], fbeod: [3, 4], ul: [4], ppl: [3, 6], phul: [4], '5x5': [3], arnold: [6], bro: [5] };
+  const missed = all.out.filter(c => c.kit === 'gym' && Object.entries(DAYS).some(([id, ds]) => ds.includes(c.level === 'new' ? Math.min(c.days, 4) : c.days) && (c.level === 'exp' || (id !== 'bro' && id !== 'arnold'))) && !c.pick.some(p => p.ds.includes(c.days) || (c.level === 'new' && p.ds.includes(Math.min(c.days, 4))))).map(c => `${c.level}/${c.goal}/${c.days}`);
+  r.ok(!missed.length, 'when a ready-made plan fits the days chosen, one that fits is offered', missed);
+  const s6 = all.out.find(c => c.level === 'some' && c.goal === 'strength' && c.days === 6 && c.kit === 'gym').pick;
+  r.ok(s6[0].id === 'phul' && /fewer than the 6 you have/.test(s6[0].note) && /recovery/.test(s6[0].note) && s6.some(p => p.ds.includes(6)), 'strength on six days: a strength plan that says why it trains fewer days, and one that uses all six', s6);
+
+  // on screen: strength on six days
+  t = await open({ fresh: true }); pages.push(t);
+  await t.p.waitForTimeout(600);
+  await t.inSheet('[data-a="wGuide"]', 500);
+  for (const v of ['some', 'strength', '6', 'gym', 'self']) await t.inSheet(`[data-a="gAns"][data-v="${v}"]`, 450);
+  const six = await t.p.evaluate(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); return { main: (w.querySelector('.guide-note.days') || {}).textContent || '', alts: [...w.querySelectorAll('.guide-plan:not(.main)')].map(a => ({ name: a.querySelector('b').textContent, note: !!a.querySelector('[data-days-note]') })) }; });
+  r.ok(/PHUL trains 4 days a week, fewer than the 6 you have/.test(six.main) && six.alts.some(a => /Push \/ Pull \/ Legs/.test(a.name) && !a.note), 'on screen, the plan says why it trains fewer days than chosen, and the six-day option sits below it', six);
+
   // not applying the settings, and tips as you go
   t = await open({ fresh: true }); pages.push(t);
   await t.p.waitForTimeout(600);
   await t.inSheet('[data-a="wGuide"]', 500);
   for (const v of ['exp', 'strength', '4', 'gym', 'tips']) await t.inSheet(`[data-a="gAns"][data-v="${v}"]`, 450);
   r.ok(/PHUL/.test(await top(t.p)) && /Rest between sets: 3:00/.test(await top(t.p)), 'strength on four days: PHUL first, with 3 minutes’ rest');
+  r.ok(!(await t.p.evaluate(() => [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.guide-note.days'))), 'a plan built for the days chosen has no days note');
   await t.p.evaluate(() => { const c = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('[data-f="gUseSet"]'); c.click(); });
   await t.p.waitForTimeout(200);
   await t.inSheet('.guide-plan.main [data-a="gUse"]', 800);

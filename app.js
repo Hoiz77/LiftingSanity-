@@ -499,7 +499,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1568,17 +1568,51 @@ const GUIDE_Q = () => [
 ];
 // the answers in a line ("Just starting · Building muscle · 3 days a week · In a gym")
 const guideSaid = a => GUIDE_Q().slice(0, 4).map(q => q.k === 'days' ? (a.days ? TN(+a.days, '{n} day a week', '{n} days a week') : '') : (q.opts.find(o => o[0] === a[q.k]) || [0, ''])[1]).filter(Boolean).join(' · ');
-// the plans that fit the answers, best first
-function guidePlans(a) {
-  const d = +a.days || 3;
-  if (a.kit === 'db') return ['db'];
-  if (a.goal === 'strength') return d >= 4 ? ['phul', '5x5', 'ul'] : ['5x5', 'fb', 'phul'];
-  if (d <= 2) return ['fb', 'fbeod'];
-  if (d === 3) return a.level === 'exp' ? ['ppl', 'fb', 'fbeod'] : ['fb', 'fbeod', 'ppl'];
-  if (d === 4) return a.level === 'new' ? ['ul', 'fbeod'] : ['ul', 'phul', 'fbeod'];
-  if (d === 5) return a.level === 'new' ? ['ul', 'ppl'] : ['ppl', 'ul', 'bro'];
-  return a.level === 'exp' ? ['ppl', 'arnold', 'ul'] : ['ppl', 'ul'];
+// the days a week each ready-made plan is built for
+const PLAN_DAYS = { fb: [3], fbeod: [3, 4], ul: [4], ppl: [3, 6], phul: [4], '5x5': [3], db: [2, 3, 4], arnold: [6], bro: [5] };
+// the plans for each goal and level, best first (5×5 and PHUL are the strength plans; Bro and Arnold come up as
+// plans that use five or six days)
+const PLAN_PREFS = {
+  strength: { new: ['5x5', 'phul', 'fb', 'ul'], some: ['5x5', 'phul', 'ul', 'fb'], exp: ['phul', '5x5', 'ul', 'ppl'] },
+  muscle: { new: ['fb', 'ul', 'fbeod', 'ppl'], some: ['ul', 'fb', 'ppl', 'fbeod', 'phul'], exp: ['ppl', 'ul', 'phul', 'arnold', 'fb'] },
+  health: { new: ['fb', 'fbeod', 'ul'], some: ['fb', 'fbeod', 'ul', 'ppl'], exp: ['ul', 'fb', 'ppl', 'fbeod'] }
+};
+const fitsDays = (id, n) => PLAN_DAYS[id].includes(n);
+// "3", "3 or 4", "2 to 4"
+const daysText = ds => ds.length === 1 ? String(ds[0]) : ds.length === 2 ? T('{a} or {b}', { a: ds[0], b: ds[1] }) : T('{a} to {b}', { a: ds[0], b: ds[ds.length - 1] });
+// when a plan isn't built for the days you have, it says so and why
+function guideDaysNote(id, d, level, goal) {
+  const ds = PLAN_DAYS[id], p = PROGRAMS.find(x => x.id === id);
+  if (!ds || !p || ds.includes(d)) return '';
+  const v = { plan: p.name, m: daysText(ds), n: d };
+  if (d > ds[ds.length - 1]) return `${T('{plan} trains {m} days a week, fewer than the {n} you have.', v)} ${level === 'new' ? T('When you’re starting, that’s plenty: lifts improve with rest in between. Add days once it feels easy to keep up.') : goal === 'strength' ? T('Heavy training needs recovery more than extra sessions; use the other days for walking, mobility or rest.') : T('Use the other days for rest or something light, or pick a plan below that trains more often.')}`;
+  if (d < ds[0]) return T('{plan} is made for {m} days a week. On {n}, go through its days in order: each one still comes round, just less often.', v);
+  return T('{plan} is made for {m} days a week. On {n}, go through its days in order and they rotate across the week.', v);
 }
+// the plans that fit the answers, best first, each with a note when it isn't built for the days you have
+function guidePick(a) {
+  const d = +a.days || 3, level = a.level || 'some', goal = a.goal || 'muscle';
+  const note = id => guideDaysNote(id, d, level, goal);
+  if (a.kit === 'db') return [{ id: 'db', note: note('db') }];
+  const prefs = PLAN_PREFS[goal][level];
+  // someone just starting is pointed to four days at most; more comes later
+  const want = level === 'new' ? Math.min(d, 4) : d;
+  // closest to the days wanted; on two days, whole-body plans first (each session works everything); on a tie, one
+  // that can use all the days, then the goal's order
+  const near = (id, n) => Math.min(...PLAN_DAYS[id].map(x => Math.abs(x - n)));
+  const whole = id => (id === 'fb' || id === 'fbeod' || id === '5x5' ? 0 : 1);
+  const rank = (id, n) => [n < 3 ? whole(id) : 0, near(id, n), PLAN_DAYS[id].some(v => v >= n) ? 0 : 1];
+  const cmp = n => (x, y) => { const a = rank(x, n), b = rank(y, n); return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; };
+  const best = (ids, n) => ids.find(id => fitsDays(id, n)) || [...ids].sort(cmp(n))[0];
+  // for strength, the strength plans come first even when they're built for fewer days (and say why)
+  const main = best(goal === 'strength' ? prefs.filter(id => id === '5x5' || id === 'phul') : prefs, want);
+  // then one that uses every day you have, if the first doesn't, and the next best for the goal
+  const every = fitsDays(main, d) ? null : [...prefs, 'ppl', 'fbeod', 'ul', 'bro', 'arnold'].find(id => id !== main && fitsDays(id, d) && (level === 'exp' || (id !== 'bro' && id !== 'arnold')));
+  const rest = prefs.filter(id => id !== main && id !== every).sort((x, y) => (fitsDays(y, want) ? 1 : 0) - (fitsDays(x, want) ? 1 : 0) || (want < 3 ? whole(x) - whole(y) : 0));
+  const alts = [every, ...rest.filter(id => fitsDays(id, want)), ...rest].filter((id, i, all) => id && all.indexOf(id) === i).slice(0, 2);
+  return [main, ...alts].map(id => ({ id, note: note(id) }));
+}
+const guidePlans = a => guidePick(a).map(p => p.id);
 const GUIDE_WHY = () => ({
   fb: T('Every muscle two or three times a week with a few big lifts: the quickest way to learn the movements and build a base.'),
   fbeod: T('A whole-body session every other day, so a missed day costs little and every muscle still gets worked often.'),
@@ -1626,10 +1660,10 @@ function guideFlow(home, done, exit) {
   const show = (def, step, extra) => { Object.assign(g, { step }, extra || {}); refreshSheet(def); const b = def.el && def.el.querySelector('.sheet-body'); if (b) b.scrollTop = 0; focusHead(def); };
   const backBtn = (a = 'gBack') => `<button class="btn ghost sm" data-a="${a}">${T('{icon}Back', { icon: icon('left') })}</button>`;
   const dots = (n, cur) => `<div class="guide-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k < cur ? 'done' : k === cur ? 'on' : ''}"></i>`).join('')}</div>`;
-  const planCard = (id, main) => {
+  const planCard = (id, main, note) => {
     const p = PROGRAMS.find(x => x.id === id); if (!p) return '';
     const days = p.days.filter(d => !isRest(d)).length;
-    return `<article class="guide-plan${main ? ' main' : ''}"><div><b>${esc(p.name)}</b><span class="muted">${p.freq ? esc(p.freq) : TN(days, '{n} training day', '{n} training days')}</span>${main ? '' : `<p class="muted small">${GUIDE_WHY()[id] || ''}</p>`}</div>
+    return `<article class="guide-plan${main ? ' main' : ''}"><div><b>${esc(p.name)}</b><span class="muted">${p.freq ? esc(p.freq) : TN(days, '{n} training day', '{n} training days')}</span>${main ? '' : `<p class="muted small">${GUIDE_WHY()[id] || ''}</p>`}${note ? `<p class="small guide-days" data-days-note>${icon('calendar', 'inline')} ${note}</p>` : ''}</div>
       <button class="btn sm${main ? ' primary' : ''}" data-a="gUse" data-id="${id}">${main ? T('Use this plan') : T('Use this')}</button></article>`;
   };
   const view = () => {
@@ -1645,13 +1679,14 @@ function guideFlow(home, done, exit) {
       </div>`;
     }
     if (g.step === 'result') {
-      const ids = guidePlans(g.a), set = guideSettings(g.a), lv = g.a.level || 'some';
+      const pick = guidePick(g.a), ids = pick.map(x => x.id), set = guideSettings(g.a), lv = g.a.level || 'some';
       const said = guideSaid(g.a);
       return `${sheetHead(T('Your plan'), '', backBtn())}
       <div class="sheet-body pad guide">
         <p class="guide-step">${T('From your answers: {list}', { list: esc(said) })}</p>
         <h2 class="guide-h" id="guideH" tabindex="-1">${esc((PROGRAMS.find(p => p.id === ids[0]) || {}).name || '')}</h2>
         <p class="guide-lead">${GUIDE_WHY()[ids[0]] || ''}</p>
+        ${pick[0].note ? `<p class="guide-note days" data-days-note>${icon('calendar')}<span>${pick[0].note}</span></p>` : ''}
         ${lv === 'new' ? `<p class="guide-note">${icon('info')}<span>${T('Start lighter than you think and learn each lift. Adding weight comes quickly at first.')}</span></p>` : ''}
         ${planCard(ids[0], true)}
         <div class="guide-set" role="group" aria-label="${T('Settings that fit your answers')}">
@@ -1660,7 +1695,7 @@ function guideFlow(home, done, exit) {
           <p>${icon('flame')}<span><b>${set.effort === 'off' ? T('Effort tracking: off for now') : T('Effort tracking: {name}', { name: term('RIR') })}</b><small>${set.effort === 'off' ? T('One thing less to log while you learn. Turn it on in Settings once you can tell how many reps you have left.') : T('After a set, note how many more reps you could have done. It shows how hard you’re really training.')}</small></span></p>
           <label class="guide-check"><input type="checkbox" data-f="gUseSet" ${g.useSet ? 'checked' : ''}><span>${T('Use these settings')}</span></label>
         </div>
-        ${ids.length > 1 ? `<p class="eyebrow">${T('Also a good fit')}</p>${ids.slice(1).map(id => planCard(id, false)).join('')}` : ''}
+        ${ids.length > 1 ? `<p class="eyebrow">${T('Also a good fit')}</p>${pick.slice(1).map(x => planCard(x.id, false, x.note)).join('')}` : ''}
         <div class="guide-more">
           <button class="btn ghost" data-a="gOwn">${icon('edit')}${T('Build my own instead')}</button>
           <button class="btn ghost" data-a="gAll">${icon('calendar')}${T('See every plan')}</button>
