@@ -1,11 +1,13 @@
 // Shared test helpers: a small web server for the app, a phone-sized browser, and pass/fail reporting.
 const http = require('http'), fs = require('fs'), path = require('path');
-let chromium;
-try { ({ chromium } = require('playwright')); } catch (e) {
+let chromium, webkit, devices;
+try { ({ chromium, webkit, devices } = require('playwright')); } catch (e) {
   console.error('These tests need Playwright: run `npm install` and `npx playwright install chromium` in the repo first.');
   process.exit(2);
 }
 const ROOT = path.join(__dirname, '..');
+// Chromium by default; LS_BROWSER=webkit runs Safari's engine with an iPhone's user agent (`npx playwright install webkit`)
+const ENGINE = process.env.LS_BROWSER === 'webkit' ? 'webkit' : 'chromium';
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.jpg': 'image/jpeg' };
 
 // serves the repo as it is on disk; `overrides` (path → text) stand in for files, e.g. to fake a new version
@@ -27,12 +29,13 @@ const HOOKED = () => fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8').replace(
 
 let browser = null, site = null;
 async function open(o = {}) {
-  if (!browser) browser = await chromium.launch();
+  if (!browser) browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
   if (!site) { site = await serve(); module.exports.__site = site; }
   const ctx = await browser.newContext({
     viewport: { width: o.width || 390, height: o.height || 844 }, isMobile: o.width ? o.width < 700 : true, hasTouch: true, deviceScaleFactor: 1,
     colorScheme: o.scheme || 'dark', reducedMotion: o.reducedMotion || 'no-preference', timezoneId: o.tz, acceptDownloads: true,
-    serviceWorkers: o.serviceWorkers ? 'allow' : 'block'
+    serviceWorkers: o.serviceWorkers ? 'allow' : 'block',
+    ...(ENGINE === 'webkit' ? { userAgent: devices['iPhone 15'].userAgent } : {})
   });
   const p = await ctx.newPage();
   p.setDefaultTimeout(5000);
@@ -91,4 +94,4 @@ function report(title) {
     }
   };
 }
-module.exports = { open, serve, report, closeAll, ROOT, chromium: () => chromium };
+module.exports = { open, serve, report, closeAll, ROOT, ENGINE, chromium: () => chromium };

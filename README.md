@@ -104,7 +104,7 @@ Your workouts are saved on each device itself, not online, so the iPad and the i
 | `i18n.js`, `ar.js`, `ar-names.js` | Languages: picks English or Arabic before the page draws, the Arabic text, and Arabic exercise names |
 | `tests/` | Automated tests that use the app in a phone-sized browser; see [tests/README.md](tests/README.md) |
 
-No build step and no dependencies for the app. Edit a file, push, and the site updates. To run the tests: `npm install`, `npx playwright install chromium`, then `npm test`.
+No build step and no dependencies for the app. Edit a file, push, and the site updates. To run the tests: `npm install`, `npx playwright install chromium`, then `npm test`. They also run on every push (GitHub Actions).
 
 ## Credits
 

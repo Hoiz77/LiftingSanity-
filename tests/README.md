@@ -9,10 +9,12 @@ server they start themselves. Nothing is installed on your phone and nothing her
 ```sh
 npm install                      # Playwright, the browser driver (once)
 npx playwright install chromium  # the browser itself (once)
-npm test                         # everything, about 6 minutes
+npm test                         # everything, about 10 minutes
 npm run test:quick               # without the two slow ones, about 3 minutes
 node tests/run.js logging        # just one file (any start of a file name works)
 STEPS=500 node tests/stress.test.js   # a longer random-tapping run
+npx playwright install webkit    # Safari's engine (once)
+LS_BROWSER=webkit node tests/journey.test.js   # any file in WebKit, with an iPhone's user agent
 ```
 
 Each check prints ✓ or ✗ with a plain description, and the run ends with a summary. A file fails if any check fails
@@ -23,7 +25,8 @@ or the page throws an error.
 | File | What it checks |
 | --- | --- |
 | `arabic-options` | In Arabic, exercise names and units/gym terms start as they are; switched to Arabic, the workout, library and plan review show Arabic names, كغ, احتياط and Arabic set letters; search finds an exercise by either name; details keep the English name; scores and saved data don't change; nothing English left with both on. |
-| `guide` | “Set me up” on a new phone: five questions as labelled radio choices with the focus on each question, a plan and settings that fit the answers (and the choice not to use them), Back keeping answers, the six-part tour with notes by experience, the words explained, tips that show once and turn off, Settings → Guide, a plan from the guide keeping your history, and all of it in Arabic. |
+| `guide` | “Set me up” on a new phone: five questions as labelled radio choices with the focus on each question, a plan and settings that fit the answers (and the choice not to use them), for all 90 combinations of answers a plan built for the days chosen whenever one exists, and any plan with a different number of days saying so and why, Back keeping answers, the six-part tour with notes by experience, the words explained, tips that show once and turn off, Settings → Guide, a plan from the guide keeping your history, and all of it in Arabic. |
+| `journey` | Someone new, start to finish: first launch, the guide sets up a plan, a whole first workout logged with the number pad and ✓, the phone locked and the app closed halfway (it comes back on the same exercise with every set), Finish and the summary, History, a backup file saved, everything erased, the file restored exactly, and still there after reopening. Runs in WebKit too. |
 | `welcome` | A new phone opens with the welcome: kg or lb, a ready-made plan (without anyone else's starting weights), building your own, sample workouts, skipping; it never comes back; someone who already has data never sees it. |
 | `arabic` | Switching to العربية turns the app right to left; every screen (tabs, workout, menus, number pad, rest timer, summary, details, plan review, the welcome) is scanned for English that isn't meant to be there; switching back to English. |
 | `selfcheck` | The app's own self-check of its calculation rules: working sets, left/right pairs, warm-ups, 1RM limits, kg ↔ lb, backup validation. |
@@ -41,7 +44,31 @@ or the page throws an error.
 | `layout` | At 375, 393 and 430 px wide in both styles (and 393 in Arabic, with Arabic names and terms in Y2K), across every tab, a workout, sheets and the summary: nothing cut off, no sideways scrolling, short button labels centred. Uses the real fonts when online. |
 | `stress` | Random taps and odd typed values in six set-ups, checking after every step for page errors, NaN/undefined on screen, broken or duplicated data and unreadable saves. |
 
+## On every push
+
+GitHub Actions runs them on every push and pull request ([.github/workflows/tests.yml](../.github/workflows/tests.yml)):
+every file in Chromium, and `journey` in WebKit. The results are on the repository's Actions tab, and a red ✗ next
+to a commit means a check failed.
+
 ## What they can't cover
 
-They run in Chromium, not Safari. Real-iPhone behaviour (Safari's own quirks, haptics, how smooth animations feel,
-the Home Screen app being suspended) still needs a try on the phone.
+They run in Chromium and WebKit, not in Safari on an iPhone. Real-iPhone behaviour (iOS's toolbar and safe areas,
+the keyboard, haptics, how smooth animations feel, the Home Screen app being suspended, saving to and opening from
+Files) still needs a try on the phone.
+
+## On a real iPhone, before a release
+
+A Safari tab keeps its data apart from the Home Screen app, so parts 1 to 3 start from nothing without touching
+the log you use.
+
+1. **First launch (Safari tab).** Open the site. The welcome appears; choose kg, then *Set me up*, answer the five
+   questions, use the plan. The bottom of Settings shows the new version.
+2. **A whole workout (Safari tab).** Start it. Type a weight and reps on the number pad and press Log; tap ✓ on the
+   next sets. The rest timer starts by itself. Halfway: lock the phone for a minute, unlock, then swipe Safari away
+   and open the site again. The workout is back on the same exercise with every set, and the timer is right. Log
+   the rest, Finish, check the summary and History.
+3. **Backup and restore (Safari tab).** Settings → Back up → Save file, into Files. Erase everything → Erase (type
+   ERASE). Restore → Choose file, and pick it in Files. The workout, the plan and the settings are back; close Safari and reopen to check again.
+4. **The Home Screen app (your own data).** Start a workout: it reaches the bottom edge with no black strip, and
+   dragging the rest timer doesn't move the page. Leave for other apps for 10 minutes or more and come back: the
+   workout and timer are as you left them. Back up → Save file here too, and check the file is in Files.
