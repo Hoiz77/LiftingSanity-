@@ -43,6 +43,7 @@ A lifting log for iPhone and iPad, made for lifters who already know how to trai
   - In one-at-a-time mode the exercise card follows your finger: let go past a quarter of the way, or flick, for the next or previous one.
   - The number pad and rest timer slide in and out. Pictures on screen stay put when a page redraws, so nothing flashes white.
   - With Reduce Motion on, screens fade instead of moving.
+- **English or Arabic.** Settings → Language (and on the welcome). In Arabic the whole app reads right to left: the tab rail and the workout list sit on the right, arrows point the other way, and swiping to the next exercise goes the way you read. Numbers stay 0–9, the number pad keeps 1 2 3 left to right, and charts run left to right as in most apps. Exercise names and how-to steps stay in English for now; everything else, the exercise-science text included, is in Arabic. A phone set to Arabic starts in Arabic the first time.
 - **Two styles.** Settings → Style: **Clean** (default) or **Y2K**: cobalt and chrome, pixel and LCD type, bevelled windows, an LCD rest timer, EQ-style bars and a live HUD.
 
 ## How the numbers are worked out
@@ -99,6 +100,7 @@ Your workouts are saved on each device itself, not online, so the iPad and the i
 | `steps.json` | Step-by-step how-to instructions, loaded the first time you open an exercise's details |
 | `sw.js` | Keeps the app on the device so it opens offline |
 | `manifest.webmanifest`, `icon-*.png` | Home Screen name and icon |
+| `i18n.js`, `ar.js` | Languages: picks English or Arabic before the page draws, and the Arabic text |
 | `tests/` | Automated tests that use the app in a phone-sized browser; see [tests/README.md](tests/README.md) |
 
 No build step and no dependencies for the app. Edit a file, push, and the site updates. To run the tests: `npm install`, `npx playwright install chromium`, then `npm test`.
