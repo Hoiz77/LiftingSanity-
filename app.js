@@ -59,6 +59,9 @@ for (const g of GROUPS) g[1] = T(g[1]);
 for (const k in EQUIP) EQUIP[k] = T(EQUIP[k]);
 for (const k in KINDS) KINDS[k] = T(KINDS[k]);
 for (const k in SET_TYPES) { SET_TYPES[k].label = T(SET_TYPES[k].label); SET_TYPES[k].desc = T(SET_TYPES[k].desc); }
+// with Arabic terms, set letters are the first letter of the Arabic word (إحماء for a warm-up, فشل for failure…)
+const AR_SHORT = { W: 'إ', T: 'ث', B: 'خ', D: 'ن', F: 'ف', A: 'ق', RP: 'ر', M: 'م', C: 'ع', P: 'ج', E: 'س' };
+if (window.AR_TERMS) for (const k in AR_SHORT) SET_TYPES[k].short = AR_SHORT[k];
 
 const slug = s => s.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const parseLib = text => text.trim().split('\n').map(line => {
@@ -69,6 +72,9 @@ const LIB = parseLib(window.FORGE_LIBRARY);
 const LIB_MAP = new Map(LIB.map(e => [e.id, e]));
 // the open exercises-dataset adds ~1,200 more; names already in the curated list keep the curated entry
 for (const e of window.LS_EXTRA ? parseLib(window.LS_EXTRA) : []) if (!LIB_MAP.has(e.id)) { LIB.push(e); LIB_MAP.set(e.id, e); }
+// with Arabic names chosen, each exercise shows its Arabic name; the English one stays on it (e.en) for search,
+// the science notes and video links
+if (window.AR_NAMES && window.LS_AR_NAMES) for (const e of LIB) { e.en = e.name; e.name = window.LS_AR_NAMES[e.id] || e.name; }
 // how-to steps are big and only shown in exercise details: fetched (or read from the page) the first time they're wanted
 let STEPS = null, stepsLoading = null;
 function loadSteps() {
@@ -105,27 +111,31 @@ function parseNum(str) {
   const v = parseFloat(String(str).replace(',', '.'));
   return isFinite(v) ? v : null;
 }
-const U = () => state.settings.unit;
-function dispW(kg) { if (kg == null) return ''; return trimNum(U() === 'lb' ? kg * KG_LB : kg, U() === 'lb' ? 1 : 2); }
-function toKg(v) { return v == null ? null : (U() === 'lb' ? v / KG_LB : v); }
-function fmtW(kg, d) { return (d == null ? dispW(kg) : trimNum(U() === 'lb' ? kg * KG_LB : kg, d)) + ' ' + U(); }
+// units, effort scales and side letters as shown: in Arabic when Arabic terms are chosen; what's saved never changes
+const TERMS = { kg: 'كغ', lb: 'رطل', km: 'كم', mi: 'ميل', m: 'م', yd: 'ياردة', RIR: 'احتياط', RPE: 'الجهد', L: 'يس', R: 'يم', k: ' ألف', M: ' مليون' };
+const term = x => (window.AR_TERMS && TERMS[x]) || x;
+const isLb = () => state.settings.unit === 'lb';
+const U = () => term(state.settings.unit);
+function dispW(kg) { if (kg == null) return ''; return trimNum(isLb() ? kg * KG_LB : kg, isLb() ? 1 : 2); }
+function toKg(v) { return v == null ? null : (isLb() ? v / KG_LB : v); }
+function fmtW(kg, d) { return (d == null ? dispW(kg) : trimNum(isLb() ? kg * KG_LB : kg, d)) + ' ' + U(); }
 function compact(v) {
-  if (v >= 1e6) return trimNum(v / 1e6, 1) + 'M';
-  if (v >= 1e5) return trimNum(v / 1e3, 0) + 'k';
-  if (v >= 1e4) return trimNum(v / 1e3, 1) + 'k';
+  if (v >= 1e6) return trimNum(v / 1e6, 1) + term('M');
+  if (v >= 1e5) return trimNum(v / 1e3, 0) + term('k');
+  if (v >= 1e4) return trimNum(v / 1e3, 1) + term('k');
   return Math.round(v).toLocaleString(LOC);
 }
-function fmtVol(kg) { return compact(U() === 'lb' ? kg * KG_LB : kg) + ' ' + U(); }
-function distUnit(k) { return k === 'wdist' ? (U() === 'lb' ? 'yd' : 'm') : (U() === 'lb' ? 'mi' : 'km'); }
+function fmtVol(kg) { return compact(isLb() ? kg * KG_LB : kg) + ' ' + U(); }
+function distUnit(k) { return term(k === 'wdist' ? (isLb() ? 'yd' : 'm') : (isLb() ? 'mi' : 'km')); }
 function dispDist(m, k) {
   if (m == null) return '';
-  if (k === 'wdist') return trimNum(U() === 'lb' ? m * 1.0936133 : m, 0);
-  return trimNum(U() === 'lb' ? m / 1609.344 : m / 1000, 2);
+  if (k === 'wdist') return trimNum(isLb() ? m * 1.0936133 : m, 0);
+  return trimNum(isLb() ? m / 1609.344 : m / 1000, 2);
 }
 function toMeters(v, k) {
   if (v == null) return null;
-  if (k === 'wdist') return U() === 'lb' ? v / 1.0936133 : v;
-  return U() === 'lb' ? v * 1609.344 : v * 1000;
+  if (k === 'wdist') return isLb() ? v / 1.0936133 : v;
+  return isLb() ? v * 1609.344 : v * 1000;
 }
 function fmtClock(sec) {
   sec = Math.max(0, Math.floor(sec));
@@ -148,7 +158,7 @@ function parseTime(str) {
   if (rest.length <= 2) return +rest * 60 + s;
   return +rest.slice(0, -2) * 3600 + +rest.slice(-2) * 60 + s;
 }
-function fmtRest(sec) { return sec < 60 ? `${sec}s` : fmtClock(sec); }
+function fmtRest(sec) { return sec < 60 ? (window.AR_TERMS ? `${sec} ث` : `${sec}s`) : fmtClock(sec); }
 function fmtDuration(ms) {
   const min = Math.max(1, Math.round(ms / 60000));
   return min >= 60 ? T('{h}h {m}m', { h: Math.floor(min / 60), m: pad2(min % 60) }) : T('{n} min', { n: min });
@@ -707,7 +717,7 @@ function allExercises() {
   return allCache;
 }
 const hays = new WeakMap();
-const hayOf = e => { const key = e.name + e.m + e.eq + e.sec; let h = hays.get(e); if (h == null || h.key !== key) hays.set(e, h = { key, t: (e.name + ' ' + MUSCLES[e.m] + ' ' + EQUIP[e.eq] + ' ' + e.sec.map(x => MUSCLES[x]).join(' ')).toLowerCase() }); return h.t; };
+const hayOf = e => { const key = e.name + e.m + e.eq + e.sec; let h = hays.get(e); if (h == null || h.key !== key) hays.set(e, h = { key, t: (e.name + ' ' + (e.en ? e.en + ' ' : '') + MUSCLES[e.m] + ' ' + EQUIP[e.eq] + ' ' + e.sec.map(x => MUSCLES[x]).join(' ')).toLowerCase() }); return h.t; };
 const hasWeight = k => k === 'wr' || k === 'bw' || k === 'aw' || k === 'wdur' || k === 'wdist';
 const hasReps = k => k === 'wr' || k === 'bw' || k === 'aw';
 const hasTime = k => k === 'dur' || k === 'wdur' || k === 'dist';
@@ -875,7 +885,7 @@ function scheme(all) {
   const w = sets.filter(s => s.t === 'W').length;
   const work = sets.filter(s => s.t !== 'W');
   const parts = [];
-  if (w) parts.push(`${w}W`);
+  if (w) parts.push(`${w}${SET_TYPES.W.short}`);
   const n = work.filter(s => s.t === 'N');
   if (n.length) parts.push(`${n.length} × ${(n[0].tr || '').replace('-', '–') || '?'}`);
   const others = {};
@@ -1196,7 +1206,7 @@ function effDisp(rir) {
   if (state.settings.effort === 'rpe') return trimNum(10 - rir, 1);
   return rir >= 5 ? '5+' : trimNum(rir, 1);
 }
-const effName = () => state.settings.effort === 'rpe' ? 'RPE' : 'RIR';
+const effName = () => term(state.settings.effort === 'rpe' ? 'RPE' : 'RIR');
 function fmtSet(x, s, k, withEff = true) {
   k = k || getEx(x.exId).k;
   const reps = `${s.r ?? 0}`;
@@ -1213,19 +1223,19 @@ function fmtSet(x, s, k, withEff = true) {
 }
 function setLabel(sets, j) {
   const s = sets[j];
-  if (s.side) return s.side;
+  if (s.side) return term(s.side);
   if (s.t !== 'N') return SET_TYPES[s.t].short;
   return String(sets.slice(0, j + 1).filter(o => o.t === 'N' && !o.side).length);
 }
 // the set marker is a small weight plate: its colour says the kind of set, it fills in when the set is done,
 // warm-ups have a dashed rim, and one-side sets wear L (green) or R (purple) with the set kind as a tag
 const badge = (t, label, attrs = '', side = '') => `<button class="badge t-${t}${side ? ' side side-' + side : ''}" ${side && t !== 'N' ? `data-tag="${SET_TYPES[t].short}"` : ''} ${attrs} aria-label="${esc(!side ? SET_TYPES[t].label : side === 'L' ? T('Left side, {type}', { type: SET_TYPES[t].label }) : T('Right side, {type}', { type: SET_TYPES[t].label }))}">${esc(label)}</button>`;
-const fullLabel = (sets, j) => { const s = sets[j]; return s.side && s.t !== 'N' ? SET_TYPES[s.t].short + s.side : setLabel(sets, j); };
+const fullLabel = (sets, j) => { const s = sets[j]; return s.side && s.t !== 'N' ? SET_TYPES[s.t].short + term(s.side) : setLabel(sets, j); };
 // Lyfta-style one-line set: "W  72.5 kg · 4 reps", "R  45 kg · 5 reps · 1 RIR"
 function lineTag(sets, j) {
   const s = sets[j];
   // a one-side warm-up reads "WL": the W in the warm-up colour, the L in the left colour
-  if (s.side && s.t !== 'N') return `<span class="lt lt-${s.t}">${esc(SET_TYPES[s.t].short)}<span class="lt-${s.side}">${s.side}</span></span>`;
+  if (s.side && s.t !== 'N') return `<span class="lt lt-${s.t}">${esc(SET_TYPES[s.t].short)}<span class="lt-${s.side}">${term(s.side)}</span></span>`;
   return `<span class="lt lt-${s.side || s.t}">${esc(fullLabel(sets, j))}</span>`;
 }
 function fmtLine(x, s, k) {
@@ -1496,7 +1506,7 @@ function welcomeSheet() {
           <li>${icon('chart')}<span>${T('<b>See your progress.</b> Records, estimated 1RM and weekly volume, worked out by rules you can read.')}</span></li>
           <li>${icon('lock')}<span>${T('<b>Your data stays on this phone.</b> No account, nothing sent anywhere. Back it up to a file whenever you like.')}</span></li>
         </ul>
-        <div class="welcome-unit"><b>${T('Weights in')}</b><div class="seg" role="group">${['kg', 'lb'].map(u => `<button class="${state.settings.unit === u ? 'on' : ''}" data-a="wUnit" data-v="${u}" aria-pressed="${state.settings.unit === u}">${u}</button>`).join('')}</div></div>
+        <div class="welcome-unit"><b>${T('Weights in')}</b><div class="seg" role="group">${['kg', 'lb'].map(u => `<button class="${state.settings.unit === u ? 'on' : ''}" data-a="wUnit" data-v="${u}" aria-pressed="${state.settings.unit === u}">${term(u)}</button>`).join('')}</div></div>
         <p class="eyebrow">${T('How do you want to start?')}</p>
         <div class="welcome-opts">
           <button class="welcome-opt" data-a="wPlans">${icon('calendar')}<span><b>${T('Pick a ready-made plan')}</b><small>${T('Push / pull / legs, upper / lower, full body and more')}</small></span>${icon('right', 'chev')}</button>
@@ -1902,14 +1912,14 @@ function planReview(split) {
       // exercise choice
       topic(T('Exercise choice'), T('Some versions of an exercise grew muscle more than others in direct comparisons. Scores are estimates from each exercise’s mechanics.'));
       const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
-      const names = re => st.ex.filter(o => re.test(o.e.name.toLowerCase())).map(o => esc(o.e.name));
+      const names = re => st.ex.filter(o => re.test((o.e.en || o.e.name).toLowerCase())).map(o => esc(o.e.name));
       if (pats.has('triPushdown') && !pats.has('triOverhead') && !pats.has('triLying')) say('tip', T('Triceps only get pushdowns ({names}). Adding an overhead or lying extension stretches the long head; in a direct comparison overhead extensions grew the triceps about 1.4 times as much. Try {ex}.', { names: list(names(/push ?down|press ?down/)), ex: best('triceps') }), ['maeo2023']);
       if (pats.has('triOverhead')) say('good', T('Overhead triceps extensions are in: the arm position that grew the triceps most in a direct comparison.'), ['maeo2023']);
       const curls = st.ex.filter(o => o.a && o.a.pattern === 'legCurl');
-      if (curls.some(o => /seated/.test(o.e.name.toLowerCase()))) say('good', T('Seated leg curls: the version that grew the hamstrings more than lying curls.'), ['maeo2021']);
+      if (curls.some(o => /seated/.test((o.e.en || o.e.name).toLowerCase()))) say('good', T('Seated leg curls: the version that grew the hamstrings more than lying curls.'), ['maeo2021']);
       else if (curls.length) say('tip', T('Your leg curl isn’t the seated kind. Seated curls stretch the hamstrings at the hip and grew them more (about +14% vs +9%).'), ['maeo2021']);
       const calves = st.ex.filter(o => o.a && o.a.pattern === 'calf');
-      if (calves.length && calves.every(o => /seated|squat calf/.test(o.e.name.toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
+      if (calves.length && calves.every(o => /seated|squat calf/.test((o.e.en || o.e.name).toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
       if (pats.has('legExt')) say('tip', T('Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.'), ['pedrosa2022']);
       if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', T('Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.'), ['plotkin2023']);
       if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', T('Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: {ex}.', { ex: best('quads') }), ['plotkin2023']);
@@ -2259,7 +2269,7 @@ function supersetGroups(w) {
     if (last && last.ss === x.ss && last.idx[last.idx.length - 1] === i - 1) last.idx.push(i);
     else groups.push({ ss: x.ss, idx: [i] });
   });
-  return groups.filter(g => g.idx.length > 1).map((g, n) => ({ ...g, letter: String.fromCharCode(65 + n) }));
+  return groups.filter(g => g.idx.length > 1).map((g, n) => ({ ...g, letter: window.AR_TERMS ? 'أبجدهوزحطي'[n] || String(n + 1) : String.fromCharCode(65 + n) }));
 }
 function ssInfo(w, i) {
   for (const g of supersetGroups(w)) { const k = g.idx.indexOf(i); if (k >= 0) return { g, k, label: g.letter + (k + 1) }; }
@@ -3030,7 +3040,7 @@ function setTypeSheet(i, j) {
   openSheet({
     cls: 'small',
     render: () => `${sheetHead(`${title} · ${esc(getEx(x.exId).name)}`)}<div class="sheet-body menu">
-      ${TYPE_ORDER.map(t => `<button class="menu-item ${s.t === t ? 'on' : ''}" data-a="type" data-t="${t}"><span class="badge t-${t}">${t === 'N' ? (s.side || num) : SET_TYPES[t].short}</span><span><b>${SET_TYPES[t].label}</b><small>${SET_TYPES[t].desc}</small></span>${s.t === t ? icon('check', 'tick') : ''}</button>`).join('')}
+      ${TYPE_ORDER.map(t => `<button class="menu-item ${s.t === t ? 'on' : ''}" data-a="type" data-t="${t}"><span class="badge t-${t}">${t === 'N' ? (s.side ? term(s.side) : num) : SET_TYPES[t].short}</span><span><b>${SET_TYPES[t].label}</b><small>${SET_TYPES[t].desc}</small></span>${s.t === t ? icon('check', 'tick') : ''}</button>`).join('')}
       <div class="menu-sep"></div>
       ${hasReps(getEx(x.exId).k) ? (mate
         ? `<button class="menu-item" data-a="join">${icon('side')}<span><b>${T('Do both sides together')}</b><small>${T('Joins the left and right rows into one set')}</small></span></button>`
@@ -3120,7 +3130,7 @@ function addExercisesToWorkout() {
   });
 }
 function plateSheet(kg) {
-  const lb = U() === 'lb';
+  const lb = isLb();
   const plates = lb ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25, 0.5];
   const st = { target: kg != null ? +dispW(kg) : (lb ? 135 : 60), bar: state.settings.bar };
   const calc = () => {
@@ -3753,10 +3763,10 @@ function exerciseSheet(exId) {
         : k === 'bw' || k === 'aw' ? [[T('Most reps'), rec.reps || '—'], [T('Most added'), rec.w ? fmtW(rec.w) : '—'], [T('Sessions'), rec.sessions]]
         : k === 'dur' || k === 'wdur' ? [[T('Longest'), rec.sec ? fmtClock(rec.sec) : '—'], [T('Sessions'), rec.sessions]]
         : [[T('Farthest'), rec.dist ? dispDist(rec.dist, k) + ' ' + distUnit(k) : '—'], [T('Sessions'), rec.sessions]];
-      const yt = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(ex.name + ' exercise form');
+      const yt = 'https://www.youtube.com/results?search_query=' + encodeURIComponent((ex.en || ex.name) + ' exercise form');
       const photo = photos.get(exId), art = artOf(exId);
-      return `${sheetHead(esc(ex.name), ex.custom ? `<button class="btn sm" data-a="editCustom">${icon('edit')}Edit</button>` : '')}
-      <div class="sheet-body pad exd">
+      return `${sheetHead(esc(ex.name), ex.custom ? `<button class="btn sm" data-a="editCustom">${icon('edit')}${T('Edit')}</button>` : '')}
+      <div class="sheet-body pad exd">${ex.en ? `<p class="exd-en" lang="en" dir="ltr">${esc(ex.en)}</p>` : ''}
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="${T('Your photo of {name}', { name: esc(ex.name) })}">` : ''}
           ${art ? `<figure class="exd-art ${art.length > 1 ? motionOn() ? 'moving' : 'still' : ''}${artKind(exId)}"${art.length > 1 && motionOn() ? ' data-mv="pic"' : ''}>${artFrames(exId, art, ex.name)}${art.length > 1 && motionOn() ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} ${T('Similar picture. {note}.', { note: esc(artNote(exId)) })}</b>` : ''}<span>${T('Illustration: {credit}', { credit: artCredit(exId) })}</span></figcaption></figure>` : ''}
           <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>${T('Back')}</figcaption></figure></div></div>
@@ -3771,7 +3781,7 @@ function exerciseSheet(exId) {
         <div class="tiles">${tiles.map(([l, v]) => `<div class="tile"><span>${l}</span><b>${esc(String(v))}</b></div>`).join('')}</div>
         ${k === 'wr' && !rec.e1rm && rec.reps > E1RM_MAX_REPS ? `<p class="muted small">${T('Est. 1RM is worked out from sets of {n} reps or fewer; higher-rep sets still count for everything else.', { n: E1RM_MAX_REPS })}</p>` : ''}
         <div class="card chart-card"><div class="chart-top"><h3>${esc(metrics.find(m => m[0] === st.metric)[1])}</h3>${metrics.length > 1 ? `<div class="seg sm">${metrics.map(([id, l]) => `<button class="${st.metric === id ? 'on' : ''}" data-a="metric" data-v="${id}">${esc(l)}</button>`).join('')}</div>` : ''}</div>
-          ${chartSlot({ type: 'line', points: pts, marks, h: 220, whole: st.metric === 'reps' || st.metric === 'sec', fmt: v => fmtMetric(st.metric, v, k), tick: v => st.metric === 'sec' ? fmtClock(v) : st.metric === 'dist' ? dispDist(v, k) : compact(U() === 'lb' && st.metric !== 'reps' ? v * KG_LB : v), aria: T('{name} progress', { name: ex.name }), empty: st.range === 'block' && hasArchived ? T('Nothing since your last reset yet. Switch to All time to see earlier sessions.') : T('Log this exercise to see your progress here.') })}
+          ${chartSlot({ type: 'line', points: pts, marks, h: 220, whole: st.metric === 'reps' || st.metric === 'sec', fmt: v => fmtMetric(st.metric, v, k), tick: v => st.metric === 'sec' ? fmtClock(v) : st.metric === 'dist' ? dispDist(v, k) : compact(isLb() && st.metric !== 'reps' ? v * KG_LB : v), aria: T('{name} progress', { name: ex.name }), empty: st.range === 'block' && hasArchived ? T('Nothing since your last reset yet. Switch to All time to see earlier sessions.') : T('Log this exercise to see your progress here.') })}
           ${st.range === 'all' && hasArchived ? `<p class="muted small">${T('Faded points are from before a reset.')}</p>` : ''}</div>
         ${k === 'wr' && Object.keys(rec.repMax).length ? `<h3 class="sub-h">${T('Best weight for each rep count')}</h3><div class="repmax">${Array.from({ length: 12 }, (_, i) => i + 1).filter(r => rec.repMax[r]).map(r => `<div><span>${TN(r, '{n} rep', '{n} reps')}</span><b>${esc(fmtW(rec.repMax[r]))}</b></div>`).join('')}</div>` : ''}
         <h3 class="sub-h">${T('Settings for this exercise')}</h3>
@@ -3837,7 +3847,7 @@ VIEWS.progress = function () {
     <div class="tile"><span>${T('Sets this week')}</span><b>${trimNum(sum(thisWeek, workingSets), 1)}</b><small>${T('working sets')}</small></div>
     <div class="tile"><span>${T('Block volume')}</span><b>${esc(fmtVol(sum(inBlock, workoutVolume)).replace(' ' + U(), ''))}</b><small>${T('{unit} lifted', { unit: U() })}</small></div></div>`;
   h += `<section class="card chart-card"><div class="chart-top"><h3>${T('Weekly volume')}</h3><span class="muted small">${T('last 12 weeks, {unit}', { unit: U() })}</span></div>
-    ${chartSlot({ type: 'bars', h: 200, bars: vol.map(v => ({ v: (U() === 'lb' ? KG_LB : 1) * sum(v.ws, workoutVolume), label: fmtShort(v.s), tip: `${T('Week of {date}', { date: fmtShort(v.s) })} · ${TN(v.ws.length, '{n} session', '{n} sessions')}` })), fmt: v => compact(v) + ' ' + U(), aria: T('Weekly volume, last 12 weeks'), empty: T('Finish a workout to start this chart.') })}</section>`;
+    ${chartSlot({ type: 'bars', h: 200, bars: vol.map(v => ({ v: (isLb() ? KG_LB : 1) * sum(v.ws, workoutVolume), label: fmtShort(v.s), tip: `${T('Week of {date}', { date: fmtShort(v.s) })} · ${TN(v.ws.length, '{n} session', '{n} sessions')}` })), fmt: v => compact(v) + ' ' + U(), aria: T('Weekly volume, last 12 weeks'), empty: T('Finish a workout to start this chart.') })}</section>`;
   const ms = muscleSets(workoutsIn(Date.now() - 7 * DAY, Infinity));
   const maxM = Math.max(22, ...ms.map(m => m[1]));
   h += `<section class="card chart-card"><div class="chart-top"><h3>${T('Sets per muscle')}</h3><span class="muted small">${T('last 7 days')}</span></div>
@@ -3859,7 +3869,7 @@ function weekLines() {
   const num = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return [
     `total_workouts: ${ws.length}`,
-    `total_volume: ${num(U() === 'lb' ? vol * KG_LB : vol)} ${U()}`,
+    `total_volume: ${num(isLb() ? vol * KG_LB : vol)} ${state.settings.unit}`,
     `total_duration: ${min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`}`,
     `streak: ${streak} week${streak === 1 ? '' : 's'}`,
     `status: ${ws.length >= 3 ? 'beast_mode' : ws.length ? 'grind_mode_active' : 'recovery_mode'}`
@@ -3932,8 +3942,8 @@ VIEWS.settings = function () {
   const demo = state.workouts.some(w => w.demo);
   return `<header class="page-h"><div><p class="eyebrow">${T('Saved on this device')}</p><h1>${T('Settings')}</h1></div></header>
   <h2 class="section-h">${T('Logging')}</h2><div class="card list-card">
-    ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', 'kg'], ['lb', 'lb']]))}
-    ${row(T('Effort'), T('RIR: reps left in the tank. RPE: how hard, out of 10.'), seg('setEffort', s.effort, [['rir', 'RIR'], ['rpe', 'RPE'], ['off', T('Off')]]))}
+    ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', term('kg')], ['lb', term('lb')]]))}
+    ${row(T('Effort'), T('RIR: reps left in the tank. RPE: how hard, out of 10.'), seg('setEffort', s.effort, [['rir', term('RIR')], ['rpe', term('RPE')], ['off', T('Off')]]))}
     ${row(T('Weight step'), T('Used for warm-ups and “try more weight” tips.'), `<label class="select-wrap sm"><select data-f="step">${(s.unit === 'lb' ? [1, 2.5, 5, 10] : [0.5, 1, 1.25, 2, 2.5, 5]).map(v => `<option value="${v}" ${+s.step === v ? 'selected' : ''}>${v} ${s.unit}</option>`).join('')}</select></label>`)}
     ${row(T('Bar weight'), T('For the plate calculator and warm-ups.'), `<label class="select-wrap sm"><select data-f="bar">${(s.unit === 'lb' ? [15, 25, 35, 45, 55] : [7, 10, 15, 20, 25]).map(v => `<option value="${v}" ${+s.bar === v ? 'selected' : ''}>${v} ${s.unit}</option>`).join('')}</select></label>`)}
   </div>
@@ -3948,7 +3958,9 @@ VIEWS.settings = function () {
     ${row(T('Keep the screen awake'), T('While a workout is open.'), toggle(s.wake, 'tgl', 'data-k="wake"'))}
   </div>
   <h2 class="section-h">${T('Look')}</h2><div class="card list-card">
-    ${row(T('Language'), T('العربية: the app reads right to left. Exercise names and how-to steps stay in English.'), seg('setLang', LANG, [['en', 'English'], ['ar', 'العربية']]))}
+    ${row(T('Language'), T('العربية: the app reads right to left. How-to steps stay in English; exercise names, units and gym terms can be switched to Arabic too.'), seg('setLang', LANG, [['en', 'English'], ['ar', 'العربية']]))}
+    ${RTL ? row(T('Exercise names'), T('In Arabic, or as they’re known in gyms and videos. Search finds an exercise by either name.'), seg('setArNames', window.AR_NAMES ? 'ar' : 'en', [['en', T('In English')], ['ar', T('In Arabic')]])) : ''}
+    ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
@@ -4169,6 +4181,8 @@ const ACT = {
   nextOpen: () => { ui.nextOpen = !ui.nextOpen; render(); },
   // a new language takes effect on a fresh start of the page (everything is drawn in it from the beginning)
   setLang: b => { if (b.dataset.v === LANG) return; setLang(b.dataset.v); persist(); location.reload(); },
+  setArNames: b => { const on = b.dataset.v === 'ar'; if (on === !!window.AR_NAMES) return; setPref('arNames', on); persist(); location.reload(); },
+  setArTerms: b => { const on = b.dataset.v === 'ar'; if (on === !!window.AR_TERMS) return; setPref('arTerms', on); persist(); location.reload(); },
   backupLater: () => { state.flags.backupSnooze = Date.now() + 3 * DAY; save(); render(); },
   copies: () => copiesSheet(),
   dismissInstall: () => { state.settings.installHint = false; save(); render(); },

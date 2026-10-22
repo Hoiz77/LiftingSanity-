@@ -1191,6 +1191,8 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 /* names (mostly English) keep their own direction, so a long one is cut short at its end rather than its start */
 [dir="rtl"] :is(.mini-name, .wo-name, .nav-name, .ex-txt b, .lift-n b, .pr-item b, .tex-name b, .kp-title b) { unicode-bidi: plaintext; text-align: right; }
 [dir="rtl"] .sheet-h h2 { unicode-bidi: plaintext; }
+/* with Arabic exercise names, the English name sits under the Arabic one in exercise details */
+.exd-en { margin: -6px 0 12px; text-align: center; color: var(--muted); font-size: 14px; }
 /* −15 / +15 keep the sign in front */
 [dir="rtl"] .rb-btns button { direction: ltr; }
 @media (min-width: 760px) {
@@ -1222,6 +1224,7 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 <script src="visuals.js"></script>
 <script src="science.js"></script>
 <script src="ar.js"></script>
+<script src="ar-names.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

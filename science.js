@@ -466,9 +466,10 @@ window.LS_SCIENCE = (() => {
   // prof: for machines, how yours feels: a PROFILES key or five points from start to end
   function analyze(ex, prof) {
     if (!ex) return null;
-    const key = ex.id + '|' + ex.name + '|' + ex.m + '|' + ex.eq + '|' + (prof || '');
+    const key = ex.id + '|' + (ex.en || ex.name) + '|' + ex.m + '|' + ex.eq + '|' + (prof || '');
     if (cache.has(key)) return cache.get(key);
-    const n = (ex.name || '').toLowerCase();
+    // the English name, also when the app shows exercise names in Arabic
+    const n = (ex.en || ex.name || '').toLowerCase();
     const p = P.find(x => x.test(ex, n));
     const out = p ? { pattern: p.id, ...p.build(ex, n) } : { pattern: 'generic', ...genericFor(ex) };
     // what the score can't fairly judge gets no score rather than a guess

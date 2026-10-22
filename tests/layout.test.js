@@ -33,7 +33,8 @@ const CUT = () => {
   const runs = ['clean', 'y2k'].flatMap(style => [...[375, 393, 430].map(width => ({ style, width, lang: 'en' })), { style, width: 393, lang: 'ar' }]);
   for (const { style, width, lang } of runs) {
     const t = await open({ width, height: 852, fonts: true, settings: { style } });
-    if (lang === 'ar') { await t.p.evaluate(() => localStorage.setItem('liftingsanity:lang', 'ar')); await t.p.reload(); await t.p.waitForFunction(() => window.LiftingSanity); await t.p.waitForTimeout(500); }
+    // Arabic as it starts in Clean; with Arabic exercise names, units and terms in Y2K
+    if (lang === 'ar') { await t.p.evaluate(all => { localStorage.setItem('liftingsanity:lang', 'ar'); if (all) { localStorage.setItem('liftingsanity:arNames', '1'); localStorage.setItem('liftingsanity:arTerms', '1'); } }, style === 'y2k'); await t.p.reload(); await t.p.waitForFunction(() => window.LiftingSanity); await t.p.waitForTimeout(500); }
     const p = t.p, found = [];
     const check = async name => {
       await p.evaluate(() => document.fonts.ready);
@@ -59,7 +60,7 @@ const CUT = () => {
     await p.keyboard.press('Escape'); await p.waitForTimeout(500);
     await check('done for today');
     await t.click('[data-a="planReview"]', 600); await check('plan review');
-    r.ok(!found.length, `${style} at ${width}px wide${lang === 'ar' ? ', in Arabic' : ''}`, found);
+    r.ok(!found.length, `${style} at ${width}px wide${lang === 'ar' ? (style === 'y2k' ? ', all in Arabic' : ', in Arabic') : ''}`, found);
     await t.ctx.close();
   }
   await r.done();

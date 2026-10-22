@@ -22,6 +22,7 @@ or the page throws an error.
 
 | File | What it checks |
 | --- | --- |
+| `arabic-options` | In Arabic, exercise names and units/gym terms start as they are; switched to Arabic, the workout, library and plan review show Arabic names, كغ, احتياط and Arabic set letters; search finds an exercise by either name; details keep the English name; scores and saved data don't change; nothing English left with both on. |
 | `welcome` | A new phone opens with the welcome: kg or lb, a ready-made plan (without anyone else's starting weights), building your own, sample workouts, skipping; it never comes back; someone who already has data never sees it. |
 | `arabic` | Switching to العربية turns the app right to left; every screen (tabs, workout, menus, number pad, rest timer, summary, details, plan review, the welcome) is scanned for English that isn't meant to be there; switching back to English. |
 | `selfcheck` | The app's own self-check of its calculation rules: working sets, left/right pairs, warm-ups, 1RM limits, kg ↔ lb, backup validation. |
@@ -36,7 +37,7 @@ or the page throws an error.
 | `review` | The plan review: topics in a fixed order, the most pressing point first, counts at the top that match, every point labelled as studies (with a link) or a rule of thumb, the key that explains those, badges on one line, exercise links that open. |
 | `screen` | The iPhone Home Screen app when iOS leaves the page shorter than the screen (it can after the keyboard has been up): the workout, tab bar, sheets and number pad still reach the bottom edge, and nothing moves in a browser tab, an iPad window beside another app, or once the page is full height again. |
 | `scores` | Growth scores are shown as estimates with their points and caveats, and aren't given to stretches, timed holds or carries; band exercises are scored for being light in the stretch. |
-| `layout` | At 375, 393 and 430 px wide in both styles (and 393 in Arabic), across every tab, a workout, sheets and the summary: nothing cut off, no sideways scrolling, short button labels centred. Uses the real fonts when online. |
+| `layout` | At 375, 393 and 430 px wide in both styles (and 393 in Arabic, with Arabic names and terms in Y2K), across every tab, a workout, sheets and the summary: nothing cut off, no sideways scrolling, short button labels centred. Uses the real fonts when online. |
 | `stress` | Random taps and odd typed values in six set-ups, checking after every step for page errors, NaN/undefined on screen, broken or duplicated data and unreadable saves. |
 
 ## What they can't cover
