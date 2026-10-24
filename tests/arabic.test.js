@@ -71,10 +71,15 @@ const ENGLISH = (names) => {
   await w.p.evaluate(k => { window.__keep = new RegExp(k); }, KEEP.source);
   const wl = await w.p.evaluate(`(${ENGLISH.toString()})([])`);
   r.ok(/[؀-ۿ]/.test(await w.sheetText()) && !wl.length, 'the welcome is in Arabic', wl.slice(0, 10));
+  // names the app gave (a plan, its days, a new workout) follow the language; a name someone typed stays as typed
+  await t.ev(`(() => { closeAllSheets(); installProgram(PROGRAMS.find(p => p.id === 'ppl'), true); state.splits.push({ id: 'typed', name: 'تقسيمي', days: [], pos: 0 }); startEmpty(); save(true); })()`); await p.waitForTimeout(400);
+  const before = await t.ev(`({ split: activeSplit().name, days: activeSplit().days.map(d => tplById(d).name), workout: A().name })`);
   // back to English
   await t.ev('closeAllSheets()'); await t.tab('settings');
   await Promise.all([p.waitForEvent('load'), t.click('[data-a="setLang"][data-v="en"]', 0)]);
   await p.waitForFunction(() => window.LiftingSanity); await p.waitForTimeout(500);
   r.ok(await p.evaluate(() => document.documentElement.dir === 'ltr' && /Settings/.test(document.querySelector('#tabs').textContent)), 'English comes back, left to right');
+  const after = await t.ev(`({ split: activeSplit().name, days: activeSplit().days.map(d => tplById(d).name), workout: A().name, typed: state.splits.find(s => s.id === 'typed').name, page: document.body.innerText })`);
+  r.ok(/[؀-ۿ]/.test(before.split + before.days.join('') + before.workout) && after.split === 'Push / Pull / Legs' && after.days.join() === 'Push,Pull,Legs' && /^(Morning|Afternoon|Evening) workout$/.test(after.workout) && after.typed === 'تقسيمي', 'a plan, its days and a workout named in Arabic show in English after switching; a name you typed stays as you typed it', { before, after: { ...after, page: undefined } });
   await r.done(t, w);
 })();

@@ -95,6 +95,11 @@ const top = p => p.evaluate(() => { const w = [...document.querySelectorAll('#sh
   r.ok(/Get to know Lifting Sanity/.test(txt) && /You told us: More than two years · Getting stronger · 4 days a week · In a gym/.test(txt), 'Settings → Guide opens the guide, with what you told it');
   await t.inSheet('[data-a="gTips"]', 300);
   r.ok((await t.state()).flags.tips === 1 && await t.p.evaluate(() => [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('[data-a="gTips"]').getAttribute('aria-pressed') === 'true'), 'tips can be turned back on there');
+  // what the research says: short answers, each with its studies
+  await t.inSheet('[data-a="gFacts"]', 500);
+  const facts = await t.p.evaluate(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); return { h: w.querySelector('#guideH').textContent, items: [...w.querySelectorAll('.guide-facts > div')].map(d => ({ t: d.querySelector('dt').textContent, links: d.querySelectorAll('a[href^="https://"]').length })) }; });
+  r.ok(facts.h === 'What the research says' && facts.items.length === 8 && facts.items.every(i => i.links >= 1) && ['Taking a break', 'Protein', 'Over 65', 'Women'].every(w => facts.items.some(i => i.t === w)), 'the guide answers common questions (breaks, protein, over 65, women…), each with a link to its study', facts);
+  await t.inSheet('[data-a="gHub"]', 500);
   await t.inSheet('[data-a="gStart"]', 500);
   await t.inSheet('[data-a="gBack"]', 500);
   r.ok(/Get to know Lifting Sanity/.test(await top(t.p)), 'Back from the first question returns to the guide');

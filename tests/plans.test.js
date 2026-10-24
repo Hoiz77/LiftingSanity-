@@ -66,12 +66,15 @@ const { open, report } = require('./lib');
       if (!once) for (const m of ['chest', 'quads', 'hamstrings']) if ((st.days[m] || 0) < 1.5) bad.push(tag + ' ' + m + ' once a week');
       // exercise choice: overhead triceps work, seated leg curls, straight-knee calf raises, nothing rated 5 or under
       // (strength plans keep their barbell lifts; the home plan has no cables or machines)
-      if (!home) for (const re of [/^Triceps only get pushdowns/, /isn’t the seated kind/, /^Calves only get seated/]) if (items.some(i => re.test(strip(i.text)))) bad.push(tag + ' ' + re.source);
+      if (!home && !strength) for (const re of [/^Triceps only get pushdowns/, /isn’t the seated kind/, /^Calves only get seated/, /^Quads only get squats or presses/]) if (items.some(i => re.test(strip(i.text)))) bad.push(tag + ' ' + re.source);
+      for (const re of [/^Rest under a minute/, /^Heavy sets of big lifts planned to failure/]) if (items.some(i => re.test(strip(i.text)))) bad.push(tag + ' ' + re.source);
+      // curls: preacher curls have the evidence; incline curls didn't grow the biceps in the one trial that tested them
+      if (st.ex.some(o => o.a && o.a.pattern === 'curlIncline' && /incline/.test(o.e.id))) bad.push(tag + ' incline curl');
       if (!strength && !home) for (const o of st.ex) if (o.a && o.a.score != null && o.a.score <= 5) bad.push(tag + ' low-rated ' + o.e.name);
     }
     return bad;
   })()`);
-  r.ok(!ev.length, 'every plan, both versions, at each days a week it’s for: nothing to fix, 0–3 RIR, 2+ minutes’ rest on big lifts, 75 minutes at most, push and pull balanced, enough sets, big muscles twice a week, well-rated exercises', ev);
+  r.ok(!ev.length, 'every plan, both versions, at each days a week it’s for: nothing to fix, 0–3 RIR and no planned failure on heavy lifts, 2+ minutes’ rest on big lifts and 1+ on small ones, 75 minutes at most, push and pull balanced, enough sets, big muscles twice a week, well-rated exercises (preacher curls, leg extensions besides squats)', ev);
 
   // the list on the Train tab
   await t.tab('train');
