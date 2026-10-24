@@ -90,6 +90,14 @@ const PROGRAMS = window.FORGE_PROGRAMS;
 // the machine version's swaps, by exercise id: barbell and dumbbell lifts for machines that do the same job
 const MACHINE_SWAPS = new Map(Object.entries(window.FORGE_MACHINE_SWAPS || {}).map(([k, v]) => [slug(k), v.map(slug).filter(id => LIB_MAP.has(id))]));
 const lineEx = line => slug(line.split('|')[0].trim());
+// names the app gives things (a plan's name, note and days, a new workout's or split's name) are saved in the language
+// of the moment; these are their English originals, so a saved one can be shown in the language chosen now
+const NAMED = new Set(['Morning workout', 'Afternoon workout', 'Evening workout', 'Logged workout', 'New template', 'Template', 'My split']);
+for (const p of PROGRAMS) { NAMED.add(p.name); if (p.note) NAMED.add(p.note); for (const d of p.days) if (Array.isArray(d)) NAMED.add(d[0]); }
+// any language's version of one of those names → its English original (a version two names share is left alone)
+const NAME_KEY = new Map();
+for (const k of NAMED) for (const v of new Set([k, (window.LS_AR || {})[k], (window.LS_AR_FULL || {})[k]])) if (typeof v === 'string') NAME_KEY.set(v, NAME_KEY.has(v) && NAME_KEY.get(v) !== k ? null : k);
+const relabel = s => { const k = typeof s === 'string' ? NAME_KEY.get(s) : null; return k ? T(k) : s; };
 // ready-made plans in the chosen language: their names, notes and day names (the exercises keep their names)
 for (const p of PROGRAMS) {
   p.name = T(p.name); p.about = T(p.about); p.freq = T(p.freq);
@@ -504,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -565,6 +573,11 @@ function migrate(s) {
     for (const p of w.prs) if (p && p.set && (p.set.rl != null || p.set.rr != null)) { p.set.r = Math.max(p.set.rl || 0, p.set.rr || 0); delete p.set.rl; delete p.set.rr; }
   }
   if (s.active) s.active.ex.forEach(splitRows);
+  // names the app gave in another language are shown in this one; names people typed stay as they are
+  for (const sp of s.splits) sp.name = relabel(sp.name);
+  for (const t of s.templates) { t.name = relabel(t.name); if (t.from) t.from = relabel(t.from); if (t.note) t.note = relabel(t.note); }
+  for (const w of s.workouts) w.name = relabel(w.name);
+  if (s.active) s.active.name = relabel(s.active.name);
   return s;
 }
 function load() {
@@ -709,6 +722,7 @@ function scienceHTML(exId) {
     ${a.r ? `<div class="sci-rates"><p class="sci-rates-h">${T('Why {score}/10: points from the mechanics', { score: a.score })}</p>${Object.entries(a.r).map(([k, v]) => `<div><span>${esc(T(SCI.RATE_NAMES[k]))}</span><span class="rate-v">${dots(v, SCI.RATE_MAX[k])}<small>${v}/${SCI.RATE_MAX[k]}</small></span></div>`).join('')}</div>
     ${a.profWhy && a.profWhy.length ? `<p class="prof-why">${icon('info', 'inline')}${T('Your machine’s profile: {why}.', { why: a.profWhy.map(x => esc(T(x))).join('; ') })}</p>` : ''}
     ${a.eqWhy ? `<p class="prof-why">${icon('info', 'inline')}${esc(T(a.eqWhy))}</p>` : ''}
+    ${a.scoreWhy ? `<p class="prof-why">${icon('flask', 'inline')}${esc(T(a.scoreWhy))}</p>` : ''}
     <div class="sci-sure"><b>${icon('info', 'inline')}${T('How sure is this?')}</b>
       <p>${a.evidence.length ? T('There are studies on this kind of exercise, below. Where they compared exercises directly, they count for more than this score.') : T('No study has compared this kind of exercise directly, so the score is a rule of thumb from its mechanics: a reasoned estimate, not a measured result.')}</p>
       <p>${T('What it can’t see: how the exercise feels on your joints, your technique and range of motion, how close to failure you take your sets (which matters more than the choice of exercise), whether you can keep adding weight or reps, and the rest of your program.')}</p></div>` : a.unrated ? `<div class="sci-sure"><b>${icon('info', 'inline')}${T('Not rated for growth')}</b><p>${esc(T(a.unrated))}</p></div>` : ''}
@@ -1662,10 +1676,21 @@ const GUIDE_TOUR = () => [
   { icon: 'lock', h: T('Your data stays yours'), pts: [T('No account and nothing sent anywhere. It all stays on this phone and works with no signal.'), T('A copy is kept each day for the last five days, and you can save a backup file any time.'), T('Settings shows when you last backed up, and reminds you now and then.')] },
   { icon: 'sliders', h: T('Make it yours'), pts: [T('Clean or Y2K style, kg or lb, English or Arabic.'), T('One exercise at a time with big buttons, or all of them in a list.'), T('Settings → Guide brings all of this back, with the words you’ll see explained.')] }
 ];
+// short answers to questions people ask, each with the studies behind it
+const GUIDE_FACTS = () => [
+  [T('Taking a break'), T('A few weeks off costs little: in one study, 3-week breaks every 6 weeks ended with the same muscle and strength as training straight through. Strength lasts longer than size, and both come back quickly. Start a little lighter for your first session or two back (a rule of thumb).'), ['ogasawara2013']],
+  [T('Protein'), T('Eating more protein adds a little muscle and strength on top of training. The benefit levelled off around 1.6 g per kg of body weight a day, about 110 g for someone of 70 kg. Training itself matters far more.'), ['morton2018']],
+  [T('Over 65'), T('Strength and muscle respond to training at any age. The same plans work: start lighter, aim for 2 to 3 sessions a week with 2 to 3 sets for each muscle, and build up steadily. With a health condition, check with your doctor first.'), ['fragala2019']],
+  [T('Women'), T('The same plans work. Women gain muscle at about the same rate as men relative to where they start, and there’s no need to plan training around the menstrual cycle; ease off on days you feel worse.'), ['refalo2025', 'colensosemple2023']],
+  [T('Deloads'), T('An easier week now and then is common practice, not a proven need: a week off mid-block didn’t cost trained lifters any muscle, though lower-body strength gains slowed. Take one when you feel run down, and cut sets rather than stopping.'), ['coleman2024']],
+  [T('Rep speed'), T('Anything from about half a second to 8 seconds a rep grows muscle about the same. Lift with intent, lower with control, and skip very slow reps of 10 seconds or more.'), ['schoenfeld2015t']],
+  [T('Machines or free weights'), T('Muscle grows about as well on either. Strength carries over best to what you train, so practise a barbell lift if you want to test it.'), ['haugen2023']],
+  [T('Training to failure'), T('Sets don’t need to go to failure. Stopping 1 to 2 reps short grew muscle as well in trained lifters, with less fatigue.'), ['refalo2024', 'refalo2023']]
+];
 const GUIDE_WORDS = () => [
   [T('Working set'), T('A set that counts: the hard sets after your warm-ups. Plans, records and weekly sets use these.')],
   [T('Warm-up'), T('Lighter sets to get ready. They’re left out of volume, set counts and records.')],
-  [term('RIR'), T('Reps in reserve: how many more reps you could have done. 0 is to failure; 1 to 3 is the usual aim.')],
+  [term('RIR'), `${T('Reps in reserve: how many more reps you could have done. 0 is to failure; 1 to 3 is the usual aim.')} ${T('Most people guess about one rep low at first; it gets easier with practice.')}`],
   [term('RPE'), T('How hard a set was, out of 10. RPE 8 is about two reps left.')],
   [T('Est. 1RM'), T('The most you could likely lift once, worked out from a set of up to 12 reps. It lets you compare sets with different reps.')],
   [T('Volume'), T('Weight times reps, added up. For growth, the number of hard sets per muscle each week matters more.')],
@@ -1714,7 +1739,7 @@ function guideFlow(home, done, exit) {
         <p class="guide-lead">${GUIDE_WHY()[ids[0]] || ''}</p>
         ${pick[0].note ? `<p class="guide-note days" data-days-note>${icon('calendar')}<span>${pick[0].note}</span></p>` : ''}
         ${lv === 'new' ? `<p class="guide-note">${icon('info')}<span>${T('Start lighter than you think and learn each lift. Adding weight comes quickly at first.')}</span></p>` : ''}
-        ${versionOf(PROGRAMS.find(p => p.id === ids[0]) || {}) === 'machine' ? `<p class="guide-note machine" data-machine-note>${icon('dumbbell')}<span>${T('This is the machine version: machines and cables in place of barbell, dumbbell and pull-up lifts while you learn. Muscle grows about as well either way ({ref}). Move to free weights in one tap from your split when you’re ready.', { ref: refLink('haugen2023') })}</span></p>` : ''}
+        ${versionOf(PROGRAMS.find(p => p.id === ids[0]) || {}) === 'machine' ? `<p class="guide-note machine" data-machine-note>${icon('dumbbell')}<span>${T('This is the machine version: machines and cables in place of barbell, dumbbell and pull-up lifts while you learn. Muscle grows about as well either way ({ref}). Move to free weights in one tap from your split when you’re ready.', { ref: refLink('haugen2023') })}${g.a.goal === 'strength' ? ` ${T('Strength carries over best to the lift you train, so move to free weights before you test a barbell max.')}` : ''}</span></p>` : ''}
         ${planCard(ids[0], true)}
         <div class="guide-set" role="group" aria-label="${T('Settings that fit your answers')}">
           <p class="eyebrow">${T('Settings that fit your answers')}</p>
@@ -1742,6 +1767,14 @@ function guideFlow(home, done, exit) {
         <div class="guide-nav">${last ? `<button class="btn ghost" data-a="gWords">${T('Words you’ll see')}</button><button class="btn primary" data-a="gEnd">${T('Done')}</button>` : `<button class="btn primary wide" data-a="gNext">${T('Next')}</button>`}</div>
       </div>`;
     }
+    if (g.step === 'facts') {
+      return `${sheetHead('', `<button class="btn ghost sm" data-a="gEnd">${T('Close')}</button>`, backBtn('gHub'))}
+      <div class="sheet-body pad guide">
+        <h2 class="guide-h" id="guideH" tabindex="-1">${T('What the research says')}</h2>
+        <p class="muted">${T('Short answers to questions people often have, with the studies behind them.')}</p>
+        <dl class="guide-words guide-facts">${GUIDE_FACTS().map(([w, d, refs]) => `<div><dt>${w}</dt><dd>${d}<span class="rv-src"><span class="basis study">${icon('flask')}${T('Studies')}</span>${refs.map(refLink).join('<span class="dot"> · </span>')}</span></dd></div>`).join('')}</dl>
+      </div>`;
+    }
     if (g.step === 'words') {
       return `${sheetHead('', `<button class="btn ghost sm" data-a="gEnd">${T('Close')}</button>`, backBtn(home === 'hub' ? 'gHub' : 'gBackTour'))}
       <div class="sheet-body pad guide">
@@ -1760,6 +1793,7 @@ function guideFlow(home, done, exit) {
         <button class="welcome-opt" data-a="gStart">${icon('list')}<span><b>${T('Find a plan that fits')}</b><small>${T('Five quick questions, then a plan and settings to match')}</small></span>${icon('right', 'chev')}</button>
         <button class="welcome-opt" data-a="gTour">${icon('play')}<span><b>${T('Tour of the app')}</b><small>${T('What it does, in six short parts')}</small></span>${icon('right', 'chev')}</button>
         <button class="welcome-opt" data-a="gWords">${icon('note')}<span><b>${T('Words you’ll see')}</b><small>${T('RIR, 1RM, working sets, supersets and more, in plain words')}</small></span>${icon('right', 'chev')}</button>
+        <button class="welcome-opt" data-a="gFacts">${icon('flask')}<span><b>${T('What the research says')}</b><small>${T('Breaks, protein, age, women, deloads, rep speed and more')}</small></span>${icon('right', 'chev')}</button>
         <button class="welcome-opt" data-a="gTips" aria-pressed="${!!state.flags.tips}">${icon('info')}<span><b>${T('Tips as you go')}</b><small>${state.flags.tips ? T('On: a short tip the first time you open each part') : T('Off: tap to turn on, and see each tip once more')}</small></span><span class="switch${state.flags.tips ? ' on' : ''}" aria-hidden="true"><span></span></span></button>
       </div>
     </div>`;
@@ -1796,6 +1830,7 @@ function guideFlow(home, done, exit) {
     gNext: (b, def) => show(def, 'tour', { card: Math.min(g.card + 1, GUIDE_TOUR().length - 1) }),
     gPrev: (b, def) => show(def, 'tour', { card: Math.max(0, g.card - 1) }),
     gWords: (b, def) => show(def, 'words'),
+    gFacts: (b, def) => show(def, 'facts'),
     gBackTour: (b, def) => show(def, 'tour', { card: GUIDE_TOUR().length - 1 }),
     gHub: (b, def) => show(def, 'hub'),
     gEnd: (b, def) => done(def),
@@ -2190,19 +2225,22 @@ function reviewTopics(split, perWeek) {
   if (muscles.length) cur.after = `<div class="mbars">${muscles.map(([m, v]) => `<div class="mbar"><span class="mbar-l">${esc(MUSCLES[m])}</span><span class="mbar-t"><span class="band" style="left:${10 / maxV * 100}%;width:${10 / maxV * 100}%"></span><span class="fill" style="width:${Math.min(100, v / maxV * 100)}%"></span></span><span class="mbar-v">${trimNum(v, 1)}</span></div>`).join('')}</div>
     <p class="muted small rv-note">${T('Working sets a week. A set counts fully for its main muscle and half for helper muscles, the way that predicted growth best in the largest analysis so far ({ref}). Shaded band: 10 to 20 sets.', { ref: refLink('pelland2026') })}</p>`;
   // frequency
-  topic(T('How often each muscle is trained'), T('Spreading a muscle’s sets over two or more days a week helps a little. The weekly total matters more.'));
+  topic(T('How often each muscle is trained'), T('With the same weekly sets, how many days you spread them over makes little difference to growth. More days keep each session shorter and help strength a little.'));
   const once = trained.filter(m => st.days[m] > 0 && st.days[m] < 1.5 && st.sets[m] >= 1);
-  if (once.length) say('tip', T('Trained directly about once a week: {list}. Splitting the same sets over two sessions tends to help a little.', { list: list(once.map(name)) }), ['schoenfeld2016f', 'pelland2026']);
-  else if (trained.length > helperOnly.length) say('good', T('Every muscle you aim an exercise at is trained about {n} times a week or more.', { n: trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1) }), ['schoenfeld2016f']);
+  if (once.length) say('tip', T('Trained directly about once a week: {list}. That works if the weekly sets are there; spreading them over two days keeps sessions shorter and helps strength a little.', { list: list(once.map(name)) }), ['schoenfeld2019f', 'pelland2026']);
+  else if (trained.length > helperOnly.length) say('good', T('Every muscle you aim an exercise at is trained about {n} times a week or more.', { n: trimNum(Math.min(...trained.filter(m => st.days[m]).map(m => st.days[m])), 1) }), ['schoenfeld2019f', 'pelland2026']);
   // effort
   topic(T('Effort'), T('How close to failure your working sets end. RIR is the reps you could still have done.'));
   const rirs = st.ex.flatMap(({ x }) => x.sets.filter(s => s.t !== 'W' && s.trir != null).map(s => s.trir));
   if (rirs.length) {
     const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length, lo = Math.min(...rirs), hi = Math.max(...rirs);
     const aim = lo === hi ? TN(lo, 'Working sets aim to stop {n} rep short of failure.', 'Working sets aim to stop {n} reps short of failure.') : T('Working sets aim to stop {lo} to {hi} reps short of failure.', { lo, hi });
-    if (avg <= 3) say('good', `${aim} ${T('Close to failure is where growth is best; going all the way on every set is optional.')}`, ['robinson2024', 'refalo2023']);
+    if (avg <= 3) say('good', `${aim} ${T('Close to failure is where growth is best; going all the way on every set is optional.')}`, ['robinson2024', 'refalo2023', 'refalo2024']);
     else say('tip', `${aim} ${T('Growth tends to improve as sets end closer to failure; try 0 to 3 reps short.')}`, ['robinson2024']);
   } else say('tip', T('No target effort (RIR) is set on the working sets. Aim to stop 0 to 3 reps short of failure.'), ['robinson2024']);
+  const heavyFail = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && o.x.sets.some(s => s.t !== 'W' && s.trir === 0 && parseInt(s.tr, 10) <= 6));
+  if (heavyFail.length) say('tip', T('Heavy sets of big lifts planned to failure: {list}. Failure added little or nothing over stopping 1 to 2 reps short, and slows recovery for a day or two; leave a rep or two in the tank.', { list: list(heavyFail.map(o => esc(o.e.name))) }), ['refalo2024', 'grgic2022']);
+  if (rirs.length) say('good', T('When you log RIR, most people guess about one rep low, more so on sets of over 12 reps. It gets easier with practice.'), ['halperin2022']);
   // exercise choice
   topic(T('Exercise choice'), T('Some versions of an exercise grew muscle more than others in direct comparisons. Scores are estimates from each exercise’s mechanics.'));
   const pats = new Set(st.ex.map(o => o.a && o.a.pattern));
@@ -2216,6 +2254,7 @@ function reviewTopics(split, perWeek) {
   if (calves.length && calves.every(o => /seated|squat calf/.test((o.e.en || o.e.name).toLowerCase()))) say('tip', T('Calves only get seated (knee-bent) raises, which train the soleus but barely grew the gastrocnemius. Add a straight-knee version such as {ex}, and spend time in the stretched bottom position.', { ex: best('calves') }), ['kinoshita2023', 'kassiano2023']);
   if (pats.has('legExt')) say('tip', T('Leg extensions: when full reps run out, keep going with partials in the bent-knee half. That half grew the quads at least as well as full reps.'), ['pedrosa2022']);
   if (pats.has('bridge') && !pats.has('squat') && !pats.has('hinge')) say('good', T('Glute bridges or hip thrusts grew the glutes about as much as squats in a direct comparison, so they can carry your glute work.'), ['plotkin2023']);
+  if (pats.has('squat') && !pats.has('legExt')) say('tip', T('Quads only get squats or presses. Leg extensions grew the rectus femoris (the quad that crosses the hip) where squats didn’t, more so with the seat reclined: {ex}.', { ex: exLink(getEx('leg-extension')) }), ['zabaletakorta2021', 'larsen2025h']);
   if (!pats.has('squat') && (st.sets.quads || 0) > 0) say('tip', T('Quads only get isolation work. A squat, hack squat or leg press would also train the glutes and adductors at long lengths: {ex}.', { ex: best('quads') }), ['plotkin2023']);
   const weak = st.ex.filter(o => o.a && o.a.score != null && o.a.score <= 5);
   for (const o of weak) { const b = bestFor(o.e.m, 1, o.e.id, o.a.score)[0]; if (b) say('tip', T('{name} rates {score}/10 on its mechanics ({title}). A higher-rated swap for the {muscle}: {ex} ({best}/10).', { name: esc(o.e.name), score: o.a.score, title: esc(T(o.a.title).toLowerCase()), muscle: name(o.e.m), ex: exLink(b), best: scoreOf(b.id) })); }
@@ -2224,12 +2263,14 @@ function reviewTopics(split, perWeek) {
   // rest
   topic(T('Rest between sets'), T('Longer rests on the big lifts let you do more reps on the next set.'));
   const shortRest = st.ex.filter(o => o.a && COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 120);
-  if (shortRest.length) say('tip', T('Rest under 2 minutes on big lifts: {list}. Longer rests (about 3 minutes) gave more growth in trained men.', { list: list(shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['schoenfeld2016r']);
-  else if (st.ex.some(o => o.a && COMPOUND.has(o.a.pattern))) say('good', T('The big lifts get at least 2 minutes of rest.'), ['schoenfeld2016r']);
+  if (shortRest.length) say('tip', T('Rest under 2 minutes on big lifts: {list}. Longer rests (2 to 3 minutes) let you do more reps on the next set, and gave more growth and strength in trained lifters.', { list: list(shortRest.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['schoenfeld2016r', 'grgic2018r']);
+  else if (st.ex.some(o => o.a && COMPOUND.has(o.a.pattern))) say('good', T('The big lifts get at least 2 minutes of rest.'), ['schoenfeld2016r', 'grgic2018r']);
+  const quick = st.ex.filter(o => o.a && o.a.score != null && !COMPOUND.has(o.a.pattern) && (o.x.rest || state.settings.rest) < 60);
+  if (quick.length) say('tip', T('Rest under a minute on {list}. Rests over 60 seconds gave slightly more growth; if you keep them short, add a set.', { list: list(quick.map(o => `${esc(o.e.name)} (${fmtRest(o.x.rest || state.settings.rest)})`)) }), ['singer2024']);
   // session length
   topic(T('Workout length'), T('Effort tends to drop late in very long sessions.'));
   const long = st.tpls.map(t => [t, estMinutes(t)]).filter(([, min]) => min > 75);
-  for (const [t, min] of long) say('tip', T('{name} takes about {n} minutes. Pairing exercises for unrelated muscles as supersets (for example a leg exercise with an arm exercise) saves time.', { name: esc(t.name), n: min }));
+  for (const [t, min] of long) say('tip', T('{name} takes about {n} minutes. Supersets save time: pair exercises that share no muscles, not even as helpers (a leg exercise with an arm exercise, or a chest press with a row). Pairs that work the same muscles cost reps. Keep heavy barbell lifts out of pairs.', { name: esc(t.name), n: min }), ['zhang2025', 'iversen2021']);
   if (!long.length && st.tpls.length) say('good', T('Each day takes about {n} minutes or less.', { n: Math.max(...st.tpls.map(estMinutes)) }));
   // balance
   topic(T('Push and pull balance'), T('Similar amounts of pushing and pulling keep the shoulders balanced.'));
@@ -2365,10 +2406,10 @@ function planSheet(id, opts = {}) {
           return `<li class="${on >= 0 ? 'on' : ''}"><b>${esc(dfmt(d.getTime(), { weekday: 'short' }))}</b><span>${on >= 0 ? esc(train[on % train.length].name) : T('Rest')}</span></li>`; }).join('')}</ol>`;
       const why = [
         [T('{lo} to {hi} hard sets a week for each main muscle: enough to keep growing, with time to recover.', { lo, hi }), ['schoenfeld2017', 'pelland2026']],
-        often >= 1.5 ? [TN(Math.floor(often), 'Each main muscle is trained {n} time a week or more.', 'Each main muscle is trained {n} times a week or more.'), ['schoenfeld2016f']] : [T('Each muscle is trained once a week. Studies favour twice, with the same sets spread over two days.'), ['schoenfeld2016f']],
-        [T('Working sets stop 1 to 2 reps short of failure, small exercises 0 to 1: close enough to grow well without wearing you down.'), ['robinson2024', 'refalo2023']],
+        often >= 1.5 ? [`${TN(Math.floor(often), 'Each main muscle is trained {n} time a week or more.', 'Each main muscle is trained {n} times a week or more.')} ${T('That spreads the weekly sets out, so no session has to do them all, and helps strength a little.')}`, ['schoenfeld2019f', 'pelland2026']] : [T('Each muscle is trained once a week. That works when the weekly sets are there; spreading them over two days keeps sessions shorter and helps strength a little.'), ['schoenfeld2019f', 'pelland2026']],
+        [T('Working sets stop 1 to 2 reps short of failure, small exercises 0 to 1: close enough to grow well without wearing you down.'), ['robinson2024', 'refalo2023', 'refalo2024']],
         strength ? [T('3 to 5 reps on the main lifts, because heavy sets build the most strength, and more reps on the rest for size.'), ['lopez2021']] : [T('6 to 12 reps on the big lifts and 10 to 20 on small ones: muscle grows about as well anywhere in that range when sets are hard.'), ['lopez2021']],
-        [T('2 to 3 minutes of rest on the big lifts and about a minute on small ones, so each set can be a good one.'), ['schoenfeld2016r', 'singer2024']]
+        [T('2 to 3 minutes of rest on the big lifts and 60 to 90 seconds on small ones, so each set can be a good one.'), ['schoenfeld2016r', 'grgic2018r', 'singer2024']]
       ];
       return `${sheetHead(esc(p.name))}
       <div class="sheet-body pad plan-d">

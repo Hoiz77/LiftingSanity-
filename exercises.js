@@ -437,14 +437,17 @@ Lever Seated Squat Calf Raise|calves|machine|wr||u
    experience it suits), goals (muscle, strength, health), kit (gym or home), short (one plain line) and why (why it
    suits someone). How they're built, checked by the plan review and tests/plans.test.js:
    - 10 to 20 hard sets a week for most muscles, fewer in the plans for beginners (Schoenfeld 2017, Pelland 2026)
-   - each muscle on two or more days a week, except the Bro Split (Schoenfeld 2016)
-   - working sets 1 to 2 reps short of failure, isolation 0 to 1 (Robinson 2024, Refalo 2023)
+   - each muscle on two or more days a week, except the Bro Split: with the same weekly sets it hardly changes growth,
+     but it keeps sessions shorter and helps strength a little (Schoenfeld 2019, Pelland 2026)
+   - working sets 1 to 2 reps short of failure, isolation 0 to 1 (Robinson 2024, Refalo 2023 and 2024)
    - 6 to 12 reps on big lifts and 10 to 20 on small ones: growth is similar across rep ranges taken close to failure,
      and heavy sets build the most strength (Lopez 2021); the strength plans go heavier
-   - at least 2 minutes' rest on big lifts (Schoenfeld 2016)
-   - exercise choice from the mechanics and direct comparisons: overhead triceps work, seated leg curls, standing
-     calf raises, cable lateral raises, incline or preacher curls
-   - about 75 minutes a session at most */
+   - 2 to 3 minutes' rest on big lifts and 60 to 90 seconds on small ones (Schoenfeld 2016, Grgic 2018, Singer 2024)
+   - exercises with direct comparisons behind them: overhead triceps extensions (Maeo 2023), seated leg curls (Maeo
+     2021), standing calf raises (Kinoshita 2023), preacher curls (Zabaleta-Korta 2023), and leg extensions besides
+     squats for the quad that crosses the hip (Zabaleta-Korta 2021); cable or dumbbell lateral raises grew the same
+     (Larsen 2025)
+   - about 75 minutes a session at most (a rule of thumb) */
 window.FORGE_PROGRAMS = [
   {
     id: 'fb', name: 'Full Body', freq: '3 days a week', week: [3], level: 'new', goals: ['muscle', 'strength', 'health'], kit: 'gym',
@@ -466,7 +469,7 @@ Incline Dumbbell Press|3|8-12|2|150
 Chest-Supported Dumbbell Row|3|8-12|2|120
 Leg Extension|2|10-15|1|75
 Face Pull|2|12-20|1|60
-Incline Dumbbell Curl|2|10-15|1|60
+Dumbbell Preacher Curl|2|10-15|1|60
 Cable Crunch|2|10-15|1|60`],
       ['Full Body C', `
 Leg Press|1w+3|8-12|2|150
@@ -492,13 +495,13 @@ Lat Pulldown|3|8-12|2|120
 Seated Leg Curl|3|10-15|1|90
 Seated Dumbbell Shoulder Press|2|8-12|2|120
 Cable Lateral Raise|2|12-20|1|60
-Incline Dumbbell Curl|2|10-15|1|60
+Dumbbell Preacher Curl|2|10-15|1|60
 Standing Calf Raise|2|10-15|1|60`],
       ['Full Body B', `
 Romanian Deadlift|1w+3|8-10|2|150
 Incline Dumbbell Press|3|8-12|2|150
 Chest-Supported Dumbbell Row|3|8-12|2|120
-Leg Press|2|10-15|2|150
+Leg Extension|2|10-15|1|75
 Barbell Hip Thrust|2|8-12|2|120
 Face Pull|2|12-20|1|60
 Overhead Cable Triceps Extension|2|10-15|1|60
@@ -518,7 +521,7 @@ Incline Dumbbell Press|2|8-12|2|150
 Chest-Supported Dumbbell Row|3|8-12|2|120
 Cable Lateral Raise|3|12-20|1|60
 Overhead Cable Triceps Extension|2|10-15|1|60
-Incline Dumbbell Curl|2|10-15|1|60`],
+Dumbbell Preacher Curl|2|10-15|1|60`],
       ['Lower', `
 Back Squat|2w+3|6-10|2|180
 Romanian Deadlift|3|8-10|2|150
@@ -566,7 +569,7 @@ Neutral-Grip Lat Pulldown|3|8-12|2|120
 Cable Lateral Raise|4|12-20|1|60
 Face Pull|3|12-20|1|60
 Overhead Cable Triceps Extension|2|10-15|1|60
-Incline Dumbbell Curl|2|10-15|1|60`],
+Dumbbell Preacher Curl|2|10-15|1|60`],
       ['Lower B', `
 Hack Squat|1w+3|8-12|2|150
 Barbell Hip Thrust|3|8-12|2|120
@@ -595,7 +598,7 @@ Back Squat|2w+3|6-10|2|180
 Seated Leg Curl|3|10-15|1|90
 Barbell Hip Thrust|2|8-12|2|120
 Leg Extension|2|10-15|1|75
-Incline Dumbbell Curl|3|10-15|1|60
+Dumbbell Preacher Curl|3|10-15|1|60
 Overhead Cable Triceps Extension|3|10-15|1|60
 Standing Calf Raise|3|10-15|1|60`],
       ['Torso B', `
@@ -629,7 +632,7 @@ Seated Dumbbell Shoulder Press|2|8-12|2|120
 Cable Crossover|2|12-15|1|60
 Leg Extension|2|10-15|1|75
 Cable Lateral Raise|3|12-20|1|60
-Incline Dumbbell Curl|2|10-15|1|60
+Dumbbell Preacher Curl|2|10-15|1|60
 Cable Crunch|2|10-15|1|60`],
       ['Posterior A', `
 Romanian Deadlift|2w+3|8-10|2|150
@@ -678,7 +681,7 @@ Pull-Up|1w+3|6-10|2|150
 Barbell Row|3|6-10|2|150
 Seated Leg Curl|3|10-15|1|90
 Face Pull|3|12-20|1|60
-Incline Dumbbell Curl|3|10-15|1|60`],
+Dumbbell Preacher Curl|3|10-15|1|60`],
       ['Push B', `
 Incline Dumbbell Press|1w+3|8-12|2|150
 Leg Press|1w+3|10-15|2|150
@@ -727,7 +730,7 @@ Seated Cable Row|3|8-12|2|120
 Lat Pulldown|3|10-12|2|120
 Cable Lateral Raise|3|12-20|1|60
 Reverse Pec Deck|2|12-20|1|60
-Incline Dumbbell Curl|2|10-15|1|60
+Dumbbell Preacher Curl|2|10-15|1|60
 Overhead Cable Triceps Extension|2|10-15|1|60`],
       ['Lower Hypertrophy', `
 Front Squat|1w+3|8-12|2|150
@@ -791,7 +794,7 @@ Pull-Up|1w+3|6-10|2|150
 Chest-Supported Dumbbell Row|3|8-12|2|120
 Seated Cable Row|2|10-12|2|120
 Face Pull|3|12-20|1|60
-Incline Dumbbell Curl|3|10-15|1|60
+Dumbbell Preacher Curl|3|10-15|1|60
 Hammer Curl|2|10-15|1|60`],
       ['Legs', `
 Hack Squat|1w+3|8-12|2|150
@@ -839,7 +842,7 @@ Cable Crunch|3|10-15|1|60`],
 Incline Dumbbell Press|1w+3|8-12|2|150
 Dumbbell Bench Press|2|10-12|2|120
 Pec Deck|2|12-15|1|60
-Incline Dumbbell Curl|3|10-15|1|60
+Dumbbell Preacher Curl|3|10-15|1|60
 Overhead Cable Triceps Extension|3|10-15|1|60
 Bayesian Cable Curl|2|10-15|1|60
 Rope Pushdown|2|12-15|1|60`]
@@ -848,7 +851,7 @@ Rope Pushdown|2|12-15|1|60`]
   {
     id: 'bro', name: 'Bro Split', freq: '5 days a week', week: [5], level: 'some', goals: ['muscle'], kit: 'gym',
     short: 'One muscle group a day, five days a week.',
-    about: 'Chest, back, shoulders, arms and legs each get their own day, with lots of sets. Each muscle is trained once a week: studies favour twice, so the other plans with five days spread the same work better.',
+    about: 'Chest, back, shoulders, arms and legs each get their own day, with lots of sets. Each muscle is trained once a week: that works when the weekly sets are there, but sessions run long, and the other five-day plans spread the same work over two days.',
     why: 'One or two muscle groups a day, five days a week. Each muscle gets one big day; the plan review shows ways to spread it.',
     days: [
       ['Chest', `
@@ -873,7 +876,7 @@ Cable Crunch|3|10-15|1|60`],
       ['Arms', `
 EZ-Bar Preacher Curl|3|8-12|1|75
 Overhead Cable Triceps Extension|3|10-15|1|75
-Incline Dumbbell Curl|3|10-15|1|60
+Cable Curl|3|10-15|1|60
 Skull Crusher|3|8-12|1|75
 Hammer Curl|2|10-15|1|60
 Rope Pushdown|2|12-15|1|60`],
@@ -905,7 +908,7 @@ Pull-Up|1w+3|6-10|2|150
 Barbell Row|3|6-10|2|150
 Seated Cable Row|2|10-12|2|120
 Face Pull|3|12-20|1|60
-Incline Dumbbell Curl|3|10-15|1|60
+Dumbbell Preacher Curl|3|10-15|1|60
 Hammer Curl|2|10-15|1|60`],
       ['Legs', `
 Back Squat|2w+3|6-10|2|180
@@ -928,7 +931,7 @@ Barbell Bench Press|2w+3|6-10|2|180
 Pull-Up|3|6-10|2|150
 Cable Lateral Raise|4|12-20|1|60
 Overhead Cable Triceps Extension|2|10-15|1|60
-Incline Dumbbell Curl|2|10-15|1|60`],
+Dumbbell Preacher Curl|2|10-15|1|60`],
       ['Lower A', `
 Back Squat|2w+3|6-10|2|180
 Seated Leg Curl|3|10-15|1|90
@@ -981,7 +984,7 @@ Overhead Cable Triceps Extension|3|10-15|1|60`],
 Incline Dumbbell Press|1w+3|8-12|2|150
 Leg Press|1w+3|10-15|2|150
 Leg Extension|2|10-15|1|75
-Incline Dumbbell Curl|3|10-15|1|60`],
+Dumbbell Preacher Curl|3|10-15|1|60`],
       ['Posterior B', `
 Chest-Supported Dumbbell Row|3|8-12|2|120
 Barbell Hip Thrust|3|8-12|2|120
@@ -1020,7 +1023,7 @@ Pec Deck|2|12-15|1|60`],
 Seated Dumbbell Shoulder Press|1w+3|8-12|2|150
 Cable Lateral Raise|4|12-20|1|60
 Face Pull|3|12-20|1|60
-Incline Dumbbell Curl|3|10-15|1|60
+Hammer Curl|3|10-15|1|60
 Overhead Cable Triceps Extension|3|10-15|1|60
 EZ-Bar Preacher Curl|2|10-12|1|60
 Skull Crusher|2|10-12|1|75`],
@@ -1047,7 +1050,7 @@ Dumbbell Row|3|10-12|2|120
 Dumbbell Shoulder Press|2|10-12|2|120
 Dumbbell Leg Curl|3|10-15|1|75
 Dumbbell Hip Thrust|2|10-15|2|90
-Incline Dumbbell Curl|2|10-15|1|60
+Dumbbell Curl|2|10-15|1|60
 Single-Leg Calf Raise|2|10-15|1|60`],
       ['Dumbbell B', `
 Dumbbell Romanian Deadlift|1w+3|10-12|2|120
@@ -1113,6 +1116,7 @@ window.FORGE_MACHINE_SWAPS = {
   'Skull Crusher': ['Overhead Cable Triceps Extension', 'Single-Arm Overhead Cable Extension', 'Rope Pushdown'],
   'Barbell Curl': ['Cable Curl', 'Machine Bicep Curl'],
   'EZ-Bar Preacher Curl': ['Machine Preacher Curl', 'Cable Curl'],
+  'Dumbbell Preacher Curl': ['Machine Preacher Curl', 'Cable Curl'],
   'Incline Dumbbell Curl': ['Bayesian Cable Curl', 'Machine Preacher Curl', 'Cable Curl'],
   'Hammer Curl': ['Rope Hammer Curl']
 };
