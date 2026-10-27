@@ -9,7 +9,7 @@ const { open, report } = require('./lib');
   let t = await open({ news: true });
   await t.p.waitForTimeout(1200);
   const v = await t.ev('APP_VERSION'), txt = await sheet(t.p);
-  r.ok(txt && /In this update/.test(txt) && txt.includes(`v${v}`) && !txt.includes(`v${v - 1}`), 'after an update, a note says what’s new in it (and only in it)', txt && txt.slice(0, 160));
+  r.ok(txt && /In this update/.test(txt) && txt.includes(`v${v}`) && !txt.includes('v37') && !txt.includes('v36'), 'after an update, a note says what’s new in it and in any update missed since (nothing older)', txt && txt.slice(0, 160));
   r.ok(await t.p.evaluate(() => document.querySelectorAll('#sheets .news-sheet .news-item').length) >= 2 && await seen(t.p) === String(v), 'a few short items, each with an icon, and it counts as seen');
   await t.click('#sheets .news-sheet [data-a="sheetClose"].news-ok', 600);
   r.ok(!(await sheet(t.p)), '“Got it” puts it away');

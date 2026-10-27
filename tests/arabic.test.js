@@ -3,7 +3,7 @@
 const { open, report } = require('./lib');
 // words that stay as they are in Arabic: units, abbreviations (1RM shows up as RM), names of things and plans, the
 // English choice in the language setting
-const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|PHAT|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive)$/;
+const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|PHAT|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive|OpenPowerlifting|openpowerlifting|brachialis|brachioradialis)$/;
 const ENGLISH = (names) => {
   const skip = '.steps, .refs, .credits, #hud, .term, .sci-ref, a[href^="http"], input, textarea, svg, [hidden], .lang-seg, [lang="en"]';
   const out = new Set();
@@ -34,6 +34,8 @@ const ENGLISH = (names) => {
   const scan = async label => { await p.waitForTimeout(450); return (await p.evaluate(`(${ENGLISH.toString()})(${JSON.stringify(names)})`)).map(x => `${label}: ${x}`); };
   let left = [];
   await t.tab('settings'); await t.click('[data-a="demoOn"]');
+  // lift ranks on, so their section, sheets and the exercise ladder are scanned too
+  await t.ev(`state.body = { sex: 'M', bw: 80, age: 30, at: 0 }; state.settings.ranks = true; save(); render()`);
   for (const tab of ['train', 'history', 'library', 'progress', 'settings']) {
     await t.tab(tab);
     for (let y = 0; y < 5; y++) { left.push(...await scan(tab)); await p.evaluate(() => scrollBy(0, innerHeight * 0.9)); }
@@ -41,6 +43,13 @@ const ENGLISH = (names) => {
   }
   await t.tab('settings'); await t.click('[data-a="openColors"]', 700);
   for (let y = 0; y < 4; y++) { left.push(...await scan('colours')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
+  await t.tab('progress'); await t.click('.rank-card [data-a="rankAll"]', 700);
+  for (let y = 0; y < 4; y++) { left.push(...await scan('ranks')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
+  await t.ev('rankSetup()'); left.push(...await scan('rank details')); await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
+  await t.ev(`exerciseSheet(rankTable()[0].id)`); await p.waitForTimeout(600);
+  await p.evaluate(() => document.querySelector('.rank-ex').scrollIntoView()); left.push(...await scan('exercise rank'));
   await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
   await t.tab('history'); await t.click('#view .hist-card', 700); left.push(...await scan('workout details')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.tab('library'); await t.click('#view .ex-row', 800);

@@ -1307,6 +1307,12 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .prfx-line { font-size: 13.5px; color: rgba(255, 255, 255, .75); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prfx-line b { color: #fff; }
 .prfx-line em { font-style: normal; font-weight: 800; color: var(--gold); }
+/* a rank-up: the banner in the new rank's colour, its emblem instead of the medal */
+.prfx-card.prfx-rank { --gold: var(--tc); --gold-2: color-mix(in srgb, var(--tc) 70%, #000); }
+.prfx-rank .prfx-medal { background: none; box-shadow: none; width: 62px; height: 68px; border-radius: 0; }
+.prfx-rank .prfx-emb { width: 62px; height: 68px; position: relative; }
+.prfx-rank .prfx-kick { font-size: 22px; }
+.prfx-from { font-weight: 600; color: rgba(255, 255, 255, .7); }
 #prfx.in .prfx-card { animation: prDrop .7s cubic-bezier(.25, 1.5, .45, 1) both; }
 #prfx.in .prfx-card::after { animation: prSweep 1.1s .45s ease-in-out both; }
 #prfx.in .prfx-medal { animation: medalPop .7s .12s cubic-bezier(.3, 1.8, .45, 1) both; }
@@ -1399,6 +1405,66 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .news-item b { display: block; font: 700 16px var(--ui); margin-bottom: 2px; }
 .news-item p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.4; }
 .news-ok { margin-top: 4px; }
+/* ---------- Lift ranks ---------- */
+.rank-e { display: inline-grid; flex: 0 0 auto; width: 34px; height: 38px; }
+.rank-e > svg, .exd .rank-e > svg { width: 100%; height: 100%; max-width: none; overflow: visible; display: block; }
+.rank-e.xs { width: 22px; height: 24px; }
+.rank-e.sm { width: 34px; height: 38px; }
+.rank-e.md { width: 58px; height: 64px; }
+.rank-e.lg { width: 86px; height: 96px; }
+.rank-e.dim { filter: grayscale(1) opacity(.45); }
+.rank-promo { display: flex; gap: 14px; align-items: flex-start; }
+.rank-promo-e { display: flex; flex: 0 0 auto; margin-top: 2px; }
+.rank-promo-e .rank-e + .rank-e { margin-inline-start: -12px; }
+.rank-promo b { font: 800 17px var(--ui); }
+.rank-promo p { margin: 4px 0 10px; color: var(--ink-2); font-size: 14px; line-height: 1.4; }
+.rank-empty { display: flex; gap: 14px; align-items: center; }
+.rank-empty p { margin: 4px 0 0; font-size: 14px; }
+.rank-card { display: grid; gap: 14px; overflow: hidden; }
+.rank-top { display: flex; align-items: center; gap: 16px; text-align: start; width: 100%; }
+.rank-top-t { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.rank-top-t > b { font: 900 30px/1.05 var(--display); font-stretch: 108%; letter-spacing: -.01em; text-transform: uppercase; }
+.rank-top-t small { color: var(--ink-2); font-size: 13px; }
+.rank-bar { display: block; height: 6px; border-radius: 99px; background: var(--panel-3); overflow: hidden; }
+.rank-bar.big { height: 9px; }
+.rank-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 55%, transparent), var(--tc)); }
+.rank-maps { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px 4px; border-radius: 18px; background: var(--panel-2); }
+.rank-maps figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
+.rank-maps figcaption { font: 700 12px var(--ui); color: var(--ink-2); }
+.rank-arrow .i { width: 20px; height: 20px; color: var(--muted); }
+.rank-body { display: flex; gap: 2px; }
+.rank-body svg { width: 56px; height: 124px; }
+.rank-list { display: grid; }
+.rank-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: start; width: 100%; border-top: 1px solid var(--line); }
+.rank-card .rank-row:first-child { border-top: 0; }
+.rank-n { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.rank-n b { font: 700 15px var(--ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-n small { color: var(--ink-2); font-size: 12.5px; }
+.rank-n small span { font-weight: 800; }
+.rank-n .rank-to { color: var(--muted); font-size: 12px; }
+.rank-tiers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 2px; margin-bottom: 6px; }
+.rank-tiers > span { display: grid; justify-items: center; gap: 3px; width: 64px; }
+.rank-tiers small { font: 700 10px var(--ui); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+.rank-how p { margin: 0 0 10px; }
+.rank-ex { display: grid; gap: 12px; padding: 16px; border-radius: 22px; background: var(--panel); box-shadow: var(--hi); margin: 14px 0; }
+.rank-ex-top { display: flex; align-items: center; gap: 14px; }
+.rank-ex-top > div { display: grid; gap: 2px; }
+.rank-ex-top b { font: 900 24px var(--display); text-transform: uppercase; font-stretch: 108%; }
+.rank-ex-top small { color: var(--ink-2); font-size: 13px; }
+.rank-ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.rank-ladder li { display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-radius: 12px; color: var(--ink-2); font-size: 14px; }
+.rank-ladder li .rl-n { flex: 1; }
+.rank-ladder li b { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 600; }
+.rank-ladder li.on { background: color-mix(in srgb, var(--tc) 18%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tc) 70%, transparent); }
+.rank-ladder li.on .rl-n, .rank-ladder li.on b { color: var(--ink); font-weight: 800; }
+.rank-adj { display: grid; gap: 8px; }
+.rank-adj p { margin: 0; }
+.rank-not { margin: 10px 0; }
+.rank-hero { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; }
+.rank-setup .seg { width: 100%; }
+.rank-setup .seg button { flex: 1; }
+.rank-setup .field-l { font: 600 13px var(--ui); color: var(--ink-2); }
+.rank-setup .sheet-body > p:first-of-type { margin: 0 0 18px; line-height: 1.45; }
 .cslot { padding: 14px 0; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
 .cslot-h { display: flex; align-items: center; gap: 12px; }
 .cslot-h > div { flex: 1; display: grid; gap: 1px; min-width: 0; }
@@ -1564,6 +1630,7 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 <script src="library-extra.js"></script>
 <script src="visuals.js"></script>
 <script src="science.js"></script>
+<script src="ranks.js"></script>
 <script src="ar.js"></script>
 <script src="ar-names.js"></script>
 <script src="app.js"></script>

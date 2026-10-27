@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -530,7 +530,7 @@ function defaults() {
       unit: 'kg', effort: 'rir', rest: 120, autoRest: true, autoNext: true, view: 'focus',
       sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows', padRir: true
     },
-    custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null,
+    custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null, body: null,
     workouts: [], active: null, rest: null,
     blocks: [{ id: 'b1', name: T('Block {n}', { n: 1 }), start: 0 }], exResets: {}, flags: {}
   };
@@ -544,6 +544,9 @@ function migrate(s) {
   s.settings = Object.assign(d.settings, typeof s.settings === 'object' ? s.settings : {});
   s.settings.colors = cleanPal(s.settings.colors);
   s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
+  // your details for lift ranks (the guide's answers are in s.profile): kept only if they make sense
+  const bd = s.body;
+  s.body = bd && typeof bd === 'object' && +bd.bw >= 30 && +bd.bw <= 250 ? { sex: bd.sex === 'F' ? 'F' : 'M', bw: +bd.bw, age: +bd.age >= 10 && +bd.age <= 100 ? Math.round(+bd.age) : null, at: +bd.at || 0 } : null;
   if (!Array.isArray(s.blocks) || !s.blocks.length) s.blocks = d.blocks;
   // a record with something missing is mended rather than stopping the app from opening
   const mend = w => {
@@ -3084,14 +3087,29 @@ function savedGain(w, p) {
   return gainOf(p.kind, p.set, recReps({ exId: p.exId, uni: p.uni }, p.set), rec);
 }
 
+// a set (and its other side, for a one-row left/right set) that moves its exercise up a rank: [rank before, after].
+// Only once the exercise has a rank, so a first go at something isn't a rank-up
+function rankUpOf(w, x, s, mate) {
+  if (!rankOn()) return null;
+  const b = rankBasis(x.exId);
+  if (b.why) return null;
+  const row = rankTable().find(o => o.id === x.exId), bw = state.body.bw;
+  let before = row ? row.load : 0, after = 0;
+  for (const o of w.ex) if (o.exId === x.exId) for (const q of o.sets) { const v = rankLoad(b, o, q, bw); if (q === s || q === mate) after = Math.max(after, v); else before = Math.max(before, v); }
+  if (!(before > 0) || !(after > before)) return null;
+  const lad = row ? row.lad : rankLadder(x.exId, b), t0 = RK.place(before, lad).tier, t1 = RK.place(after, lad).tier;
+  return t1 > t0 ? [t0, t1] : null;
+}
+
 /* ----- a record while you train: a gold banner, confetti, a fanfare and a stronger tap ----- */
 let prTimer = null;
-function prParty(x, gains) {
+function prParty(x, gains, up = null) {
   let el = $('#prfx');
   if (!el) { el = document.createElement('div'); el.id = 'prfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
   const ex = getEx(x.exId), k = ex.k;
-  el.innerHTML = `<button class="prfx-card" data-a="prfxHide"><span class="prfx-medal" aria-hidden="true"><span class="prfx-rays"></span>${icon('trophy')}</span>
-    <span class="prfx-txt"><b class="prfx-kick">${TN(gains.length, 'New PR!', 'New PRs!')}</b><span class="prfx-ex">${esc(ex.name)}</span>
+  // a rank-up: the new rank's emblem instead of the trophy, in its colours
+  el.innerHTML = `<button class="prfx-card${up ? ' prfx-rank' : ''}" data-a="prfxHide" ${up ? `style="--tc:${tierColor(up[1])}"` : ''}><span class="prfx-medal" aria-hidden="true"><span class="prfx-rays"></span>${up ? emblem(up[1], 'prfx-emb') : icon('trophy')}</span>
+    <span class="prfx-txt"><b class="prfx-kick">${up ? T('Rank up: {tier}!', { tier: tierName(up[1]) }) : TN(gains.length, 'New PR!', 'New PRs!')}</b><span class="prfx-ex">${esc(ex.name)}${up ? ` · <span class="prfx-from">${T('from {tier}', { tier: tierName(up[0]) })}</span>` : ''}</span>
     ${gains.map(g => `<span class="prfx-line"><span>${esc(recKind(g.kind))}</span> <b>${esc(gainNow(g, k))}</b>${gainPlus(g, k) ? ` <em>${esc(gainPlus(g, k))}</em>` : ''}</span>`).join('')}</span></button>`;
   el.hidden = false;
   el.classList.remove('in', 'out'); void el.offsetWidth; el.classList.add('in');
@@ -3099,9 +3117,9 @@ function prParty(x, gains) {
     const m = $('.prfx-medal', el);
     if (!m || el.hidden) return;
     const r = m.getBoundingClientRect();
-    confetti(r.left + r.width / 2, r.top + r.height / 2, { n: 110, colors: fxColors('gold'), angle: Math.PI / 2, spread: Math.PI * 1.7, power: 0.95 });
+    confetti(r.left + r.width / 2, r.top + r.height / 2, { n: up ? 160 : 110, colors: up ? [...RK.TIERS[up[1]].c, RK.TIERS[up[1]].glow, '#FFFFFF'] : fxColors('gold'), angle: Math.PI / 2, spread: Math.PI * 1.7, power: up ? 1.1 : 0.95 });
   }, calm() ? 0 : 160);
-  fanfare(false);
+  fanfare(!!up);
   hapticBurst();
   clearTimeout(prTimer);
   prTimer = setTimeout(prHide, 3800);
@@ -3146,8 +3164,22 @@ function workoutStory(w) {
     count: COUNT_MARKS.includes(n) || (n > 1000 && n % 250 === 0) ? n : null,
     mark: LIFE_MARKS.filter(m => before < m && life >= m).pop() || null,
     streak: streakAt(w.start), weekCount: all.filter(o => weekStart(o.start) === wk).length,
-    cmp: prev ? compareTo(w, prev) : null
+    cmp: prev ? compareTo(w, prev) : null,
+    ...rankStory(w)
   };
+}
+// the ranks a workout moved up (only exercises that had a rank before it), and every rank just after it
+function rankStory(w) {
+  if (!rankOn()) return { rankUps: [], rankRows: [] };
+  const before = new Map(rankTable(w.start).map(o => [o.id, o])), after = rankTable(w.start + 1), ups = [];
+  for (const o of after) {
+    const was = before.get(o.id);
+    if (!was || !w.ex.some(x => x.exId === o.id) || o.now.tier <= was.now.tier) continue;
+    const x = w.ex.filter(q => q.exId === o.id).reduce((a, q) => { const bs = bestSet(q); return bs && (!a || e1rm(bs.w, recReps(q, bs)) > e1rm(a.s.w, recReps(a.x, a.s))) ? { x: q, s: bs } : a; }, null);
+    ups.push({ o, from: was.now.tier, to: o.now.tier, x: x && x.x, s: x && x.s });
+  }
+  ups.sort((a, b) => b.to - a.to || b.o.now.score - a.o.now.score);
+  return { rankUps: ups, rankRows: after };
 }
 // weeks in a row with a workout, up to the week of `ts`
 function streakAt(ts) {
@@ -3454,11 +3486,56 @@ function cardProgress(st, rows) {
   });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, defs) };
 }
+// a rank-up, big: the new emblem, the rank, the lift and the set that did it
+function cardRankUp(st) {
+  const u = st.rankUps[0], t = RK.TIERS[u.to], c = cardCtx('rankup', T('Rank up')), ex = getEx(u.o.id), g = `url(#${c.id}t)`;
+  let h = `<circle cx="180" cy="150" r="190" fill="url(#${c.id}r)"/>${rays(180, 150, 220, t.glow, 0.09)}`;
+  h += RK.emblem(u.to, c.id + 'em', tierName(u.to)).replace('<svg class="rank-emb"', '<svg x="104" y="38" width="152" height="168"');
+  h += ctext({ ...c, rtl: false }, 180, 230, T('Rank up').toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: t.c[1], ls: 3, max: 300 });
+  h += `<text x="180" y="276" font-size="${fitText(tierName(u.to).toLocaleUpperCase(LOC), 312, 44, 900, c.font, 26)[1]}" font-weight="900" fill="${g}" text-anchor="middle" letter-spacing="1">${esc(tierName(u.to).toLocaleUpperCase(LOC))}</text>`;
+  h += ctext(c, 180, 306, ex.name, { size: 18, weight: 800, max: 312 });
+  if (u.s) h += ctext(c, 180, 332, `${fmtSet(u.x, u.s)}${u.o.b.per ? ' ' + perText(u.o.b) : ''}`, { size: 14.5, weight: 700, fill: c.ink2, max: 312 });
+  h += ctext(c, 180, 354, T('from {tier} · est. 1RM {w}', { tier: tierName(u.from), w: fmtW(u.o.load, 1) }), { size: 12, weight: 600, fill: c.dim, max: 312 });
+  // how far to the next rank
+  if (u.to < 8) {
+    const f = u.o.now.frac;
+    h += `<rect x="70" y="374" width="220" height="7" rx="3.5" fill="${c.muscle}"/><rect x="${c.rtl ? 70 + 220 * (1 - f) : 70}" y="374" width="${Math.max(7, 220 * f)}" height="7" rx="3.5" fill="${RK.TIERS[u.to + 1].c[1]}"/>`;
+    h += ctext(c, 180, 398, rankNext(u.o), { size: 11, weight: 700, fill: c.ink2, max: 300 });
+  }
+  if (st.rankUps.length > 1) h += ctext(c, 180, 414, TN(st.rankUps.length - 1, 'And {n} more rank-up', 'And {n} more rank-ups'), { size: 10.5, weight: 800, fill: t.c[1], max: 300 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 't', [t.c[0], t.c[1], t.c[2]]) + glow(c.id + 'r', t.glow, 0.38)) };
+}
+// your muscles by rank, where you started and now, and your overall rank
+function cardRanks(st) {
+  const c = cardCtx('ranks', T('Ranks')), rows = st.rankRows, all = overallRank(rows), was = overallRank(rows, 'was'), t = RK.TIERS[all.tier];
+  let h = `<circle cx="180" cy="70" r="150" fill="url(#${c.id}r)"/>`;
+  h += RK.emblem(all.tier, c.id + 'em', tierName(all.tier)).replace('<svg class="rank-emb"', `<svg x="${cx_(c, 28, 66)}" y="30" width="66" height="73"`);
+  h += ctext(c, 108, 54, T('Your rank').toLocaleUpperCase(LOC), { size: 10.5, weight: 800, fill: c.ink2, ls: 1.6, anchor: 'start', max: 220 });
+  h += ctext(c, 108, 88, tierName(all.tier).toLocaleUpperCase(LOC), { size: 30, weight: 900, fill: t.c[1], anchor: 'start', max: 230 });
+  h += ctext(c, 108, 108, TN(rows.length, 'from {n} lift', 'from {n} lifts'), { size: 11.5, weight: 600, fill: c.ink2, anchor: 'start', max: 220 });
+  // start and now, front and back
+  const fig = (view, mr, x) => `<svg x="${x}" y="128" width="72" height="158" viewBox="0 0 100 220">${rankFigure(view, mr, [c.body, c.muscle])}</svg>`;
+  const mw = muscleRanks(rows, 'was'), mn = muscleRanks(rows), [L, R] = c.rtl ? [196, 22] : [22, 196];
+  h += fig('front', mw, L) + fig('back', mw, L + 70) + fig('front', mn, R) + fig('back', mn, R + 70);
+  h += `<path d="M${c.rtl ? 186 : 174} 207 l${c.rtl ? -12 : 12} 0 m${c.rtl ? 5 : -5} -5 l${c.rtl ? -5 : 5} 5 l${c.rtl ? 5 : -5} 5" stroke="${c.ink2}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  h += ctext(c, 93, 304, `${TC('Start', 'rank')} · ${was ? tierName(was.tier) : '—'}`, { size: 12, weight: 700, fill: c.ink2, max: 150 });
+  h += ctext(c, 267, 304, `${T('Now')} · ${tierName(all.tier)}`, { size: 12, weight: 800, fill: t.c[1], max: 150 });
+  // the best three
+  rows.slice(0, 3).forEach((o, i) => {
+    const y = 330 + i * 26, tt = RK.TIERS[o.now.tier];
+    h += `<circle cx="${cx_(c, 34)}" cy="${y - 4}" r="5" fill="${tt.c[1]}"/>`;
+    h += ctext(c, 46, y, getEx(o.id).name, { size: 13, weight: 700, anchor: 'start', max: 200 });
+    h += ctext(c, 332, y, tierName(o.now.tier) + (o.b.conf === 'rough' ? ' ≈' : ''), { size: 13, weight: 800, fill: tt.c[1], anchor: 'end', max: 100 });
+  });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, glow(c.id + 'r', t.glow, 0.28)) };
+}
 function finCards(st) {
   const out = [], prog = progressRows(st);
   if (st.count || st.mark) out.push(cardMilestone(st));
+  if (st.rankUps.length) out.push(cardRankUp(st));
   out.push(cardWorkout(st));
   if (st.prs.length) out.push(cardRecords(st));
+  if (st.rankRows.length) out.push(cardRanks(st));
   out.push(cardExercises(st));
   if (st.muscles.length) out.push(cardMuscles(st));
   if (prog.length) out.push(cardProgress(st, prog));
@@ -4232,7 +4309,8 @@ function toggleSet(i, j, viaPad) {
   ui.prFirst = null;
   if (w.mode !== 'edit') {
     const gains = [...first, ...setGains(w, x, j)].reduce((out, g) => { const o = out.find(q => q.kind === g.kind); if (!o) out.push(g); else if (g.now > o.now) Object.assign(o, g); return out; }, []);
-    if (gains.length) { ui.prBump = s.id; setTimeout(() => prParty(x, gains), 140); }
+    const up = rankUpOf(w, x, s, partnerOf(x, s));
+    if (gains.length || up) { ui.prBump = s.id; setTimeout(() => prParty(x, gains, up), 140); }
   }
   // first side of a left/right set: no rest yet, straight on to the other side
   const mate = partnerOf(x, s);
@@ -5211,6 +5289,7 @@ function exerciseSheet(exId) {
           <a class="btn sm ghost" href="${yt}" target="_blank" rel="noopener">${icon('external')}${T('Watch how it’s done')}</a></div>
         ${hasArchived || resets.length || state.blocks.length > 1 ? `<div class="seg" role="group" aria-label="${T('Time range')}"><button class="${st.range === 'block' ? 'on' : ''}" data-a="range" data-v="block">${T('Since last reset')}</button><button class="${st.range === 'all' ? 'on' : ''}" data-a="range" data-v="all">${T('All time')}</button></div>` : ''}
         <div class="tiles">${tiles.map(([l, v]) => `<div class="tile"><span>${l}</span><b>${esc(String(v))}</b></div>`).join('')}</div>
+        ${rankBlock(exId)}
         ${k === 'wr' && !rec.e1rm && rec.reps > E1RM_MAX_REPS ? `<p class="muted small">${T('Est. 1RM is worked out from sets of {n} reps or fewer; higher-rep sets still count for everything else.', { n: E1RM_MAX_REPS })}</p>` : ''}
         <div class="card chart-card"><div class="chart-top"><h3>${esc(metrics.find(m => m[0] === st.metric)[1])}</h3>${metrics.length > 1 ? `<div class="seg sm">${metrics.map(([id, l]) => `<button class="${st.metric === id ? 'on' : ''}" data-a="metric" data-v="${id}">${esc(l)}</button>`).join('')}</div>` : ''}</div>
           ${chartSlot({ type: 'line', points: pts, marks, h: 220, whole: st.metric === 'reps' || st.metric === 'sec', fmt: v => fmtMetric(st.metric, v, k), tick: v => st.metric === 'sec' ? fmtClock(v) : st.metric === 'dist' ? dispDist(v, k) : compact(isLb() && st.metric !== 'reps' ? v * KG_LB : v), aria: T('{name} progress', { name: ex.name }), empty: st.range === 'block' && hasArchived ? T('Nothing since your last reset yet. Switch to All time to see earlier sessions.') : T('Log this exercise to see your progress here.') })}
@@ -5235,6 +5314,7 @@ function exerciseSheet(exId) {
     },
     actions: {
       range: (b, def) => { st.range = b.dataset.v; refreshSheet(def); },
+      rankAdj: (b, def) => { const v = +b.dataset.v; state.exPrefs[exId] = { ...(state.exPrefs[exId] || {}), rankAdj: v || undefined }; if (!v) delete state.exPrefs[exId].rankAdj; save(); refreshSheet(def); render(); },
       howto: (b, def, ev) => { ev.preventDefault(); st.howto = !st.howto; b.parentElement.open = st.howto; },
       photo: () => pickPhoto(exId),
       photoDel: (b, def) => { storePhoto(exId, null); refreshAll(); toast(T('Photo removed.')); },
@@ -5257,6 +5337,199 @@ function exerciseSheet(exId) {
 
 /* ============================== Progress tab ============================== */
 
+/* ============================== Lift ranks: Wood to Olympian, from your bodyweight (the standards are in ranks.js) ============================== */
+const RK = window.LS_RANKS;
+const rankOn = () => !!(RK && state.settings.ranks && state.body && state.body.bw > 0);
+const tierName = i => T(RK.TIERS[i].name);
+const tierColor = i => RK.TIERS[i].c[1];
+let embSeq = 0;
+const emblem = (i, cls = '') => `<span class="rank-e ${cls}">${RK.emblem(i, 'e' + (++embSeq), tierName(i))}</span>`;
+const basisMemo = new Map();
+function rankBasis(id) {
+  const ex = getEx(id), key = `${id}|${ex.name}|${ex.eq}|${ex.k}|${ex.uni}`;
+  if (!basisMemo.has(key)) basisMemo.set(key, RK.basis(ex, (sciOf(id) || {}).pattern));
+  return basisMemo.get(key);
+}
+// a set's weight as its rank sees it: the estimated 1RM, with your bodyweight in it for pull-ups and dips
+function rankLoad(b, x, s, bw) {
+  if (!s.done || NO_RECORD.has(s.t)) return 0;
+  const r = recReps(x, s);
+  if (b.per === 'total') { const tot = getEx(x.exId).k === 'aw' ? bw - (+s.w || 0) : bw + (+s.w || 0); return tot > 0 ? e1rm(tot, r) : 0; }
+  return e1rm(+s.w || 0, r);
+}
+const RANK_RECENT = 180 * DAY, RANK_FIRST = 14 * DAY;
+const CONF_W = { data: 1, est: 0.85, rough: 0.6 };
+const rankAdj = id => (state.exPrefs[id] || {}).rankAdj || 0;
+const rankLadder = (id, b) => RK.ladder(b, state.body, b.conf === 'rough' ? rankAdj(id) : 0);
+// every ranked exercise you've done, best first: where you started (your best in your first two weeks of it) and
+// where you are (your best in the last six months, or your best ever if it's been longer). Saved workouts before
+// `upTo` only; worked out again only when your workouts or details change
+let rankMemo = ['', null];
+function rankTable(upTo = Infinity) {
+  const p = state.body, last = state.workouts[state.workouts.length - 1];
+  const key = [state.workouts.length, last && last.id, last && last.end, p.sex, p.bw, p.age, Object.entries(state.exPrefs).filter(([, v]) => v && v.rankAdj).map(([k, v]) => k + v.rankAdj).join()].join('|');
+  if (upTo === Infinity && rankMemo[0] === key) return rankMemo[1];
+  const now = upTo === Infinity ? Date.now() : upTo, m = new Map();
+  for (const w of state.workouts) {
+    if (w.start >= upTo) break;
+    for (const x of w.ex) {
+      const b = rankBasis(x.exId);
+      if (b.why) continue;
+      let o = m.get(x.exId);
+      for (const s of x.sets) {
+        const v = rankLoad(b, x, s, p.bw);
+        if (!(v > 0)) continue;
+        if (!o) { o = { id: x.exId, b, first: w.start, start: 0, best: 0, bestAt: 0, recent: 0 }; m.set(x.exId, o); }
+        if (w.start < o.first + RANK_FIRST) o.start = Math.max(o.start, v);
+        if (v > o.best) { o.best = v; o.bestAt = w.start; }
+        if (w.start >= now - RANK_RECENT) o.recent = Math.max(o.recent, v);
+      }
+    }
+  }
+  for (const o of m.values()) {
+    o.lad = rankLadder(o.id, o.b);
+    o.stale = !o.recent;
+    o.load = o.recent || o.best;
+    o.now = RK.place(o.load, o.lad);
+    o.was = RK.place(o.start, o.lad);
+  }
+  const out = [...m.values()].sort((a, b) => b.now.score - a.now.score);
+  if (upTo === Infinity) rankMemo = [key, out];
+  return out;
+}
+// each muscle's rank: its best exercise (a helper muscle counts a tier lower)
+function muscleRanks(rows, when = 'now') {
+  const m = {};
+  for (const o of rows) {
+    const ex = getEx(o.id), sc = o[when].score;
+    const put = (mm, v) => { if (!m[mm] || v > m[mm]) m[mm] = v; };
+    put(ex.m, sc);
+    for (const s of ex.sec) put(s, Math.max(0, sc - 1));
+  }
+  return m;
+}
+// your overall rank: each muscle's best exercise, averaged, with estimated and rough ranks counting less
+function overallRank(rows, when = 'now') {
+  const per = {};
+  for (const o of rows) { const m = getEx(o.id).m, sc = o[when].score; if (!per[m] || sc > per[m].sc) per[m] = { sc, w: CONF_W[o.b.conf] }; }
+  const v = Object.values(per);
+  if (!v.length) return null;
+  const score = sum(v, x => x.sc * x.w) / sum(v, x => x.w), tier = Math.min(8, Math.floor(score));
+  return { score, tier, frac: tier === 8 ? 1 : score - tier };
+}
+// one view of the body with each muscle in its rank's colour (muscles with no rank in grey)
+function rankFigure(view, mr, grey = ['#3A3A42', '#2C2C33']) {
+  const reg = {};
+  for (const [m, sc] of Object.entries(mr)) for (const mm of m === 'fullbody' ? FULL_BODY : [m]) for (const [r, wt] of BODY_OF[mm] || []) if (wt >= 0.6 && (reg[r] == null || sc > reg[r])) reg[r] = sc;
+  const parts = [];
+  for (const [r, pts] of BODY[view]) {
+    const sc = reg[r], fill = sc != null ? tierColor(Math.min(8, Math.floor(sc))) : r === 'head' || r === 'knees' ? grey[0] : grey[1];
+    for (const p of pts.split('|')) parts.push(`<polygon points="${p}" fill="${fill}"/>`);
+  }
+  return parts.join('');
+}
+const rankBody = (mr, cls = '') => `<span class="rank-body ${cls}">${['front', 'back'].map(v => `<svg viewBox="0 0 100 220" aria-hidden="true">${rankFigure(v, mr)}</svg>`).join('')}</span>`;
+const perText = b => b.per === 'hand' ? T('per dumbbell') : b.per === 'side' ? T('per side') : b.per === 'total' ? T('with your bodyweight') : '';
+// how far along: the share of the way to the next tier, and how much more that takes
+function rankNext(o) {
+  if (o.now.tier === 8) return T('The top rank');
+  return T('{w} more for {tier}', { w: fmtW(Math.max(0.1, o.now.next - o.load), 1), tier: tierName(o.now.tier + 1) });
+}
+const rankRow = o => `<button class="rank-row" data-a="openEx" data-id="${o.id}">${emblem(o.now.tier, 'sm')}
+  <span class="rank-n"><b>${esc(getEx(o.id).name)}</b><small><span style="color:${tierColor(o.now.tier)}">${tierName(o.now.tier)}${o.b.conf === 'rough' ? ' ≈' : ''}</span> · ${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${o.b.per ? ` ${perText(o.b)}` : ''}</small>
+  <span class="rank-bar" style="--tc:${tierColor(Math.min(8, o.now.tier + 1))}"><i style="width:${Math.round(o.now.frac * 100)}%"></i></span><small class="rank-to">${esc(rankNext(o))}</small></span></button>`;
+// the Progress page: your overall rank, your muscles from where you started to now, and your best lifts
+function ranksSection() {
+  if (!RK) return '';
+  if (!rankOn()) return state.flags.rankPromoOff ? '' : `<section class="card rank-promo"><span class="rank-promo-e">${[1, 3, 5].map(i => emblem(i, 'sm')).join('')}</span><div><b>${T('Lift ranks')}</b>
+    <p>${T('See how strong you are for your bodyweight, Wood to Olympian, for each lift. Optional, and it stays on this phone.')}</p>
+    <div class="row-btns left"><button class="btn sm primary" data-a="rankSetup">${T('Turn on')}</button><button class="btn sm ghost" data-a="rankPromoOff">${T('Not now')}</button></div></div></section>`;
+  const rows = rankTable();
+  if (!rows.length) return `<section class="card rank-card rank-empty">${emblem(0, 'md dim')}<div><b>${T('Lift ranks')}</b><p class="muted">${T('Log a set of a ranked exercise (a squat, press, row, pulldown, curl…) and its rank shows here.')}</p></div></section>`;
+  const all = overallRank(rows), was = overallRank(rows, 'was');
+  return `<section class="card rank-card">
+    <button class="rank-top" data-a="rankAll">${emblem(all.tier, 'lg')}<span class="rank-top-t"><span class="eyebrow">${T('Your rank')}</span><b style="color:${tierColor(all.tier)}">${tierName(all.tier)}</b>
+      <span class="rank-bar big" style="--tc:${tierColor(Math.min(8, all.tier + 1))}"><i style="width:${Math.round(all.frac * 100)}%"></i></span>
+      <small>${all.tier < 8 ? T('{p}% of the way to {tier}', { p: Math.round(all.frac * 100), tier: tierName(all.tier + 1) }) : T('The top rank')} · ${TN(rows.length, 'from {n} lift', 'from {n} lifts')}</small></span></button>
+    <div class="rank-maps"><figure>${rankBody(muscleRanks(rows, 'was'))}<figcaption>${TC('Start', 'rank')} · ${was ? tierName(was.tier) : '—'}</figcaption></figure><span class="rank-arrow">${icon(RTL ? 'left' : 'right')}</span><figure>${rankBody(muscleRanks(rows))}<figcaption>${T('Now')} · ${tierName(all.tier)}</figcaption></figure></div>
+    <div class="rank-list">${rows.slice(0, 4).map(rankRow).join('')}</div>
+    <div class="row-btns left"><button class="btn sm" data-a="rankAll">${T('All your ranks')}</button><button class="btn sm ghost" data-a="rankSetup">${T('Your details')}</button></div>
+  </section>`;
+}
+// every rank, grouped by how sure it is, and how they work
+function ranksSheet() {
+  openSheet({
+    cls: 'rank-sheet', label: T('Your ranks'),
+    render: () => {
+      const rows = rankTable(), groups = [['data', T('From competition records')], ['est', T('Estimated from the big lifts')], ['rough', T('Rough: machines and cables')]];
+      return `${sheetHead(T('Your ranks'))}<div class="sheet-body pad">
+        <div class="rank-tiers">${RK.TIERS.map((t, i) => `<span>${emblem(i, 'sm')}<small>${tierName(i)}</small></span>`).join('')}</div>
+        ${groups.map(([c, h]) => { const g = rows.filter(o => o.b.conf === c); return g.length ? `<h3 class="sub-h">${h}</h3><div class="rank-list">${g.map(rankRow).join('')}</div>` : ''; }).join('')}
+        <h3 class="sub-h">${T('How ranks work')}</h3>
+        <div class="prose small rank-how">
+          <p>${T('Each exercise is ranked from your best estimated 1RM in the last six months (your best ever if it’s been longer), against people of your sex and bodyweight.')}</p>
+          <p>${T('The standards come from OpenPowerlifting’s public records: the best squat, bench press and deadlift of every raw lifter in ten federations, 659,000 results. Gold starts at the bottom 15% of those competitors, Platinum at 40%, Diamond at 65%, Champion at 85%, Titan at 95% and Olympian at the top 1%. Silver is 80% of Gold, Bronze 60%, and Wood is everyone starting out.')}</p>
+          <p>${T('Other exercises are measured against the nearest of the three by a typical ratio, so they are estimates. Machines and cables are rough: the same weight reads differently on each one, so you can tell each machine how it reads.')}</p>
+          <p>${T('If you give your age, the standards follow how strength changes with age in the same records. Height and years of training aren’t used: once your bodyweight is known, height changes little, and ranks compare what you lift.')}</p>
+          <p class="muted">${T('Data: OpenPowerlifting (openpowerlifting.org), public domain.')}</p>
+        </div>
+        <div class="row-btns left"><button class="btn" data-a="details">${T('Your details')}</button></div></div>`;
+    },
+    actions: { details: () => rankSetup() }
+  });
+}
+// in an exercise's details: its rank, the ladder for your bodyweight, and how it's worked out
+function rankBlock(id) {
+  if (!rankOn()) return '';
+  const b = rankBasis(id);
+  if (b.why) return `<p class="muted small rank-not">${b.why === 'machine' ? T('Not ranked: how much this shows depends too much on the machine or setup.') : T('Not ranked: there’s no fair standard for this kind of exercise.')}</p>`;
+  const o = rankTable().find(r => r.id === id), lad = o ? o.lad : rankLadder(id, b), cur = o ? o.now.tier : -1;
+  const lift = { S: T('squat'), D: T('deadlift') }[b.ref] || T('bench press');
+  const how = b.conf === 'data' ? T('From competition records: raw lifters of your sex and bodyweight.')
+    : b.per === 'total' ? T('Estimated from the bench press standards, counting your bodyweight plus anything added.')
+    : b.conf === 'est' ? T('Estimated from the {lift} standards: this is usually about {p}% of it.', { lift, p: Math.round(b.r * 100) })
+    : T('Rough: estimated from the {lift} standards at about {p}%, and machines differ.', { lift, p: Math.round(b.r * 100) });
+  return `<section class="rank-ex">
+    <div class="rank-ex-top">${emblem(Math.max(0, cur), cur < 0 ? 'md dim' : 'md')}<div><span class="eyebrow">${T('Rank')}</span><b ${cur >= 0 ? `style="color:${tierColor(cur)}"` : ''}>${cur >= 0 ? tierName(cur) + (b.conf === 'rough' ? ' ≈' : '') : T('Not ranked yet')}</b>
+      <small>${o ? `${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${b.per ? ' ' + perText(b) : ''} · ${esc(rankNext(o))}` : T('Log a set to get a rank.')}</small></div></div>
+    <ol class="rank-ladder">${lad.map((v, i) => `<li class="${i === cur ? 'on' : ''}" style="--tc:${tierColor(i)}">${emblem(i, 'xs')}<span class="rl-n">${tierName(i)}</span><b dir="ltr">${i ? fmtW(v, 0) + '+' : '—'}</b></li>`).reverse().join('')}</ol>
+    <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
+    ${b.conf === 'rough' ? `<div class="rank-adj"><p class="small">${T('Next to free weights, this machine reads:')}</p><div class="seg" role="group">${[[-1, TC('Light', 'machine')], [0, T('Typical')], [1, T('Heavy')]].map(([v, l]) => `<button class="${rankAdj(id) === v ? 'on' : ''}" data-a="rankAdj" data-v="${v}" aria-pressed="${rankAdj(id) === v}">${l}</button>`).join('')}</div>
+      <p class="muted small">${T('Heavy: it shows bigger numbers than free weights would (long levers, light stacks), so its standards go up a quarter. Light: down a fifth.')}</p></div>` : ''}
+  </section>`;
+}
+// your details: which standards, bodyweight, and age if you like; saved, ranks are on
+function rankSetup() {
+  const p = { sex: 'M', bw: null, age: null, ...(state.body || {}) }, lb = isLb();
+  const shown = p.bw ? trimNum(lb ? p.bw * KG_LB : p.bw, 1) : '';
+  openSheet({
+    cls: 'rank-setup', label: T('Lift ranks'),
+    render: () => `${sheetHead(T('Lift ranks'), `<button class="btn sm primary" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
+      <div class="sheet-body pad">
+        <div class="rank-hero">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => emblem(i, 'sm')).join('')}</div>
+        <p>${T('Each lift gets a rank, Wood to Olympian, from how much you lift for your bodyweight. The standards come from 659,000 raw powerlifting results; other exercises are estimated from them.')}</p>
+        <div class="field"><span class="field-l">${T('Standards')}</span><div class="seg" role="group">${[['M', T('Men’s')], ['F', T('Women’s')]].map(([v, l]) => `<button class="${p.sex === v ? 'on' : ''}" data-a="sex" data-v="${v}" aria-pressed="${p.sex === v}">${l}</button>`).join('')}</div></div>
+        <label class="field"><span class="field-l">${T('Bodyweight ({unit})', { unit: U() })}</span><input type="text" inputmode="decimal" data-f="bw" value="${shown}" placeholder="${lb ? '176' : '80'}" autocomplete="off"></label>
+        <label class="field"><span class="field-l">${T('Age (optional)')}</span><input type="text" inputmode="numeric" data-f="age" value="${p.age || ''}" placeholder="—" autocomplete="off"></label>
+        <p class="muted small">${T('Height and years of training aren’t needed: once your bodyweight is known, height changes little, and ranks compare what you lift. All of it stays on this phone (and in your backups).')}</p>
+        ${state.settings.ranks ? `<div class="row-btns left"><button class="btn ghost" data-a="off">${T('Turn ranks off')}</button></div>` : ''}
+      </div>`,
+    actions: {
+      sex: (b, d) => { p.sex = b.dataset.v; for (const x of $$('[data-a="sex"]', d.el)) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); } },
+      save: (b, d) => {
+        const bw = parseNum($('[data-f="bw"]', d.el).value), age = parseNum($('[data-f="age"]', d.el).value), kg = bw == null ? null : lb ? bw / KG_LB : bw;
+        if (!(kg >= 30 && kg <= 250)) { toast(T('Type your bodyweight first.')); $('[data-f="bw"]', d.el).focus(); return; }
+        if (age != null && !(age >= 10 && age <= 100)) { toast(T('That age doesn’t look right.')); return; }
+        state.body = { sex: p.sex, bw: +trimNum(kg, 2), age: age == null ? null : Math.round(age), at: Date.now() };
+        state.settings.ranks = true;
+        save(); closeSheet(d); render();
+        toast(T('Ranks are on.'));
+      },
+      off: (b, d) => { state.settings.ranks = false; save(); closeSheet(d); render(); }
+    }
+  });
+}
+
 VIEWS.progress = function () {
   const b = curBlock(), [from] = blockRange(b);
   const inBlock = workoutsIn(from, Infinity);
@@ -5268,6 +5541,7 @@ VIEWS.progress = function () {
   const vol = weeks.map(s => ({ s, ws: workoutsIn(s, weekFrom(s, 1)) }));
   const archived = state.blocks.slice(0, -1).reverse();
   let h = `<header class="page-h"><div><p class="eyebrow">${TN(state.workouts.length, '{n} sessions all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
+  h += ranksSection();
   h += weekCard();
   h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(blkName(b))}${icon('edit')}</button></h2>
       <p class="muted">${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(inBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
@@ -5376,6 +5650,7 @@ VIEWS.settings = function () {
   <div class="card list-card guide-row">
     ${row(T('Guide'), T('A plan that fits you, a tour of the app, the words you’ll see and tips as you go.'), `<button class="btn sm" data-a="openGuide">${icon('info')}${T('Open')}</button>`)}
     ${row(T('What’s new'), T('What changed in the last few updates.'), `<button class="btn sm" data-a="openNews">v${APP_VERSION}</button>`)}
+    ${RK ? row(T('Lift ranks'), rankOn() ? T('{standards}, {bw}{age}. Wood to Olympian for each lift, from your bodyweight.', { standards: state.body.sex === 'F' ? T('Women’s standards') : T('Men’s standards'), bw: fmtW(state.body.bw, 1), age: state.body.age ? T(', age {n}', { n: state.body.age }) : '' }) : T('Wood to Olympian for each lift, from your bodyweight. Off: no ranks anywhere.'), rankOn() ? `<div class="btn-pair"><button class="btn sm" data-a="rankSetup">${T('Edit')}</button>${toggle(true, 'rankToggle')}</div>` : toggle(false, 'rankToggle')) : ''}
   </div>
   <h2 class="section-h">${T('Logging')}</h2><div class="card list-card">
     ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', term('kg')], ['lb', term('lb')]]))}
@@ -5422,6 +5697,11 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 39, items: [
+    ['trophy', 'Lift ranks', 'Every lift gets a rank, Wood to Olympian, from how much you lift for your bodyweight. The standards come from 659,000 competition results. Optional: turn them on in Progress or Settings.'],
+    ['chart', 'Your muscles by rank', 'Progress shows your body in rank colours, from where you started to now, with each lift’s ladder in its details.'],
+    ['flame', 'Rank-ups', 'Beat your rank mid-workout and the banner shows your new emblem; the end screen opens with a rank-up card to share.']
+  ] },
   { v: 38, items: [
     ['sliders', 'Every colour is yours', 'Background, cards, text, greys, the delete red and each set type, for dark and light mode. Ready-made looks too, like X Dim, Graphite and Midnight.'],
     ['layout', 'Y2K gets its own colours', 'Change its frame, neon and highlight, or pick a look like Vaporwave, Matrix or Amber. The Clean style keeps its own.'],
@@ -5441,7 +5721,8 @@ let firstRun = false;
 const seenVersion = () => { try { return +localStorage.getItem(NEWS_KEY) || 0; } catch (e) { return APP_VERSION; } };
 const markSeen = () => { try { localStorage.setItem(NEWS_KEY, String(APP_VERSION)); } catch (e) { /* shown again next time */ } };
 function newsSheet(all) {
-  const since = seenVersion() || APP_VERSION - 1;
+  // nothing seen yet: an update from v37 or before (the last versions without this note)
+  const since = seenVersion() || 37;
   const list = all ? CHANGELOG : CHANGELOG.filter(c => c.v > since && c.v <= APP_VERSION).slice(0, 3);
   markSeen();
   return openSheet({
@@ -5909,6 +6190,10 @@ const ACT = {
   setMotion: b => { state.settings.motion = b.dataset.v === 'on'; save(); mvStopAll(); render(); renderWorkout(); },
   openColors: () => colorsSheet(),
   openNews: () => newsSheet(true),
+  rankSetup: () => rankSetup(),
+  rankAll: () => ranksSheet(),
+  rankPromoOff: () => { state.flags.rankPromoOff = 1; save(); render(); },
+  rankToggle: () => { if (rankOn()) { state.settings.ranks = false; save(); render(); } else if (state.body && state.body.bw > 0) { state.settings.ranks = true; save(); render(); } else rankSetup(); },
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
