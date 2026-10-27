@@ -39,6 +39,9 @@ const ENGLISH = (names) => {
     for (let y = 0; y < 5; y++) { left.push(...await scan(tab)); await p.evaluate(() => scrollBy(0, innerHeight * 0.9)); }
     await p.evaluate(() => scrollTo(0, 0));
   }
+  await t.tab('settings'); await t.click('[data-a="openColors"]', 700);
+  for (let y = 0; y < 4; y++) { left.push(...await scan('colours')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
   await t.tab('history'); await t.click('#view .hist-card', 700); left.push(...await scan('workout details')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.tab('library'); await t.click('#view .ex-row', 800);
   for (let y = 0; y < 6; y++) { left.push(...await scan('exercise details')); await p.evaluate(() => { const b = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().querySelector('.sheet-body'); b.scrollTop += 600; }); }

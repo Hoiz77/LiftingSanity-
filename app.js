@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1317,6 +1317,171 @@ function applyTheme() {
   if (sheet) sheet.media = y2k ? 'all' : 'not all';
   if (y2k) startY2k();
   else { clearInterval(hudTimer); const hud = $('#hud'); if (hud) hud.innerHTML = ''; }
+  applyColors();
+}
+/* ============================== Colours: your own accent, done, left/right, record and background colours ============================== */
+
+// the colours you can change, with the stylesheet's own dark-mode colour as the default
+const COLOR_SLOTS = [
+  { k: 'accent', def: '#0A84FF', name: () => T('Accent'), desc: () => T('Buttons, the box you’re typing in, links and the progress bar.') },
+  { k: 'good', def: '#30D158', name: () => T('Done'), desc: () => T('Checked sets, the Log key, switches and the rest timer.') },
+  { k: 'left', def: '#32D74B', name: () => T('Left side'), desc: () => T('The L plate and left-side rows.') },
+  { k: 'right', def: '#BF5AF2', name: () => T('Right side'), desc: () => T('The R plate and right-side rows.') },
+  { k: 'gold', def: '#FFD60A', name: () => T('Records'), desc: () => T('New records, the trophy count and the end of a workout.') },
+  { k: 'bg', def: '#000000', name: () => T('Background'), desc: () => T('In dark mode: behind everything, with the cards a shade lighter.') }
+];
+// quick picks; any other colour comes from the colour wheel or a hex code
+const SWATCHES = {
+  any: ['#0A84FF', '#5E5CE6', '#BF5AF2', '#FF375F', '#FF453A', '#FF9F0A', '#FFD60A', '#30D158', '#00C7BE', '#64D2FF', '#AC8E68', '#F5F5F7'],
+  bg: ['#000000', '#0B0B10', '#101418', '#0A1020', '#0D1A14', '#140D1C', '#1C1410', '#1A1A1E']
+};
+// whole sets of colours at once
+const COLOR_PRESETS = [
+  ['Default', {}],
+  ['Ocean', { accent: '#00C7BE', good: '#64D2FF', bg: '#0A1020' }],
+  ['Crimson', { accent: '#FF375F', good: '#FF9F0A', bg: '#0B0B10' }],
+  ['Violet', { accent: '#BF5AF2', good: '#64D2FF', left: '#64D2FF', right: '#FF375F', bg: '#140D1C' }],
+  ['Forest', { accent: '#30D158', good: '#A3D65C', bg: '#0D1A14' }],
+  ['Sunset', { accent: '#FF9F0A', good: '#FF375F', bg: '#1C1410' }],
+  ['Mono', { accent: '#F5F5F7', good: '#AEAEB2', left: '#F5F5F7', right: '#8E8E93', gold: '#F5F5F7' }]
+];
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const rgba = (h, a) => `rgba(${hexRgb(h).join(', ')}, ${a})`;
+const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
+// relative luminance and contrast ratio, as in the web accessibility guidelines (WCAG)
+function luma(h) { const [r, g, b] = hexRgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+const contrastOf = (a, b) => { const x = luma(a), y = luma(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+// a colour moved toward black (or white) until it stands out from `bg` by `min`; 3 : 1 is enough for buttons and bold text
+function readable(c, bg, min) {
+  const to = luma(bg) > 0.4 ? '#000000' : '#FFFFFF';
+  let t = 0, out = c;
+  while (contrastOf(out, bg) < min && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, to, t); }
+  return out;
+}
+// a background picked for dark mode is kept dark enough for light text on it
+function darkBg(c) { let t = 0, out = c; while (luma(out) > 0.035 && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, '#000000', t); } return out; }
+const normHex = v => { v = String(v || '').trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join(''); return /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null; };
+const slotDef = k => COLOR_SLOTS.find(s => s.k === k).def;
+// the colour in use: yours where you picked one, otherwise the default
+const colorOf = k => (state.settings.colors || {})[k] || slotDef(k);
+// CSS custom properties for the colours that were changed, in dark or light mode. In light mode each colour is
+// darkened just enough to read on white, and the background stays the light one
+function colorVars(cols, mode) {
+  const v = {}, dark = mode === 'dark';
+  const on = c => contrastOf(c, '#FFFFFF') >= 3 ? '#FFFFFF' : mixHex(c, '#000000', 0.86);
+  if (cols.accent) {
+    const a = dark ? cols.accent : readable(cols.accent, '#FFFFFF', 3);
+    Object.assign(v, { '--accent': a, '--accent-soft': rgba(a, dark ? 0.17 : 0.1), '--on-accent': on(a), '--glow': dark ? `0 12px 30px -10px ${rgba(a, 0.75)}` : `0 12px 26px -12px ${rgba(a, 0.7)}` });
+  }
+  if (cols.good) { const g = dark ? cols.good : readable(cols.good, '#FFFFFF', 2.6); Object.assign(v, { '--good': g, '--good-soft': rgba(g, 0.14), '--on-good': on(g) }); }
+  if (cols.left) v['--side-l'] = dark ? cols.left : readable(cols.left, '#FFFFFF', 2.6);
+  if (cols.right) v['--side-r'] = dark ? cols.right : readable(cols.right, '#FFFFFF', 2.6);
+  if (cols.gold) { const g = dark ? cols.gold : readable(cols.gold, '#FFFFFF', 2.2); Object.assign(v, { '--gold': g, '--gold-2': mixHex(g, '#FF3B00', 0.35) }); }
+  return v;
+}
+function bgVars(c) {
+  const b = darkBg(c), up = t => mixHex(b, '#FFFFFF', t);
+  return { '--bg': b, '--panel': up(0.07), '--panel-2': up(0.11), '--panel-3': up(0.17), '--line': up(0.13), '--line-2': up(0.21), '--grid': up(0.12), '--seg-on': up(0.23), '--bar-bg': up(0.07), '--status-band': b, '--term-bg': mixHex(b, '#000000', 0.4) };
+}
+const cssVars = v => Object.entries(v).map(([k, x]) => `${k}: ${x};`).join(' ');
+// your colours as one small stylesheet after the main one. Y2K keeps its own colours; the end-of-workout screen and
+// the record banner, which are always dark, take the dark-mode ones
+function applyColors() {
+  const cols = state.settings.colors || {};
+  let el = $('#usercolors');
+  if (!el) { el = document.createElement('style'); el.id = 'usercolors'; document.head.append(el); }
+  const R = ':root:not([data-style="y2k"])', d = cssVars(colorVars(cols, 'dark')), l = cssVars(colorVars(cols, 'light')), b = cols.bg ? cssVars(bgVars(cols.bg)) : '';
+  el.textContent = !d && !b ? '' : `${R} { ${d} }
+@media (prefers-color-scheme: light) { ${R}:not([data-theme="dark"]) { ${l} } }
+${R}[data-theme="light"] { ${l} }
+${b ? `@media (prefers-color-scheme: dark) { ${R}:not([data-theme="light"]) { ${b} } } ${R}[data-theme="dark"] { ${b} }` : ''}
+${R} .fin, ${R} .prfx-card { ${d} ${b} }`;
+}
+// the light and dark colours the preview starts from (the stylesheet's own), so either can be shown whatever the phone uses
+const BASE_COLORS = {
+  dark: { '--bg': '#000000', '--panel': '#121214', '--panel-2': '#1c1c1f', '--panel-3': '#2a2a2f', '--line': '#222226', '--line-2': '#36363c', '--seg-on': '#3a3a41', '--ink': '#f5f5f7', '--ink-2': '#ababb3', '--muted': '#75757d', '--accent': '#0a84ff', '--on-accent': '#ffffff', '--accent-soft': 'rgba(10, 132, 255, .17)', '--good': '#30d158', '--on-good': '#00230d', '--good-soft': 'rgba(48, 209, 88, .14)', '--side-l': '#32d74b', '--side-r': '#bf5af2', '--gold': '#ffd60a', '--gold-2': '#ff9f0a', '--bar-bg': '#121214', '--glow': '0 12px 30px -10px rgba(10, 132, 255, .75)', '--hi': 'inset 0 1px 0 rgba(255, 255, 255, .06)', 'color-scheme': 'dark' },
+  light: { '--bg': '#f2f2f7', '--panel': '#ffffff', '--panel-2': '#f2f2f7', '--panel-3': '#e5e5ea', '--line': '#e5e5ea', '--line-2': '#d1d1d6', '--seg-on': '#ffffff', '--ink': '#111114', '--ink-2': '#4a4a52', '--muted': '#6e6e76', '--accent': '#007aff', '--on-accent': '#ffffff', '--accent-soft': 'rgba(0, 122, 255, .1)', '--good': '#1f9d47', '--on-good': '#ffffff', '--good-soft': 'rgba(52, 199, 89, .14)', '--side-l': '#1e9e45', '--side-r': '#9f45d8', '--gold': '#b88600', '--gold-2': '#e08600', '--bar-bg': '#f9f9fb', '--glow': '0 12px 26px -12px rgba(0, 122, 255, .7)', '--hi': '0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12)', 'color-scheme': 'light' }
+};
+const darkNow = () => state.settings.theme === 'dark' || (state.settings.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+// a few parts of a workout, drawn with the real styles, to see the colours before saving them
+function colorPreview() {
+  const cell = (v, cls = '') => `<span class="cell ${cls}">${v}</span>`;
+  return `<div class="cpv-top"><div><b>${T('Full Body')}</b><small><span class="cpv-clock">7:59</span> · ${T('<b class="{bump}">{done}</b>/{total} sets', { bump: '', done: 3, total: 22 })}</small></div><span class="btn primary sm">${T('Finish')}</span></div>
+    <div class="wo-prog cpv-prog"><span class="full"><i style="width:100%"></i></span><span class="cur"><i style="width:50%"></i></span><span><i style="width:0"></i></span><span><i style="width:0"></i></span></div>
+    <div class="exc cpv-exc"><div class="sets" style="--cols:${setCols('wr', true, false)}">
+      <div class="set-row done"><span class="badge t-N">1</span><div class="prev"><span class="none">50×5</span></div>${cell('50')}${cell('5')}${cell('1', 'eff has')}<span class="check">${icon('check')}</span></div>
+      <div class="set-row"><span class="badge t-N">2</span><div class="prev"><span class="none">50×5</span></div>${cell('52.5', 'kp-on')}${cell('<span class="ph">5</span>', 'empty')}${cell('<span class="ph">1</span>', 'eff empty')}<span class="check">${icon('check')}</span></div>
+      <div class="pr-row">${icon('trophy')}<span>${T('New record: {list}', { list: T('Heaviest') })}</span></div>
+    </div></div>
+    <div class="cpv-misc"><span class="badge side side-L t-N">L</span><span class="badge side side-R t-N">R</span><span class="switch on"><span></span></span><span class="seg"><button class="on">${T('On')}</button><button>${T('Off')}</button></span><span class="link">${T('Link')}</span></div>
+    <div class="kp-grid cpv-kp"><span class="kp-k">7</span><span class="kp-k">8</span><span class="kp-k fn">${T('Next')}</span><span class="kp-k log">${icon('check')}${T('Log')}</span></div>`;
+}
+function colorsSheet() {
+  let draft = { ...(state.settings.colors || {}) }, mode = darkNow() ? 'dark' : 'light';
+  const cur = k => draft[k] || slotDef(k);
+  const pvVars = () => cssVars({ ...BASE_COLORS[mode], ...colorVars(draft, mode), ...(mode === 'dark' && draft.bg ? bgVars(draft.bg) : {}) });
+  // a note when a colour is shown differently than picked, or is hard to see
+  const note = k => {
+    const c = cur(k);
+    if (k === 'bg') return draft.bg && darkBg(c) !== c ? T('Shown a little darker, so text stays easy to read.') : '';
+    if (!draft[k]) return '';
+    if (contrastOf(c, draft.bg ? darkBg(draft.bg) : '#000000') < 2) return T('Hard to see on the dark background.');
+    return readable(c, '#FFFFFF', k === 'accent' ? 3 : k === 'gold' ? 2.2 : 2.6) !== c ? T('In light mode it’s shown a little darker, so it reads on white.') : '';
+  };
+  const slotHTML = s => {
+    const c = cur(s.k), list = SWATCHES[s.k === 'bg' ? 'bg' : 'any'];
+    return `<section class="cslot" data-k="${s.k}">
+      <div class="cslot-h"><span class="cdot" style="background:${c}"></span><div><b>${s.name()}</b><small>${s.desc()}</small></div><button class="link cslot-reset" data-a="reset" data-k="${s.k}" ${draft[s.k] ? '' : 'hidden'}>${T('Default')}</button></div>
+      <div class="cswatches">${list.map(v => `<button class="csw ${v === c ? 'on' : ''}" style="--c:${v}" data-a="pick" data-k="${s.k}" data-v="${v}" aria-label="${v}" aria-pressed="${v === c}"></button>`).join('')}
+        <label class="csw any" title="${T('Any colour')}"><input type="color" data-ck="${s.k}" value="${c.toLowerCase()}" aria-label="${esc(T('{name}: any colour', { name: s.name() }))}"></label>
+        <input class="chex" data-hex="${s.k}" value="${c}" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="characters" aria-label="${esc(T('{name}: hex code', { name: s.name() }))}"></div>
+      <p class="cnote">${note(s.k)}</p></section>`;
+  };
+  // after a change: the preview, and that colour's dot, swatches, wheel, code, note and reset
+  const paint = (d, k, from) => {
+    $('.cpv', d.el).style.cssText = pvVars();
+    const sec = $(`.cslot[data-k="${k}"]`, d.el);
+    if (!sec) return;
+    const c = cur(k);
+    $('.cdot', sec).style.background = c;
+    for (const b of $$('.csw[data-v]', sec)) { b.classList.toggle('on', b.dataset.v === c); b.setAttribute('aria-pressed', b.dataset.v === c); }
+    if (from !== 'wheel') $('input[type="color"]', sec).value = c.toLowerCase();
+    if (from !== 'hex') $('.chex', sec).value = c;
+    $('.cslot-reset', sec).hidden = !draft[k];
+    $('.cnote', sec).textContent = note(k);
+    if (k === 'bg') for (const kk of ['accent', 'good', 'left', 'right', 'gold']) { const n = $(`.cslot[data-k="${kk}"] .cnote`, d.el); if (n) n.textContent = note(kk); }
+  };
+  const set = (k, v) => { if (!v || v === slotDef(k)) delete draft[k]; else draft[k] = v; };
+  openSheet({
+    cls: 'wide colors-sheet',
+    label: T('Colours'),
+    render: () => `${sheetHead(T('Colours'), `<button class="btn sm primary" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
+      <div class="sheet-body pad">
+        <div class="cpv-box"><div class="cpv-bar"><b>${T('Preview')}</b><div class="seg" role="group">${['dark', 'light'].map(m => `<button class="${mode === m ? 'on' : ''}" data-a="mode" data-v="${m}" aria-pressed="${mode === m}">${m === 'dark' ? T('Dark') : T('Light')}</button>`).join('')}</div></div>
+          <div class="cpv" style="${pvVars()}" inert>${colorPreview()}</div></div>
+        <h3 class="sub-h">${T('Ready-made')}</h3>
+        <div class="cpresets">${COLOR_PRESETS.map(([n, c], i) => `<button class="cpreset" data-a="preset" data-i="${i}"><span class="cpreset-dots">${['accent', 'good', 'gold'].map(k => `<i style="background:${c[k] || slotDef(k)}"></i>`).join('')}</span><span class="cpreset-bg" style="background:${c.bg || '#000000'}"></span>${esc(T(n))}</button>`).join('')}</div>
+        ${COLOR_SLOTS.map(slotHTML).join('')}
+        <div class="row-btns left"><button class="btn ghost" data-a="resetAll">${icon('reset')}${T('All back to default')}</button></div>
+        ${state.settings.style === 'y2k' ? `<p class="muted small">${T('Y2K keeps its own colours; these are for the Clean style.')}</p>` : ''}
+      </div>`,
+    onInput: (el, d) => {
+      if (el.dataset.ck) { set(el.dataset.ck, normHex(el.value)); paint(d, el.dataset.ck, 'wheel'); }
+      else if (el.dataset.hex) { const h = normHex(el.value); if (h) { set(el.dataset.hex, h); paint(d, el.dataset.hex, 'hex'); } }
+    },
+    actions: {
+      pick: (b, d) => { set(b.dataset.k, b.dataset.v); paint(d, b.dataset.k); },
+      reset: (b, d) => { delete draft[b.dataset.k]; paint(d, b.dataset.k); },
+      preset: (b, d) => { draft = { ...COLOR_PRESETS[+b.dataset.i][1] }; refreshSheet(d); },
+      resetAll: (b, d) => { draft = {}; refreshSheet(d); },
+      mode: (b, d) => { mode = b.dataset.v; refreshSheet(d); },
+      save: (b, d) => {
+        state.settings.colors = { ...draft };
+        save(); applyColors(); closeSheet(d); render(); renderWorkout();
+        toast(T('Colours saved.'));
+      }
+    }
+  });
 }
 /* ----- Y2K style extras: its fonts, a number-grid backdrop and the HUD strip (styles live in y2k.css) ----- */
 let hudTimer = null;
@@ -2655,12 +2820,13 @@ const recKind = k => ({ 'Est. 1RM': T('Est. 1RM'), Heaviest: T('Heaviest'), 'Mos
 /* ============================== Celebrations: confetti, a fanfare, a stronger tap ============================== */
 
 // confetti on one canvas over everything, thrown from a point on the screen; none with Reduce Motion
-const FX_COLORS = {
-  party: ['#0A84FF', '#30D158', '#FFD60A', '#FF375F', '#BF5AF2', '#64D2FF', '#FFFFFF'],
-  gold: ['#FFD60A', '#FFE680', '#FF9F0A', '#FFF6CC', '#FFB800', '#FFFFFF'],
-  y2k: ['#19F0FF', '#FF2D8F', '#1F3BFF', '#E8F0FF', '#A9B8F5']
+// in your colours (Settings → Colours): the record gold, or the accent, done and side colours with a few more
+const fxColors = kind => {
+  if (state.settings.style === 'y2k') return ['#19F0FF', '#FF2D8F', '#1F3BFF', '#E8F0FF', '#A9B8F5'];
+  const g = colorOf('gold');
+  return kind === 'gold' ? [g, mixHex(g, '#FFFFFF', 0.45), mixHex(g, '#FF3B00', 0.35), mixHex(g, '#FFFFFF', 0.8), '#FFFFFF']
+    : [colorOf('accent'), colorOf('good'), g, '#FF375F', colorOf('right'), '#64D2FF', '#FFFFFF'];
 };
-const fxColors = kind => state.settings.style === 'y2k' ? FX_COLORS.y2k : FX_COLORS[kind];
 let fxCv = null, fxBits = [], fxRaf = 0, fxLast = 0, fxEnd = 0, fxFrames = 0;
 function confetti(x, y, { n = 120, colors = fxColors('party'), angle = -Math.PI / 2, spread = Math.PI * 2, power = 1 } = {}) {
   if (calm() || !window.requestAnimationFrame) return;
@@ -2856,9 +3022,10 @@ const CARD_W = 360, CARD_H = 450;
 const CARD_FONT = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'SF Arabic', 'Geeza Pro', 'Noto Sans Arabic', sans-serif`;
 let cardSeq = 0;
 function cardCtx(k, label) {
+  const g = colorOf('gold'), bg = (state.settings.colors || {}).bg && darkBg(state.settings.colors.bg);
   const c = state.settings.style === 'y2k'
-    ? { bg1: '#05060F', bg2: '#101A57', line: '#1F3BFF', ink: '#E8F0FF', ink2: '#A9B8F5', dim: '#6C7BC7', accent: '#19F0FF', gold: ['#FFFFFF', '#19F0FF', '#FF2D8F'], good: '#19F0FF', flame: ['#E8F0FF', '#19F0FF', '#FF2D8F'], body: '#131B4D', muscle: '#1E2A6E', hot: ['#19F0FF', '#FF2D8F'], font: `'Courier New', ui-monospace, Menlo, monospace` }
-    : { bg1: '#0A0A0E', bg2: '#1A1A22', line: 'rgba(255,255,255,.1)', ink: '#F5F5F7', ink2: '#A1A1AA', dim: '#6B6B73', accent: '#0A84FF', gold: ['#FFF3B0', '#FFD60A', '#FF9F0A'], good: '#30D158', flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#24242B', muscle: '#33333B', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+    ? { bg1: '#05060F', bg2: '#101A57', line: '#1F3BFF', ink: '#E8F0FF', ink2: '#A9B8F5', dim: '#6C7BC7', accent: '#19F0FF', gold: ['#FFFFFF', '#19F0FF', '#FF2D8F'], good: '#19F0FF', flame: ['#E8F0FF', '#19F0FF', '#FF2D8F'], body: '#2A3A8A', muscle: '#1E2A6E', hot: ['#19F0FF', '#FF2D8F'], font: `'Courier New', ui-monospace, Menlo, monospace` }
+    : { bg1: bg || '#0A0A0E', bg2: bg ? mixHex(bg, '#FFFFFF', 0.09) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: '#F5F5F7', ink2: '#A1A1AA', dim: '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
   return Object.assign(c, { k, label, rtl: RTL, id: `cd${++cardSeq}` });
 }
 let measure = null;
@@ -2891,17 +3058,46 @@ const grad = (id, cols, v = true) => `<linearGradient id="${id}" x1="0" y1="0" x
 const glow = (id, col, op) => `<radialGradient id="${id}"><stop offset="0" stop-color="${col}" stop-opacity="${op}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient>`;
 // light rays from a point, for the records and milestone cards
 const rays = (x, y, r, col, op) => Array.from({ length: 16 }, (_, i) => `<path d="M${x} ${y}L${x + r * Math.cos((i * 22.5 - 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 - 3) * Math.PI / 180)}L${x + r * Math.cos((i * 22.5 + 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 + 3) * Math.PI / 180)}Z" fill="${col}" opacity="${op}"/>`).join('');
-const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('');
 function cardFrame(c, inner, defs = '') {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}" font-family="${c.font}" role="img" aria-label="${esc(c.label)}">
-<defs>${grad(c.id + 'bg', [c.bg2, c.bg1])}${defs}</defs><rect width="${CARD_W}" height="${CARD_H}" rx="26" fill="url(#${c.id}bg)"/>${inner}
+<defs>${grad(c.id + 'bg', [c.bg2, c.bg1])}<filter id="${c.id}blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter>${defs}</defs><rect width="${CARD_W}" height="${CARD_H}" rx="26" fill="url(#${c.id}bg)"/>${inner}
 <rect x=".75" y=".75" width="${CARD_W - 1.5}" height="${CARD_H - 1.5}" rx="25.5" fill="none" stroke="${c.line}" stroke-width="1.5"/>${ctext({ ...c, rtl: false }, 180, 432, 'LIFTING SANITY', { size: 10.5, weight: 800, fill: c.dim, ls: 3.2 })}</svg>`;
 }
-// the body, front or back, with each trained muscle coloured by how many sets it got
-function cardFigure(c, view, heat, x, y, h) {
-  const body = `<g fill="${c.body}">${FIG_BODY}${FIG_LIMBS}<g transform="${MIRROR}">${FIG_LIMBS}</g></g>`;
-  const mus = (view === 'front' ? FIG_FRONT : FIG_BACK).map(([m, d, mir]) => `<g fill="${heat[m] ? mixHex(c.hot[0], c.hot[1], heat[m]) : c.muscle}">${d}${mir ? `<g transform="${MIRROR}">${d}</g>` : ''}</g>`).join('');
-  return `<svg x="${x}" y="${y}" width="${h / 2}" height="${h}" viewBox="0 0 100 200">${body}${mus}</svg>`;
+/* ----- the body on the cards: muscle shapes from react-body-highlighter (https://github.com/GV79/react-body-highlighter),
+   front and back, rounded to one decimal and keyed by region. Its licence:
+   MIT License. Copyright (c) 2020 GV79.
+   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
+   files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
+   modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice
+   shall be included in all copies or substantial portions of the Software.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. ----- */
+const BODY = {"front":[["chest","51.8 41.6 51 55.1 58 58 67.8 55.5 70.6 47.3 62 41.6|29.8 46.5 31.4 55.5 40.8 58 48.2 55.1 47.8 42 37.6 42"],["obliques","68.6 63.3 67.3 57.1 58.8 59.6 60 64.1 60.4 83.3 65.7 78.8 66.5 69.8|33.9 78.4 33.1 71.8 31 63.3 32.2 57.1 40.8 59.2 39.2 63.3 39.2 83.7"],["abs","56.3 59.2 58 64.1 58.4 78 58.4 92.7 56.3 98.4 55.1 104.1 51.4 107.8 51 84.5 50.6 67.3 51 57.1|43.7 58.8 48.6 57.1 49 67.3 48.6 84.5 48.2 107.3 44.5 103.7 40.8 91.4 40.8 78.4 41.2 64.5"],["biceps","16.7 68.2 18 71.4 22.9 66.1 29 53.9 27.8 49.4 20.4 55.9|71.4 49.4 70.2 54.7 76.3 66.1 81.6 71.8 82.9 69 78.8 55.5"],["triceps","69.4 55.5 69.4 61.6 75.9 72.7 77.6 70.2 75.5 67.3|22.4 69.4 29.8 55.5 29.8 60.8 22.9 73.1"],["neck","55.5 23.7 50.6 33.5 50.6 39.2 61.6 40 70.6 44.9 69.4 36.7 63.3 35.1 58.4 30.6|29 44.9 30.2 37.1 36.3 35.1 41.2 30.2 44.5 24.5 49 33.9 48.6 39.2 38 39.6"],["fdelt","78.4 53.1 79.6 47.8 79.2 41.2 75.9 38 71 36.3 72.2 42.9 71.4 47.3|28.2 47.3 21.2 53.1 20 47.8 20.4 40.8 24.5 37.1 28.6 37.1 26.9 43.3"],["head","42.4 2.9 40 11.8 42 19.6 46.1 23.3 49.8 25.3 54.7 22.4 57.6 19.2 59.2 10.2 57.1 2.4 49.8 0"],["add","52.7 110.2 54.3 124.9 60 110.2 62 100 64.9 94.3 60 92.7 56.7 104.5|47.8 110.6 44.9 125.3 42 115.9 40.4 113.1 39.6 107.3 38 102.4 34.7 93.9 39.6 92.2 41.6 99.2 43.7 105.3"],["quads","34.7 98.8 37.1 108.2 37.1 127.8 34.3 137.1 31 132.7 29.4 120 28.2 111.4 29.4 100.8 32.2 94.7|63.3 105.7 64.5 100 66.9 94.7 70.2 101.2 71 111.8 68.2 133.1 65.3 137.6 62.4 128.6 62 111.4|38.8 129.4 38.4 112.2 41.2 118.4 44.5 129.4 42.9 135.1 40 146.1 36.3 146.5 35.5 140|59.6 145.7 55.5 129 60.8 113.9 61.2 130.2 64.1 139.6 62.9 146.5|32.7 138.4 26.5 145.7 25.7 136.7 25.7 127.3 26.9 114.3 29.4 133.5|71.8 113.1 73.9 124.1 73.9 140.4 72.7 145.7 66.5 138.4 70.2 133.5"],["knees","33.9 140 34.7 143.3 35.5 147.3 36.3 151 35.1 156.7 29.8 156.7 27.3 152.7 27.3 147.3 30.2 144.1|65.7 140 72.2 147.8 72.2 152.2 69.8 157.1 64.9 156.7 62.9 151"],["calves","71.4 160.4 73.5 153.5 76.7 161.2 79.6 167.8 78.4 187.8 79.6 195.5 74.7 195.5|24.9 194.7 27.8 164.9 28.2 160.4 26.1 154.3 24.9 157.6 22.4 161.6 20.8 167.8 22 188.2 20.8 195.5|72.7 195.1 69.8 159.2 65.3 158.4 64.1 162.4 64.1 165.3 65.7 177.1|35.5 158.4 35.9 162.4 35.9 166.9 35.1 172.2 35.1 176.7 32.2 182 30.6 187.3 26.9 194.7 27.3 187.8 28.2 180.4 28.6 175.5 29 169.8 29.8 164.1 30.2 158.8"],["forearms","6.1 88.6 10.2 75.1 14.7 70.2 16.3 74.3 19.2 73.5 4.5 97.6 0 100|84.5 69.8 83.3 73.5 80 73.1 95.1 98.4 100 100.4 93.5 89.4 89.8 76.3|77.6 72.2 77.6 77.6 80.4 84.1 85.3 89.8 92.2 101.2 94.7 99.6|6.9 101.2 13.5 90.6 18.8 84.1 21.6 77.1 21.2 71.8 4.9 98.8"]],"back":[["head","50.6 0 46 0.9 40.9 5.5 40.4 12.8 45.1 20 55.7 20 59.1 13.6 59.6 4.7 55.7 1.3"],["traps","44.7 21.7 47.7 21.7 47.2 38.3 47.7 64.7 38.3 53.2 35.3 40.9 31.1 36.6 39.1 33.2 43.8 27.2|52.3 21.7 55.7 21.7 56.6 27.2 60.9 32.8 68.9 36.6 64.7 40.4 61.7 53.2 52.3 64.7 53.2 38.3"],["rdelt","29.4 37 23 39.1 17.4 44.3 18.3 53.6 24.3 49.4 27.2 46.4|71.1 37 78.3 39.6 82.6 44.7 81.7 53.6 74.9 48.9 72.3 45.1"],["lats","31.1 38.7 28.1 48.9 28.5 55.3 34 75.3 47.2 71.1 47.2 66.4 36.6 54 33.6 41.3|68.9 38.7 71.9 49.4 71.5 56.2 66 75.3 52.8 71.1 52.8 66.4 63.4 54.5 66.4 41.7"],["triceps","26.8 49.8 17.9 55.7 14.5 72.3 16.6 81.7 21.7 63.8 26.8 55.7|73.6 50.2 82.1 55.7 86 73.2 83.4 82.1 77.9 63 73.2 55.7|26.8 58.3 26.8 68.5 23 75.3 19.1 77.4 22.6 65.5|72.8 58.3 77 64.7 80.4 77.4 76.6 75.3 72.8 68.9"],["lowerback","47.7 72.8 34.5 77 35.3 83.4 49.4 102.1 46.8 83|52.3 72.8 65.5 77 64.7 83.4 50.6 102.1 53.2 83.8"],["forearms","86.4 75.7 91.1 83.4 93.2 94 100 106.4 96.2 104.3 88.1 89.4 84.3 83.8|13.6 75.7 8.9 83.8 6.8 93.6 0 106.4 3.8 104.3 12.3 88.5 15.7 83|81.3 79.6 77.4 77.9 79.1 84.7 91.1 103.8 93.2 108.9 94.5 104.7|18.7 79.6 22.1 77.9 20.9 84.3 9.4 103 6.8 108.5 5.1 104.7"],["glutes","44.7 99.6 30.2 108.5 29.8 118.7 31.5 126 47.2 121.3 49.4 114.9|55.3 99.1 51.1 114.5 52.3 120.9 68.1 126 69.8 119.1 69.4 108.5"],["add","48.1 123 44.7 123 41.3 125.5 45.1 144.3 48.5 135.7 48.9 129.4|51.9 122.6 55.7 123.4 59.1 126 54.9 144.3 51.9 136.2 51.1 129.4"],["hams","28.9 122.1 31.1 129.4 36.6 126 35.3 135.3 34.5 150.2 29.4 158.3 28.9 146.8 27.7 141.3 27.2 131.5|71.5 121.7 69.4 128.9 63.8 126 65.5 136.6 66.4 150.2 71.1 158.3 71.5 147.7 72.8 142.1 73.6 131.9|38.7 125.5 44.3 146 40.4 166.8 36.2 152.8 37 135.3|61.7 125.5 63.4 136.2 64.3 153.2 60 166.8 56.2 146.4"],["knees","34.5 153.2 31.1 159.1 33.6 166.4 37.4 162.6|66.4 153.6 63 163 66.8 166.4 69.4 159.1"],["calves","29.4 160.4 28.5 167.2 24.7 179.6 23.8 192.8 25.5 197 28.5 193.2 29.8 180 31.9 171.1 31.9 166.8|37.4 165.1 35.3 167.7 33.2 171.9 31.1 180.4 30.2 191.9 34 200 38.7 190.6 39.1 168.9|63 165.1 61.3 168.5 61.7 190.6 66.4 199.6 70.6 191.9 68.9 179.6 66.8 170.2|70.6 160.4 72.3 168.5 75.7 179.1 76.6 192.8 74.5 196.6 72.3 193.6 70.6 179.6 68.1 168.1"],["soleus","28.5 195.7 30.2 195.7 33.6 201.7 30.6 220 28.5 213.6 26.8 198.3"],["soleus","69.8 195.7 71.9 195.7 73.6 198.3 71.9 213.2 70.2 219.6 67.2 202.1"]]};
+// how much each region of that body shows each muscle the app knows (side delts show from the front and the back)
+const BODY_OF = { chest: [['chest', 1]], frontdelts: [['fdelt', 1]], sidedelts: [['fdelt', 0.6], ['rdelt', 0.6]], reardelts: [['rdelt', 1]], biceps: [['biceps', 1]], triceps: [['triceps', 1]],
+  forearms: [['forearms', 1]], abs: [['abs', 1]], obliques: [['obliques', 1]], neck: [['neck', 1]], traps: [['traps', 1], ['neck', 0.6]], upperback: [['traps', 0.8], ['lats', 0.4]], lats: [['lats', 1]],
+  lowerback: [['lowerback', 1]], glutes: [['glutes', 1]], abductors: [['glutes', 0.6]], adductors: [['add', 1]], quads: [['quads', 1]], hamstrings: [['hams', 1]], calves: [['calves', 1], ['soleus', 1]] };
+const FULL_BODY = ['chest', 'quads', 'abs', 'frontdelts', 'lats', 'glutes', 'hamstrings', 'upperback'];
+// how worked each region is, 0 to 1, from sets per muscle (the most-trained muscle, or 4 sets, is the top)
+function bodyHeat(muscles) {
+  const top = muscles.length ? Math.max(4, muscles[0][1]) : 4, h = {};
+  for (const [m, n] of muscles) {
+    const t = 0.3 + 0.7 * Math.min(1, n / top);
+    for (const mm of m === 'fullbody' ? FULL_BODY : [m]) for (const [r, wt] of BODY_OF[mm] || []) h[r] = Math.max(h[r] || 0, t * wt);
+  }
+  return h;
+}
+// one view of the body, h tall: the muscles worked in warm colours with a glow, the rest in grey
+function cardBody(c, view, heat, x, y, h) {
+  const parts = [], glows = [];
+  for (const [r, pts] of BODY[view]) {
+    const t = Math.min(1, heat[r] || 0), fill = t ? mixHex(c.hot[0], c.hot[1], t) : r === 'head' || r === 'knees' ? c.body : c.muscle;
+    for (const p of pts.split('|')) { parts.push(`<polygon points="${p}" fill="${fill}"/>`); if (t > 0.45) glows.push(`<polygon points="${p}" fill="${fill}"/>`); }
+  }
+  return `<svg x="${x}" y="${y}" width="${+(h * 100 / 220).toFixed(1)}" height="${h}" viewBox="0 0 100 220" overflow="visible">${glows.length ? `<g filter="url(#${c.id}blur)" opacity=".6">${glows.join('')}</g>` : ''}${parts.join('')}</svg>`;
 }
 function cardWorkout(st) {
   const c = cardCtx('workout', T('The workout')), { w } = st, unitTxt = ' ' + U();
@@ -2924,12 +3120,8 @@ function cardWorkout(st) {
     h += ctext(c, x, 239, label.toLocaleUpperCase(LOC), { size: 9, weight: 700, fill: c.ink2, ls: 1, max: cw - 6 });
   });
   // the muscles worked, front and back
-  const most = st.muscles.length ? st.muscles[0][1] : 1, heat = {};
-  for (const [m, n] of st.muscles) {
-    const t = 0.25 + 0.75 * Math.min(1, n / Math.max(4, most));
-    for (const mm of m === 'fullbody' ? ['chest', 'quads', 'abs', 'frontdelts', 'lats', 'glutes', 'hamstrings', 'upperback'] : [m]) heat[mm] = Math.max(heat[mm] || 0, t);
-  }
-  h += cardFigure(c, 'front', heat, 98, 252, 148) + cardFigure(c, 'back', heat, 188, 252, 148);
+  const heat = bodyHeat(st.muscles);
+  h += cardBody(c, 'front', heat, 100, 250, 154) + cardBody(c, 'back', heat, 190, 250, 154);
   if (st.muscles.length) h += ctext(c, 180, 414, st.muscles.slice(0, 3).map(([m, n]) => `${MUSCLES[m]} ${trimNum(n, 1)}`).join(' · '), { size: 11, weight: 600, fill: c.ink2, max: 312 });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h) };
 }
@@ -3009,18 +3201,116 @@ function cardMilestone(st) {
   if (byCount && st.mark) h += ctext(c, 180, 372, T('And {v} lifted in total!', { v: `${compact(st.mark)} ${U()}` }), { size: 13.5, weight: 800, fill: c.gold[1], max: 312 });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.3)) };
 }
+// an exercise's best working set: the heaviest, then the most reps, the longest, the farthest
+function bestSet(x) {
+  const key = s => [s.w || 0, recReps(x, s), s.sec || 0, s.dist || 0];
+  const more = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+  let best = null;
+  for (const s of x.sets) if (s.done && s.t !== 'W' && (!best || more(key(s), key(best)))) best = s;
+  return best;
+}
+// what was done, with each exercise's picture (your photo, or its drawing), its sets and best set
+function cardExercises(st) {
+  const c = cardCtx('exercises', T('The exercises')), list = st.w.ex.filter(x => x.sets.some(s => s.done && s.t !== 'W')), n = list.length;
+  // bigger tiles when there are fewer: one column of two, two by two, or two by three
+  const prIds = new Set(st.prs.map(p => p.exId)), cols = n <= 2 ? 1 : 2, x0 = 22, y0 = 92, gx = 16, gy = 12;
+  const tw = cols === 1 ? 316 : 150, th = n <= 4 ? 150 : 94, ph = th - 40;
+  let h = ctext(c, 180, 46, TN(n, '{n} exercise', '{n} exercises').toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 76, st.w.name, { size: 22, weight: 800, max: 312 });
+  let defs = '';
+  list.slice(0, 6).forEach((x, i) => {
+    const ex = getEx(x.exId), col = i % cols, row = Math.floor(i / cols), tx = cx_(c, x0 + col * (tw + gx), tw), ty = y0 + row * (th + gy), clip = `${c.id}c${i}`;
+    const pic = photos.get(x.exId) || (artOf(x.exId) || []).slice(-1)[0];
+    const sets = x.sets.filter(s => s.done && s.t !== 'W'), best = bestSet(x);
+    defs += `<clipPath id="${clip}"><rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="14"/></clipPath>`;
+    h += `<g clip-path="url(#${clip})"><rect x="${tx}" y="${ty}" width="${tw}" height="${th}" fill="${c.bg2}"/><rect x="${tx}" y="${ty}" width="${tw}" height="${ph}" fill="${pic ? '#EEF1F6' : c.bg1}"/>`;
+    // the drawing's stand-in (the body with this exercise's muscles), shown when there's no picture or it can't load
+    const fh = ph - 6, fb = cardBody(c, BACK_VIEW.has(ex.m) ? 'back' : 'front', bodyHeat([[ex.m, 4], ...ex.sec.map(m => [m, 2])]), tx + tw / 2 - fh * 50 / 220, ty + 3, fh);
+    h += pic ? `<g data-fb="${i}" display="none"><rect x="${tx}" y="${ty}" width="${tw}" height="${ph}" fill="${c.bg1}"/>${fb}</g><image data-i="${i}" href="${esc(pic)}" x="${tx + 4}" y="${ty + 3}" width="${tw - 8}" height="${ph - 6}" preserveAspectRatio="xMidYMid ${photos.get(x.exId) ? 'slice' : 'meet'}"/>` : fb;
+    h += `</g>`;
+    if (prIds.has(x.exId)) h += `<circle cx="${tx + (c.rtl ? 14 : tw - 14)}" cy="${ty + 14}" r="11" fill="${c.gold[1]}"/>${TROPHY('#1B1000', tx + (c.rtl ? 14 : tw - 14) - 7, ty + 7, 0.14)}`;
+    const textX = (c.rtl ? CARD_W - tx - tw : tx) + 10;
+    h += ctext(c, textX, ty + ph + 17, ex.name, { size: 12, weight: 700, anchor: 'start', max: tw - 20 });
+    h += ctext(c, textX, ty + ph + 32, `${TN(sets.length, '{n} set', '{n} sets')}${best ? ` · ${fmtSet(x, best, null, false)}` : ''}`, { size: 10.5, weight: 600, fill: c.ink2, anchor: 'start', max: tw - 20 });
+  });
+  if (n > 6) h += ctext(c, 180, 414, T('+{n} more', { n: n - 6 }), { size: 12, weight: 700, fill: c.ink2 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, defs) };
+}
+// the muscles worked, big, front and back, with how many sets each got
+function cardMuscles(st) {
+  const c = cardCtx('muscles', T('Muscles worked')), heat = bodyHeat(st.muscles), n = st.muscles.length;
+  let h = `<circle cx="180" cy="230" r="170" fill="url(#${c.id}r)"/>`;
+  h += ctext(c, 180, 46, T('Muscles worked').toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 70, TN(n, '{n} muscle group', '{n} muscle groups'), { size: 13, weight: 600, fill: c.ink2, max: 300 });
+  h += cardBody(c, 'front', heat, 40, 82, 284) + cardBody(c, 'back', heat, 191, 82, 284);
+  h += `<rect x="${cx_(c, 110, 140)}" y="378" width="140" height="7" rx="3.5" fill="url(#${c.id}h)"/>`;
+  h += ctext(c, 102, 385, T('fewer sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'end', max: 80 }) + ctext(c, 258, 385, T('more sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'start', max: 80 });
+  if (n) h += ctext(c, 180, 410, st.muscles.slice(0, 4).map(([m, k]) => `${MUSCLES[m]} ${trimNum(k, 1)}`).join(' · '), { size: 11.5, weight: 700, max: 312 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'h', c.hot, false) + glow(c.id + 'r', c.hot[1], 0.16)) };
+}
+// the exercises with some history, as small charts of the best set each time (est. 1RM, reps, time or distance)
+function progressRows(st) {
+  const prIds = new Set(st.prs.map(p => p.exId)), rows = [];
+  for (const id of [...new Set(st.w.ex.filter(x => x.sets.some(s => s.done && s.t !== 'W')).map(x => x.exId))]) {
+    const k = getEx(id).k, metric = metricsFor(k)[0][0];
+    const pts = exSeries(id, metric, baselineAt(id, st.w.start), st.w.start + 1).slice(-8);
+    if (pts.length < 3 || pts[pts.length - 1].wid !== st.w.id) continue;
+    const gain = pts[pts.length - 1].y - pts[0].y;
+    rows.push({ id, k, metric, pts, gain, rel: pts[0].y ? gain / pts[0].y : 0, pr: prIds.has(id) });
+  }
+  return rows.sort((a, b) => (b.pr - a.pr) || (b.rel - a.rel)).slice(0, 3);
+}
+function cardProgress(st, rows) {
+  const up = rows.some(r => r.gain > 0), c = cardCtx('progress', up ? T('Getting stronger') : T('Your progress'));
+  let h = ctext(c, 180, 46, (up ? T('Getting stronger') : T('Your progress')).toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 68, T('Your best set, session by session'), { size: 12.5, weight: 600, fill: c.ink2, max: 300 });
+  let defs = grad(c.id + 'a', [c.accent, c.bg1]);
+  const rh = Math.min(160, 330 / rows.length);
+  rows.forEach((r, i) => {
+    const y = 88 + i * rh, ex = getEx(r.id), last = r.pts[r.pts.length - 1];
+    h += ctext(c, 28, y + 14, ex.name, { size: 14, weight: 700, anchor: 'start', max: 190 });
+    h += ctext(c, 332, y + 14, fmtMetric(r.metric, last.y, r.k), { size: 14, weight: 800, fill: c.accent, anchor: 'end', max: 110 });
+    const plus = r.gain > 0 ? gainPlus({ kind: { e1rm: 'Est. 1RM', top: 'Heaviest', reps: 'Most reps', sec: 'Longest', dist: 'Farthest' }[r.metric] || 'Heaviest', now: last.y, was: r.pts[0].y }, r.k) : '';
+    h += ctext(c, 332, y + 30, plus ? T('{gain} since {date}', { gain: plus, date: fmtShort(r.pts[0].x) }) : T('Steady since {date}', { date: fmtShort(r.pts[0].x) }), { size: 10.5, weight: 700, fill: plus ? c.good : c.ink2, anchor: 'end', max: 200 });
+    // the chart runs left to right in every language, like the app's charts
+    const lo = Math.min(...r.pts.map(p => p.y)), hi = Math.max(...r.pts.map(p => p.y)), cy0 = y + 40, ch = rh - 58;
+    const X = j => 34 + j * (292 / (r.pts.length - 1)), Y = v => hi === lo ? cy0 + ch / 2 : cy0 + ch - (v - lo) / (hi - lo) * ch;
+    const line = r.pts.map((p, j) => `${j ? 'L' : 'M'}${X(j).toFixed(1)} ${Y(p.y).toFixed(1)}`).join('');
+    h += `<path d="${line}L${X(r.pts.length - 1).toFixed(1)} ${cy0 + ch + 6}L34 ${cy0 + ch + 6}Z" fill="url(#${c.id}a)" opacity=".28"/>`;
+    h += `<path d="${line}" fill="none" stroke="${c.accent}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    h += r.pts.map((p, j) => j === r.pts.length - 1 ? '' : `<circle cx="${X(j).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.6" fill="${c.bg1}" stroke="${c.accent}" stroke-width="1.6"/>`).join('');
+    const lx = X(r.pts.length - 1), ly = Y(last.y), hot = r.pr ? c.gold[1] : c.accent;
+    h += `<circle cx="${lx}" cy="${ly.toFixed(1)}" r="9" fill="${hot}" opacity=".3" filter="url(#${c.id}blur)"/><circle cx="${lx}" cy="${ly.toFixed(1)}" r="5" fill="${hot}" stroke="${c.ink}" stroke-width="1.5"/>`;
+  });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, defs) };
+}
 function finCards(st) {
-  const out = [];
+  const out = [], prog = progressRows(st);
   if (st.count || st.mark) out.push(cardMilestone(st));
   out.push(cardWorkout(st));
   if (st.prs.length) out.push(cardRecords(st));
+  out.push(cardExercises(st));
+  if (st.muscles.length) out.push(cardMuscles(st));
+  if (prog.length) out.push(cardProgress(st, prog));
   out.push(cardStreak(st));
   if (st.cmp && st.cmp.vol) out.push(cardCompare(st));
   return out;
 }
+// pictures in a card go into the shared picture itself (a picture drawn from SVG can't fetch them); one that
+// can't be fetched is swapped for its stand-in
+const artData = new Map();
+const dataURL = u => artData.get(u) || artData.set(u, fetch(u).then(r => r.ok ? r.blob() : Promise.reject(new Error(r.status))).then(b => new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); })).catch(() => null)).get(u);
+async function inlineArt(svg) {
+  const urls = [...new Set([...svg.matchAll(/<image data-i="\d+" href="([^"]+)"/g)].map(m => m[1]).filter(u => !u.startsWith('data:')))];
+  const got = new Map(await Promise.all(urls.map(async u => [u, await dataURL(u.replace(/&amp;/g, '&'))])));
+  const failed = [];
+  svg = svg.replace(/<image data-i="(\d+)" href="([^"]+)"/g, (m, i, u) => { if (u.startsWith('data:')) return m; const d = got.get(u); if (d) return `<image data-i="${i}" href="${d}"`; failed.push(i); return `<image data-i="${i}" display="none" href=""`; });
+  for (const i of failed) svg = svg.replace(`<g data-fb="${i}" display="none">`, `<g data-fb="${i}">`);
+  return svg;
+}
 // a card as a 1080 × 1350 picture (the size phones share best)
-function cardPNG(cd) {
-  const svg = cd.svg.replace(`width="${CARD_W}" height="${CARD_H}"`, `width="${CARD_W * 3}" height="${CARD_H * 3}"`);
+async function cardPNG(cd) {
+  const svg = (await inlineArt(cd.svg)).replace(`width="${CARD_W}" height="${CARD_H}"`, `width="${CARD_W * 3}" height="${CARD_H * 3}"`);
   return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
@@ -3134,6 +3424,7 @@ function finishScreen(id, mode = 'new') {
     }
   });
   const el = def.el, strip = $('.fin-cards', el), dots = $$('.fin-dots button', el);
+  for (const im of $$('.fin-card image[data-i]', el)) im.addEventListener('error', () => { const fb = im.parentNode.querySelector(`[data-fb="${im.dataset.i}"]`) || im.closest('svg').querySelector(`[data-fb="${im.dataset.i}"]`); im.remove(); if (fb) fb.removeAttribute('display'); });
   // the dot under the card in view; its picture is made while you look at it, ready for Share
   strip.addEventListener('scroll', () => {
     const a = strip.children[0], b = strip.children[1];
@@ -4943,6 +5234,7 @@ VIEWS.settings = function () {
     ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
+    ${row(T('Colours'), s.style === 'y2k' ? T('Your own accent, done, left and right, record and background colours, with a preview. Y2K keeps its own; they show in the Clean style.') : T('Your own accent, done, left and right, record and background colours, with a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${['accent', 'good', 'left', 'right', 'gold'].map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
   </div>
   <h2 class="section-h">${T('Your data')}</h2><div class="card list-card">
@@ -4957,7 +5249,7 @@ VIEWS.settings = function () {
     <p class="muted small">${T('Your workouts are stored on this device only, and nobody else can see them: sharing the link shares the app, not your data. Browsers can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.')}</p>
   </div>
   <p class="muted small center">Lifting Sanity 1.3 · ${TN(LIB.length, '{n} exercise', '{n} exercises')} · ${storageOK ? T('saving to this device') : T('storage blocked')}</p>
-  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })}</p>
+  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })} · ${T('Muscle map on the end-of-workout cards: {lib} (MIT)', { lib: '<a href="https://github.com/GV79/react-body-highlighter" target="_blank" rel="noopener">react-body-highlighter</a>' })}</p>
   <p class="muted small center fit-info" id="fitInfo" lang="en" dir="ltr">${(screenGap(), fitLine())}</p>`;
 };
 function exportData() {
@@ -5413,6 +5705,7 @@ const ACT = {
     save(); refreshAll();
   },
   setMotion: b => { state.settings.motion = b.dataset.v === 'on'; save(); mvStopAll(); render(); renderWorkout(); },
+  openColors: () => colorsSheet(),
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },

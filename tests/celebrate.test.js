@@ -67,19 +67,29 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
     return w && { title: w.querySelector('.fin-title').textContent, sub: w.querySelector('.fin-sub').textContent, cards: [...w.querySelectorAll('.fin-card')].map(c => c.querySelector('svg').getAttribute('aria-label')), dots: w.querySelectorAll('.fin-dots button').length, medal: !!w.querySelector('.fin-face') };
   });
   r.ok(fin && fin.title === 'New records!' && fin.sub === 'Your workout number 4 · Upper A' && fin.medal, 'Finish opens the full-screen celebration: a medal, “New records!” and the workout’s number', fin);
-  r.ok(fin && JSON.stringify(fin.cards) === JSON.stringify(['The workout', 'New records', 'Week streak', 'Against last time']) && fin.dots === 4, 'the cards: the workout, its records, the week streak and against last time, with a dot for each', fin && fin.cards);
+  const CARDS = ['The workout', 'New records', 'The exercises', 'Muscles worked', 'Getting stronger', 'Week streak', 'Against last time'];
+  r.ok(fin && JSON.stringify(fin.cards) === JSON.stringify(CARDS) && fin.dots === 7, 'the cards: the workout, its records, the exercises, the muscles worked, getting stronger, the week streak and against last time, with a dot for each', fin && fin.cards);
   r.ok(await t.ev('fxBits.length') > 100, 'it opens with confetti');
   await p.waitForTimeout(1800);
-  const cardText = i => p.evaluate(i => document.querySelectorAll('.fin-card')[i].textContent.replace(/\s+/g, ' ').trim(), i);
+  const cardText = i => p.evaluate(i => document.querySelectorAll('.fin-card')[i].textContent.replace(/\s+/g, ' ').trim(), typeof i === 'number' ? i : CARDS.indexOf(i));
   const vol = 82.5 * 8 * 3 + 62.5 * 10 * 3, prevVol = 80 * 8 * 3 + 60 * 10 * 3;
   const c0 = await cardText(0);
   r.ok(c0.includes('Upper A') && c0.includes(`${vol.toLocaleString('en-US')} kg`) && /As heavy as 2\.6 cars/.test(c0) && /\d+ min/.test(c0) && /WORKING SETS/.test(c0) && /LIFTING SANITY/.test(c0), 'the workout card: the name, the weight lifted (counted up to the total), what that weighs as much as, time and sets', c0);
   const c1 = await cardText(1);
   r.ok(/4\s*NEW RECORDS/.test(c1) && /Barbell Bench Press/.test(c1) && /\+2\.5 kg/.test(c1) && /Seated Cable Row/.test(c1), 'the records card lists each record with what it beat by', c1);
-  const c2 = await cardText(2);
+  const c2 = await cardText('Week streak');
   r.ok(/4-week streak!/.test(c2) && /trained 4 weeks in a row/.test(c2) && /1 workout this week/.test(c2), 'the streak card: weeks in a row and the workouts this week', c2);
-  const c3 = await cardText(3), pct = Math.round((vol - prevVol) / prevVol * 100);
+  const c3 = await cardText('Against last time'), pct = Math.round((vol - prevVol) / prevVol * 100);
   r.ok(c3.includes(`+${pct}%`) && /more weight lifted than last time/.test(c3) && /Better than last time on 2 of 2 exercises/.test(c3) && /Biggest jump/.test(c3), `against last time: +${pct}% weight lifted, better on 2 of 2 exercises, the biggest jump`, c3);
+  const ce = await cardText('The exercises'), tiles = await p.evaluate(() => {
+    const c = [...document.querySelectorAll('.fin-card')][2];
+    return { pics: [...c.querySelectorAll('image[data-i]')].map(i => i.getAttribute('href')), standIns: [...c.querySelectorAll('svg[viewBox="0 0 100 220"]')].filter(b => !b.closest('[display="none"]')).length, trophies: (c.innerHTML.match(/<circle[^>]*r="11"/g) || []).length };
+  });
+  r.ok(/2 EXERCISES/.test(ce) && /Barbell Bench Press/.test(ce) && /3 sets · 82\.5 × 8/.test(ce) && /Seated Cable Row/.test(ce) && tiles.trophies === 2, 'the exercises card: each exercise with its sets and best set, a trophy on the ones with records', { ce, tiles });
+  r.ok(tiles.standIns === 2 && !tiles.pics.some(u => /^https:/.test(u)), 'a picture that can’t load (no internet here) shows the body with that exercise’s muscles instead', tiles);
+  const cm = await cardText('Muscles worked'), cg = await cardText('Getting stronger');
+  r.ok(/MUSCLES WORKED/.test(cm) && /muscle groups/.test(cm) && /fewer sets/.test(cm) && /Chest/.test(cm) && await p.evaluate(() => [...document.querySelectorAll('.fin-card')][3].querySelectorAll('polygon').length > 60), 'the muscles card: the body front and back, with the muscles worked and how many sets', cm);
+  r.ok(/GETTING STRONGER/.test(cg) && /Barbell Bench Press/.test(cg) && /\+3\.2 kg since/.test(cg) && /Seated Cable Row/.test(cg), 'getting stronger: a chart of each lift’s best set over the last sessions, with the gain', cg);
   const more = await p.evaluate(() => ({ prs: [...document.querySelectorAll('.fin-prs li')].map(l => l.innerText.replace(/\s+/g, ' ')), bars: document.querySelectorAll('.fin-ms div').length }));
   r.ok(more.prs.length === 4 && more.prs.every(l => /\+[\d.]+ (kg|reps)/.test(l)) && more.bars >= 2, 'below the cards: every record with its gain, and sets per muscle as bars', more);
   // sharing a card: here there's no share sheet, so the picture is saved
@@ -94,8 +104,14 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   const dot = await p.evaluate(() => [...document.querySelectorAll('.fin-dots button')].findIndex(b => b.classList.contains('on')));
   const s2 = await shot();
   r.ok(dot === 1 && /-records\.png$/.test(s2.name), 'swiping to another card moves the dot, and Share shares that card', { dot, name: s2.name });
+  await p.evaluate(() => document.querySelectorAll('.fin-card')[2].scrollIntoView({ inline: 'center', block: 'nearest' })); await p.waitForTimeout(500);
+  const s3 = await shot();
+  r.ok(/-exercises\.png$/.test(s3.name) && s3.size.join('×') === '1080×1350' && s3.bytes > 20000, 'the exercises card shares as a picture too, stand-ins and all', s3);
   await t.inSheet('[data-a="finDot"][data-i="2"]', 700);
   r.ok(await p.evaluate(() => [...document.querySelectorAll('.fin-dots button')].findIndex(b => b.classList.contains('on'))) === 2, 'a dot goes to its card');
+  // a picture that can't be fetched for the shared picture: its stand-in goes in instead
+  const swapped = await t.ev(`inlineArt('<svg><g data-fb="0" display="none"><rect/></g><image data-i="0" href="https://raw.githubusercontent.com/none.webp" x="0"/></svg>')`);
+  r.ok(/<g data-fb="0">/.test(swapped) && /<image data-i="0" display="none"/.test(swapped), 'for sharing, a picture that can’t be fetched is swapped for its stand-in', swapped);
   // the note and saving
   await t.inSheet('[data-a="wnoteChip"]', 200);
   const note = await t.ev('state.workouts[state.workouts.length - 1].note');
@@ -108,7 +124,7 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   await t.ev('fxBits = []');
   await t.inSheet('[data-a="cards"]', 900);
   const hist = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'); return w && { title: w.querySelector('.fin-title').textContent, note: !!w.querySelector('.fin-more'), cards: w.querySelectorAll('.fin-card').length }; });
-  r.ok(hist && hist.title === 'Upper A' && !hist.note && hist.cards === 4 && await t.ev('fxBits.length') === 0, 'History → a workout → Share opens its cards, with no confetti', hist);
+  r.ok(hist && hist.title === 'Upper A' && !hist.note && hist.cards === 7 && await t.ev('fxBits.length') === 0, 'History → a workout → Share opens its cards, with no confetti', hist);
   await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
 

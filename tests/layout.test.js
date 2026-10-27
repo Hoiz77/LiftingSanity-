@@ -64,6 +64,7 @@ const CUT = () => {
     await p.keyboard.press('Escape'); await p.waitForTimeout(500);
     await check('done for today');
     await t.click('[data-a="planReview"]', 600); await check('plan review');
+    await t.ev('closeAllSheets()'); await p.waitForTimeout(400); await t.tab('settings'); await t.click('[data-a="openColors"]', 700); await check('colours');
     r.ok(!found.length, `${style} at ${width}px wide${lang === 'ar' ? (style === 'y2k' ? ', all in Arabic' : ', in Arabic') : ''}`, found);
     await t.ctx.close();
   }
