@@ -1,5 +1,5 @@
 # Every push and pull request runs the test suite: all of it in Chromium, and the first-launch-to-restore journey
-# in WebKit (Safari's engine, with an iPhone's user agent). Same commands as on a computer: see tests/README.md.
+# and your own colours in WebKit (Safari's engine, with an iPhone's user agent). Same commands as on a computer: see tests/README.md.
 name: Tests
 
 on:
@@ -29,7 +29,7 @@ jobs:
       - run: npm test
 
   webkit:
-    name: First launch to restored backup (WebKit, iPhone)
+    name: First launch to restored backup, and colours (WebKit, iPhone)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -40,5 +40,8 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps webkit
       - run: node tests/journey.test.js
+        env:
+          LS_BROWSER: webkit
+      - run: node tests/colors.test.js
         env:
           LS_BROWSER: webkit

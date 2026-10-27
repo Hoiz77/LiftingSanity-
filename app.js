@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -542,6 +542,8 @@ function migrate(s) {
   for (const k of ['custom', 'templates', 'splits', 'workouts']) s[k] = Array.isArray(s[k]) ? s[k].filter(o => o && typeof o === 'object') : [];
   for (const k of ['exPrefs', 'exResets', 'flags']) if (typeof s[k] !== 'object' || Array.isArray(s[k])) s[k] = {};
   s.settings = Object.assign(d.settings, typeof s.settings === 'object' ? s.settings : {});
+  s.settings.colors = cleanPal(s.settings.colors);
+  s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
   if (!Array.isArray(s.blocks) || !s.blocks.length) s.blocks = d.blocks;
   // a record with something missing is mended rather than stopping the app from opening
   const mend = w => {
@@ -592,7 +594,7 @@ function load() {
   }
   if (!state) state = defaults();
   // nothing saved yet: someone new (or a new device). They get the welcome, not the Full Body EOD split
-  if (!raw && !saveBlocked) { state.flags.fbeod = 1; state.flags.newUser = 1; }
+  if (!raw && !saveBlocked) { state.flags.fbeod = 1; state.flags.newUser = 1; firstRun = true; }
   ensureSplits();
   if (saveBlocked) setTimeout(() => toast(T('Your saved data couldn’t be read, so nothing is saved over it. Free some storage, then reopen.')), 600);
   else persist();
@@ -1319,32 +1321,65 @@ function applyTheme() {
   else { clearInterval(hudTimer); const hud = $('#hud'); if (hud) hud.innerHTML = ''; }
   applyColors();
 }
-/* ============================== Colours: your own accent, done, left/right, record and background colours ============================== */
+/* ============================== Colours: every colour, for each style (Clean and Y2K) and each mode (dark and light) ============================== */
 
-// the colours you can change, with the stylesheet's own dark-mode colour as the default
-const COLOR_SLOTS = [
-  { k: 'accent', def: '#0A84FF', name: () => T('Accent'), desc: () => T('Buttons, the box you’re typing in, links and the progress bar.') },
-  { k: 'good', def: '#30D158', name: () => T('Done'), desc: () => T('Checked sets, the Log key, switches and the rest timer.') },
-  { k: 'left', def: '#32D74B', name: () => T('Left side'), desc: () => T('The L plate and left-side rows.') },
-  { k: 'right', def: '#BF5AF2', name: () => T('Right side'), desc: () => T('The R plate and right-side rows.') },
-  { k: 'gold', def: '#FFD60A', name: () => T('Records'), desc: () => T('New records, the trophy count and the end of a workout.') },
-  { k: 'bg', def: '#000000', name: () => T('Background'), desc: () => T('In dark mode: behind everything, with the cards a shade lighter.') }
-];
+// what each style starts from. "@accent" follows another colour of the same style; null is worked out from the
+// others (the cards from the background; Y2K's text and greys from its frame colour)
+const TYPE_KEYS = ['W', 'B', 'D', 'F', 'A', 'RP', 'M', 'C', 'P', 'E'];
+const PALETTES = {
+  clean: {
+    accent: '#0A84FF', good: '#30D158', gold: '#FFD60A', bad: '#FF453A', left: '#32D74B', right: '#BF5AF2',
+    dark: { bg: '#000000', panel: null, ink: '#F5F5F7', ink2: '#ABABB3' },
+    light: { bg: '#F2F2F7', panel: null, ink: '#111114', ink2: '#4A4A52' },
+    types: { W: '#FFD60A', B: '#8E8E93', D: '#5E5CE6', F: '@bad', A: '#FF9F0A', RP: '#FF375F', M: '#66D4CF', C: '#A3D65C', P: '#AC8E68', E: '#64D2FF' }
+  },
+  y2k: {
+    frame: '#1F3BFF', accent: '#19F0FF', hot: '#FF2D8F', good: '@accent', gold: '#FFD60A', bad: '@hot', left: '@accent', right: '@hot',
+    dark: { bg: '#05060F', panel: null, ink: null, ink2: null },
+    light: { bg: '#DCE2EE', panel: null, ink: '#05060F', ink2: null },
+    types: { W: '#D9E2F5', B: '#8A9BE0', D: '#6F7DFF', F: '@bad', A: '@hot', RP: '@hot', M: '@accent', C: '#A9B8F5', P: '#8A9BE0', E: '@accent' }
+  }
+};
 // quick picks; any other colour comes from the colour wheel or a hex code
 const SWATCHES = {
   any: ['#0A84FF', '#5E5CE6', '#BF5AF2', '#FF375F', '#FF453A', '#FF9F0A', '#FFD60A', '#30D158', '#00C7BE', '#64D2FF', '#AC8E68', '#F5F5F7'],
-  bg: ['#000000', '#0B0B10', '#101418', '#0A1020', '#0D1A14', '#140D1C', '#1C1410', '#1A1A1E']
+  neon: ['#1F3BFF', '#19F0FF', '#FF2D8F', '#B967FF', '#05FFA1', '#FF71CE', '#39FF14', '#FFE600', '#FFB000', '#FF3B3B', '#7C4DFF', '#E8F6FF'],
+  bgdark: ['#000000', '#15202B', '#1C1C1E', '#2C2C2E', '#0B1020', '#0A1A24', '#0D1A14', '#140D1C', '#1C1410', '#202124', '#05060F', '#0B0B10'],
+  bglight: ['#F2F2F7', '#FFFFFF', '#F7F9F9', '#E5E5EA', '#EAF2FB', '#E8EFE6', '#FBEFF3', '#F4EFE6', '#F3EBDD', '#EFEBFA', '#DCE2EE', '#EDEDED'],
+  paneldark: ['#121214', '#192734', '#16181C', '#2C2C2E', '#3A3A3C', '#141B33', '#10242F', '#14251C', '#21152B', '#2A201A', '#0A0F2E', '#1E1E22'],
+  panellight: ['#FFFFFF', '#FBFBFD', '#F7F9F9', '#FFFDF8', '#F5F9FF', '#F7FBF6', '#FFF7FA', '#FAF6EF', '#F8F6FD', '#EEF2F9', '#F2F2F7', '#E9E9EE'],
+  inkdark: ['#F5F5F7', '#FFFFFF', '#E7E9EA', '#F7F9F9', '#EDE6D6', '#E8F0FF', '#D9FFD9', '#FFE8C2', '#FFE4EC', '#E0F7FF', '#F2F2F2', '#DADADA'],
+  ink2dark: ['#ABABB3', '#8B98A5', '#71767B', '#8E8E93', '#C7C7CC', '#A9B8F5', '#9AA6C8', '#B5AA98', '#7FCF8A', '#D1A3B8', '#9CB4C0', '#A1A1AA'],
+  inklight: ['#111114', '#000000', '#0F1419', '#1C1C1E', '#2B2620', '#05060F', '#14213D', '#102A1C', '#2A1020', '#3A2A10', '#202020', '#333333'],
+  ink2light: ['#4A4A52', '#536471', '#6E6E73', '#3C3C43', '#6B6257', '#26305E', '#5B6770', '#3F5E4A', '#6A4458', '#5E5040', '#555555', '#707070']
 };
-// whole sets of colours at once
-const COLOR_PRESETS = [
-  ['Default', {}],
-  ['Ocean', { accent: '#00C7BE', good: '#64D2FF', bg: '#0A1020' }],
-  ['Crimson', { accent: '#FF375F', good: '#FF9F0A', bg: '#0B0B10' }],
-  ['Violet', { accent: '#BF5AF2', good: '#64D2FF', left: '#64D2FF', right: '#FF375F', bg: '#140D1C' }],
-  ['Forest', { accent: '#30D158', good: '#A3D65C', bg: '#0D1A14' }],
-  ['Sunset', { accent: '#FF9F0A', good: '#FF375F', bg: '#1C1410' }],
-  ['Mono', { accent: '#F5F5F7', good: '#AEAEB2', left: '#F5F5F7', right: '#8E8E93', gold: '#F5F5F7' }]
-];
+// whole looks at once
+const COLOR_PRESETS = {
+  clean: [
+    ['Default', {}],
+    ['X Dim', { accent: '#1D9BF0', good: '#00BA7C', dark: { bg: '#15202B', panel: '#192734', ink: '#F7F9F9', ink2: '#8B98A5' }, light: { bg: '#F7F9F9', panel: '#FFFFFF', ink: '#0F1419', ink2: '#536471' } }],
+    ['Lights out', { accent: '#1D9BF0', good: '#00BA7C', dark: { bg: '#000000', panel: '#16181C', ink: '#E7E9EA', ink2: '#71767B' }, light: { bg: '#FFFFFF', panel: '#F7F9F9', ink: '#0F1419', ink2: '#536471' } }],
+    ['Graphite', { dark: { bg: '#1C1C1E', panel: '#2C2C2E', ink2: '#AEAEB2' }, light: { bg: '#E5E5EA', panel: '#F2F2F7' } }],
+    ['Midnight', { accent: '#7C9CFF', good: '#3DDC97', dark: { bg: '#0B1020', panel: '#141B33', ink: '#E6EBFF', ink2: '#9AA6C8' }, light: { bg: '#EAF2FB', panel: '#F5F9FF', ink: '#14213D', ink2: '#4A5878' } }],
+    ['Ocean', { accent: '#00C7BE', good: '#64D2FF', dark: { bg: '#0A1A24', panel: '#10242F' }, light: { bg: '#E6F4F6' } }],
+    ['Crimson', { accent: '#FF375F', good: '#FF9F0A', dark: { bg: '#0B0B10' } }],
+    ['Violet', { accent: '#BF5AF2', good: '#64D2FF', left: '#64D2FF', right: '#FF375F', dark: { bg: '#140D1C', panel: '#21152B' }, light: { bg: '#EFEBFA', panel: '#F8F6FD' } }],
+    ['Forest', { accent: '#30D158', good: '#A3D65C', dark: { bg: '#0D1A14', panel: '#14251C' }, light: { bg: '#E8EFE6', panel: '#F7FBF6' } }],
+    ['Sunset', { accent: '#FF9F0A', good: '#FF375F', dark: { bg: '#1C1410', panel: '#2A201A' }, light: { bg: '#F4EFE6', panel: '#FFFDF8' } }],
+    ['Paper', { accent: '#C2410C', good: '#4D7C0F', gold: '#D97706', dark: { bg: '#1A1714', panel: '#24201C', ink: '#F2EBDD', ink2: '#B5AA98' }, light: { bg: '#F3EBDD', panel: '#FFFDF8', ink: '#2B2620', ink2: '#6B6257' } }],
+    ['Mono', { accent: '#F5F5F7', good: '#AEAEB2', left: '#F5F5F7', right: '#8E8E93', gold: '#F5F5F7' }]
+  ],
+  y2k: [
+    ['Default', {}],
+    ['Vaporwave', { frame: '#B967FF', accent: '#05FFA1', hot: '#FF71CE', dark: { bg: '#120A1F' }, light: { bg: '#EDE4F7' } }],
+    ['Matrix', { frame: '#00A63E', accent: '#39FF14', hot: '#E6FF00', dark: { bg: '#020A04' }, light: { bg: '#DDEBDD' } }],
+    ['Red alert', { frame: '#E0102F', accent: '#FF5C5C', hot: '#FFD60A', dark: { bg: '#0F0505' }, light: { bg: '#F0E0E0' } }],
+    ['Amber', { frame: '#B35A00', accent: '#FFB000', hot: '#FF5F1F', dark: { bg: '#0D0700' }, light: { bg: '#F1E6D6' } }],
+    ['Ice', { frame: '#3D7BFF', accent: '#E8F6FF', hot: '#8FD3FF', dark: { bg: '#060B12' } }],
+    ['Sakura', { frame: '#FF5FA2', accent: '#FFC2DD', hot: '#9B5CFF', dark: { bg: '#12060C' }, light: { bg: '#F7E6EE' } }],
+    ['Chrome', { frame: '#8A8F99', accent: '#FFFFFF', hot: '#C0C6D0', dark: { bg: '#070708' }, light: { bg: '#E4E5E8' } }]
+  ]
+};
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const rgba = (h, a) => `rgba(${hexRgb(h).join(', ')}, ${a})`;
 const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
@@ -1358,50 +1393,116 @@ function readable(c, bg, min) {
   while (contrastOf(out, bg) < min && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, to, t); }
   return out;
 }
-// a background picked for dark mode is kept dark enough for light text on it
-function darkBg(c) { let t = 0, out = c; while (luma(out) > 0.035 && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, '#000000', t); } return out; }
+// a background (or cards) picked for dark mode is kept dark enough for light text on it, and for light mode light enough
+function darkBg(c, max = 0.06) { let t = 0, out = c; while (luma(out) > max && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, '#000000', t); } return out; }
+function lightBg(c, min = 0.55) { let t = 0, out = c; while (luma(out) < min && t < 1) { t = Math.min(1, t + 0.05); out = mixHex(c, '#FFFFFF', t); } return out; }
 const normHex = v => { v = String(v || '').trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join(''); return /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null; };
-const slotDef = k => COLOR_SLOTS.find(s => s.k === k).def;
-// the colour in use: yours where you picked one, otherwise the default
-const colorOf = k => (state.settings.colors || {})[k] || slotDef(k);
-// CSS custom properties for the colours that were changed, in dark or light mode. In light mode each colour is
-// darkened just enough to read on white, and the background stays the light one
-function colorVars(cols, mode) {
-  const v = {}, dark = mode === 'dark';
+const styleNow = () => state.settings.style === 'y2k' ? 'y2k' : 'clean';
+const palKey = st => st === 'y2k' ? 'colorsY2k' : 'colors';
+const userPal = (st = styleNow()) => state.settings[palKey(st)] || {};
+// one colour, by where it's kept ('accent', 'dark.bg', 'types.W'): yours, else the style's own, following another
+// colour where the style says so. Worked-out ones (null) are left to tokens()
+function palGet(st, pal, path) {
+  const [a, b] = path.split('.');
+  let v = b ? (pal[a] || {})[b] : pal[a];
+  if (!v) v = b ? PALETTES[st][a][b] : PALETTES[st][a];
+  return typeof v === 'string' && v[0] === '@' ? palGet(st, pal, v.slice(1)) : v || null;
+}
+// the colour in use (as in dark mode): yours where you picked one, otherwise the default
+const colorOf = (k, st = styleNow()) => palGet(st, userPal(st), k);
+// saved colours, tidied: only real colours, in the places they belong. Before v38 the background sat at the top
+function cleanPal(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return {};
+  const out = {}, sub = (o, keys) => { const r = {}; if (o && typeof o === 'object') for (const k of keys) if (normHex(o[k])) r[k] = normHex(o[k]); return Object.keys(r).length ? r : null; };
+  for (const k of ['accent', 'good', 'gold', 'bad', 'left', 'right', 'frame', 'hot']) if (normHex(p[k])) out[k] = normHex(p[k]);
+  for (const m of ['dark', 'light']) { const r = sub(p[m], ['bg', 'panel', 'ink', 'ink2']); if (r) out[m] = r; }
+  if (normHex(p.bg) && !(out.dark && out.dark.bg)) out.dark = { ...(out.dark || {}), bg: normHex(p.bg) };
+  const t = sub(p.types, TYPE_KEYS);
+  if (t) out.types = t;
+  return out;
+}
+// every colour token of a style in one mode, worked out from a palette. Kept readable: the page and cards stay dark
+// (or light), text stands out from the cards, and in light mode each colour is darkened just enough to read on them
+function tokens(st, pal, mode) {
+  const g = p => palGet(st, pal, p), dark = mode === 'dark', y2k = st === 'y2k';
   const on = c => contrastOf(c, '#FFFFFF') >= 3 ? '#FFFFFF' : mixHex(c, '#000000', 0.86);
-  if (cols.accent) {
-    const a = dark ? cols.accent : readable(cols.accent, '#FFFFFF', 3);
-    Object.assign(v, { '--accent': a, '--accent-soft': rgba(a, dark ? 0.17 : 0.1), '--on-accent': on(a), '--glow': dark ? `0 12px 30px -10px ${rgba(a, 0.75)}` : `0 12px 26px -12px ${rgba(a, 0.7)}` });
+  const up = (c, t) => mixHex(c, '#FFFFFF', t), down = (c, t) => mixHex(c, '#000000', t);
+  const F = y2k ? g('frame') : null;
+  const B = dark ? darkBg(g(mode + '.bg')) : lightBg(g(mode + '.bg'));
+  let P = g(mode + '.panel') || (y2k ? (dark ? mixHex(B, F, 0.15) : up(B, 0.55)) : dark ? up(B, 0.07) : up(B, 0.85));
+  P = dark ? darkBg(P, 0.13) : lightBg(P, 0.6);
+  const I = readable(g(mode + '.ink') || up(F, 0.91), P, 7);
+  const I2 = readable(g(mode + '.ink2') || (dark ? up(F, 0.65) : mixHex(I, F, 0.3)), P, 4.5);
+  const lightest = luma(B) > luma(P) ? B : P;
+  const fit = (c, min) => dark ? c : readable(c, lightest, min);
+  const A = fit(g('accent'), 3), G = fit(g('good'), 2.6), X = fit(g('bad'), 3), Au = fit(g('gold'), 2.2);
+  const v = {
+    '--accent': A, '--on-accent': on(A), '--accent-soft': rgba(A, y2k ? 0.12 : dark ? 0.17 : 0.1),
+    '--good': G, '--on-good': on(G), '--good-soft': rgba(G, y2k && !dark ? 0.1 : y2k ? 0.12 : 0.14),
+    '--bad': X, '--bad-soft': rgba(X, dark ? 0.15 : 0.1), '--side-l': fit(g('left'), 2.6), '--side-r': fit(g('right'), 2.6),
+    '--gold': Au, '--gold-2': mixHex(Au, '#FF3B00', 0.35),
+    '--bg': B, '--panel': P, '--status-band': B, '--ink': I, '--ink-2': I2, '--muted': readable(mixHex(I2, B, dark ? (y2k ? 0.4 : 0.32) : 0.21), P, 3)
+  };
+  for (const k of TYPE_KEYS) { const c = fit(g('types.' + k), 2.6), n = k.toLowerCase(); v['--p-' + n] = c; v['--on-p-' + n] = on(c); }
+  if (!y2k) {
+    Object.assign(v, dark
+      ? { '--panel-2': up(P, 0.045), '--panel-3': up(P, 0.11), '--line': up(P, 0.065), '--line-2': up(P, 0.15), '--grid': up(P, 0.05), '--seg-on': up(P, 0.17), '--bar-bg': P, '--term-bg': down(B, 0.4), '--glow': `0 12px 30px -10px ${rgba(A, 0.75)}` }
+      : { '--panel-2': down(P, 0.05), '--panel-3': down(P, 0.1), '--line': down(P, 0.1), '--line-2': down(P, 0.18), '--grid': down(P, 0.07), '--seg-on': P, '--bar-bg': mixHex(P, B, 0.35), '--term-bg': P, '--glow': `0 12px 26px -12px ${rgba(A, 0.7)}` });
+    return v;
   }
-  if (cols.good) { const g = dark ? cols.good : readable(cols.good, '#FFFFFF', 2.6); Object.assign(v, { '--good': g, '--good-soft': rgba(g, 0.14), '--on-good': on(g) }); }
-  if (cols.left) v['--side-l'] = dark ? cols.left : readable(cols.left, '#FFFFFF', 2.6);
-  if (cols.right) v['--side-r'] = dark ? cols.right : readable(cols.right, '#FFFFFF', 2.6);
-  if (cols.gold) { const g = dark ? cols.gold : readable(cols.gold, '#FFFFFF', 2.2); Object.assign(v, { '--gold': g, '--gold-2': mixHex(g, '#FF3B00', 0.35) }); }
+  // Y2K: the frame colour tints the panels and lines; the HUD, wells, tab bar and number pad stay dark in light mode too
+  const H = g('hot');
+  Object.assign(v, { '--cyan': g('accent'), '--magenta': H, '--term-ink': g('accent'), '--glow': `0 0 12px ${rgba(F, 0.8)}` });
+  if (dark) {
+    Object.assign(v, {
+      '--cobalt': F, '--navy': B, '--panel-2': mixHex(P, F, 0.1), '--panel-3': mixHex(P, F, 0.28), '--line': mixHex(B, F, 0.52), '--line-2': mixHex(B, F, 0.85), '--grid': mixHex(B, F, 0.3), '--seg-on': F,
+      '--bar-bg': P, '--term-bg': down(B, 0.55), '--bevel-hi': up(F, 0.2), '--bevel-lo': down(B, 0.5), '--titlebar': `linear-gradient(90deg, ${F} 0%, ${mixHex(F, B, 0.55)} 60%, ${B} 100%)`,
+      '--well': down(mixHex(B, F, 0.04), 0.5), '--deck': P, '--track': mixHex(B, F, 0.2), '--y-fig': mixHex(B, F, 0.4), '--y-fig-m': mixHex(B, F, 0.52), '--hud-dim': v['--muted']
+    });
+  } else {
+    const d = tokens(st, pal, 'dark'), C = readable(F, lightest, 3);
+    for (const k of ['--navy', '--well', '--deck', '--track', '--y-fig', '--y-fig-m', '--hud-dim', '--titlebar']) v[k] = d[k];
+    Object.assign(v, {
+      '--cobalt': C, '--panel-2': mixHex(P, B, 0.6), '--panel-3': mixHex(B, F, 0.1), '--line': down(mixHex(B, F, 0.3), 0.08), '--line-2': down(mixHex(B, F, 0.5), 0.15), '--grid': mixHex(B, F, 0.1), '--seg-on': C,
+      '--bar-bg': P, '--term-bg': d['--bg'], '--bevel-hi': '#FFFFFF', '--bevel-lo': down(mixHex(B, F, 0.5), 0.15)
+    });
+  }
   return v;
 }
-function bgVars(c) {
-  const b = darkBg(c), up = t => mixHex(b, '#FFFFFF', t);
-  return { '--bg': b, '--panel': up(0.07), '--panel-2': up(0.11), '--panel-3': up(0.17), '--line': up(0.13), '--line-2': up(0.21), '--grid': up(0.12), '--seg-on': up(0.23), '--bar-bg': up(0.07), '--status-band': b, '--term-bg': mixHex(b, '#000000', 0.4) };
+// only what your colours change, so everything you left alone keeps the stylesheet's own hand-picked colours
+function tokenDiff(st, pal, mode) {
+  const mine = tokens(st, pal, mode), base = tokens(st, {}, mode), out = {};
+  for (const k in mine) if (mine[k] !== base[k]) out[k] = mine[k];
+  return out;
 }
 const cssVars = v => Object.entries(v).map(([k, x]) => `${k}: ${x};`).join(' ');
-// your colours as one small stylesheet after the main one. Y2K keeps its own colours; the end-of-workout screen and
-// the record banner, which are always dark, take the dark-mode ones
+// your colours as one small stylesheet after the main ones, for both styles. The end-of-workout screen and the
+// record banner, which are always dark, take the dark-mode ones
 function applyColors() {
-  const cols = state.settings.colors || {};
   let el = $('#usercolors');
   if (!el) { el = document.createElement('style'); el.id = 'usercolors'; document.head.append(el); }
-  const R = ':root:not([data-style="y2k"])', d = cssVars(colorVars(cols, 'dark')), l = cssVars(colorVars(cols, 'light')), b = cols.bg ? cssVars(bgVars(cols.bg)) : '';
-  el.textContent = !d && !b ? '' : `${R} { ${d} }
-@media (prefers-color-scheme: light) { ${R}:not([data-theme="dark"]) { ${l} } }
-${R}[data-theme="light"] { ${l} }
-${b ? `@media (prefers-color-scheme: dark) { ${R}:not([data-theme="light"]) { ${b} } } ${R}[data-theme="dark"] { ${b} }` : ''}
-${R} .fin, ${R} .prfx-card { ${d} ${b} }`;
+  const css = [];
+  for (const st of ['clean', 'y2k']) {
+    const pal = state.settings[palKey(st)] || {}, R = st === 'y2k' ? ':root[data-style="y2k"]' : ':root:not([data-style="y2k"])';
+    const d = cssVars(tokenDiff(st, pal, 'dark')), l = cssVars(tokenDiff(st, pal, 'light'));
+    if (d) css.push(`@media (prefers-color-scheme: dark) { ${R}:not([data-theme="light"]) { ${d} } }`, `${R}[data-theme="dark"] { ${d} }`, `${R} .fin, ${R} .prfx-card { ${d} }`);
+    if (l) css.push(`@media (prefers-color-scheme: light) { ${R}:not([data-theme="dark"]) { ${l} } }`, `${R}[data-theme="light"] { ${l} }`);
+  }
+  el.textContent = css.join('\n');
+  if (styleNow() === 'y2k') numGrid();
 }
-// the light and dark colours the preview starts from (the stylesheet's own), so either can be shown whatever the phone uses
-const BASE_COLORS = {
-  dark: { '--bg': '#000000', '--panel': '#121214', '--panel-2': '#1c1c1f', '--panel-3': '#2a2a2f', '--line': '#222226', '--line-2': '#36363c', '--seg-on': '#3a3a41', '--ink': '#f5f5f7', '--ink-2': '#ababb3', '--muted': '#75757d', '--accent': '#0a84ff', '--on-accent': '#ffffff', '--accent-soft': 'rgba(10, 132, 255, .17)', '--good': '#30d158', '--on-good': '#00230d', '--good-soft': 'rgba(48, 209, 88, .14)', '--side-l': '#32d74b', '--side-r': '#bf5af2', '--gold': '#ffd60a', '--gold-2': '#ff9f0a', '--bar-bg': '#121214', '--glow': '0 12px 30px -10px rgba(10, 132, 255, .75)', '--hi': 'inset 0 1px 0 rgba(255, 255, 255, .06)', 'color-scheme': 'dark' },
-  light: { '--bg': '#f2f2f7', '--panel': '#ffffff', '--panel-2': '#f2f2f7', '--panel-3': '#e5e5ea', '--line': '#e5e5ea', '--line-2': '#d1d1d6', '--seg-on': '#ffffff', '--ink': '#111114', '--ink-2': '#4a4a52', '--muted': '#6e6e76', '--accent': '#007aff', '--on-accent': '#ffffff', '--accent-soft': 'rgba(0, 122, 255, .1)', '--good': '#1f9d47', '--on-good': '#ffffff', '--good-soft': 'rgba(52, 199, 89, .14)', '--side-l': '#1e9e45', '--side-r': '#9f45d8', '--gold': '#b88600', '--gold-2': '#e08600', '--bar-bg': '#f9f9fb', '--glow': '0 12px 26px -12px rgba(0, 122, 255, .7)', '--hi': '0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12)', 'color-scheme': 'light' }
-};
+// the stylesheets' own colours for a style and mode (read from the stylesheets, so the preview always matches them)
+function sheetTokens(sel) {
+  const out = {};
+  for (const sh of document.styleSheets) {
+    let rules = [];
+    try { rules = sh.cssRules || []; } catch (e) { continue; }
+    for (const r of rules) if (r.selectorText === sel) for (let i = 0; i < r.style.length; i++) { const p = r.style[i]; if (p.startsWith('--') || p === 'color-scheme') out[p] = r.style.getPropertyValue(p).trim(); }
+  }
+  return out;
+}
+const baseTokens = (st, mode) => ({ ...sheetTokens(':root'), ...(mode === 'light' ? sheetTokens(':root[data-theme="light"]') : {}),
+  ...(st === 'y2k' ? { ...sheetTokens(':root[data-style="y2k"]'), ...(mode === 'light' ? sheetTokens(':root[data-style="y2k"][data-theme="light"]') : {}) } : {}) });
 const darkNow = () => state.settings.theme === 'dark' || (state.settings.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
 // a few parts of a workout, drawn with the real styles, to see the colours before saving them
 function colorPreview() {
@@ -1413,45 +1514,100 @@ function colorPreview() {
       <div class="set-row"><span class="badge t-N">2</span><div class="prev"><span class="none">50×5</span></div>${cell('52.5', 'kp-on')}${cell('<span class="ph">5</span>', 'empty')}${cell('<span class="ph">1</span>', 'eff empty')}<span class="check">${icon('check')}</span></div>
       <div class="pr-row">${icon('trophy')}<span>${T('New record: {list}', { list: T('Heaviest') })}</span></div>
     </div></div>
-    <div class="cpv-misc"><span class="badge side side-L t-N">L</span><span class="badge side side-R t-N">R</span><span class="switch on"><span></span></span><span class="seg"><button class="on">${T('On')}</button><button>${T('Off')}</button></span><span class="link">${T('Link')}</span></div>
+    <div class="cpv-types">${TYPE_KEYS.map(k => `<span class="badge filled t-${k}" ${window.AR_TERMS ? '' : 'lang="en"'}>${esc(SET_TYPES[k].short)}</span>`).join('')}</div>
+    <div class="cpv-misc"><span class="badge side side-L t-N">L</span><span class="badge side side-R t-N">R</span><span class="switch on"><span></span></span><span class="seg"><button class="on">${T('On')}</button><button>${T('Off')}</button></span><span class="cpv-del">${icon('trash')}${T('Delete')}</span></div>
     <div class="kp-grid cpv-kp"><span class="kp-k">7</span><span class="kp-k">8</span><span class="kp-k fn">${T('Next')}</span><span class="kp-k log">${icon('check')}${T('Log')}</span></div>`;
 }
+// the colours in the editor, in groups. k is where a colour is kept: 'accent', 's.bg' (the mode being edited) or 'types.W'
+function colorGroups(st) {
+  const y = st === 'y2k';
+  return [
+    { id: 'main', h: T('Main colours'), slots: [
+      ...(y ? [{ k: 'frame', name: T('Frame'), desc: T('Window borders, title bars, glows and the dots behind everything.'), sw: 'neon' }] : []),
+      { k: 'accent', name: T('Accent'), desc: y ? T('The bright one: buttons, the box you’re typing in, readouts and the Log key.') : T('Buttons, the box you’re typing in, links and the progress bar.'), sw: y ? 'neon' : 'any' },
+      ...(y ? [{ k: 'hot', name: T('Highlight'), desc: T('The second neon: labels, the right side and Delete.'), sw: 'neon' }] : []),
+      { k: 'good', name: T('Done'), desc: T('Checked sets, the Log key, switches and the rest timer.'), sw: y ? 'neon' : 'any' },
+      { k: 'gold', name: T('Records'), desc: T('New records, the trophy count and the end of a workout.'), sw: 'any' },
+      { k: 'bad', name: T('Delete and warnings'), desc: T('Delete buttons, failure sets and warnings.'), sw: y ? 'neon' : 'any' }
+    ] },
+    { id: 'surf', h: T('Background and text'), surf: true, slots: [
+      { k: 's.bg', name: T('Background'), desc: T('Behind everything.'), sw: 'bg' },
+      { k: 's.panel', name: T('Cards'), desc: T('Exercise cards, set rows, sheets and bars; the lines and greys follow them.'), sw: 'panel' },
+      { k: 's.ink', name: T('Text'), desc: T('Names, numbers and headings.'), sw: 'ink' },
+      { k: 's.ink2', name: T('Secondary text'), desc: T('Hints, last time’s numbers and labels; the faintest grey follows it.'), sw: 'ink2' }
+    ] },
+    { id: 'sides', h: T('Left and right'), slots: [
+      { k: 'left', name: T('Left side'), desc: T('The L plate and left-side rows.'), sw: y ? 'neon' : 'any' },
+      { k: 'right', name: T('Right side'), desc: T('The R plate and right-side rows.'), sw: y ? 'neon' : 'any' }
+    ] },
+    { id: 'types', h: T('Set types'), slots: TYPE_KEYS.map(k => ({ k: 'types.' + k, name: SET_TYPES[k].label, badge: k, sw: 'any' })) }
+  ];
+}
+// the token that shows each colour, to find how it's shown
+const SLOT_TOKEN = { accent: '--accent', good: '--good', gold: '--gold', bad: '--bad', left: '--side-l', right: '--side-r', frame: '--cobalt', hot: '--magenta', bg: '--bg', panel: '--panel', ink: '--ink', ink2: '--ink-2' };
 function colorsSheet() {
-  let draft = { ...(state.settings.colors || {}) }, mode = darkNow() ? 'dark' : 'light';
-  const cur = k => draft[k] || slotDef(k);
-  const pvVars = () => cssVars({ ...BASE_COLORS[mode], ...colorVars(draft, mode), ...(mode === 'dark' && draft.bg ? bgVars(draft.bg) : {}) });
-  // a note when a colour is shown differently than picked, or is hard to see
+  const st = styleNow(), y = st === 'y2k';
+  let draft = JSON.parse(JSON.stringify(userPal(st))), mode = darkNow() ? 'dark' : 'light';
+  const shut = new Set(['sides', 'types']);
+  const path = k => k.startsWith('s.') ? mode + k.slice(1) : k;
+  const own = k => { const [a, b] = path(k).split('.'); return b ? (draft[a] || {})[b] : draft[a]; };
+  const tokenOf = k => { const p = path(k).split('.'); return p[0] === 'types' ? '--p-' + p[1].toLowerCase() : SLOT_TOKEN[p[p.length - 1]]; };
+  // the colour a slot shows in its dot: yours, or the default (worked out where the style works it out)
+  const cur = k => own(k) || palGet(st, draft, path(k)) || tokens(st, draft, k.startsWith('s.') ? mode : 'dark')[tokenOf(k)];
+  const follows = k => { const [a, b] = path(k).split('.'), d = b ? PALETTES[st][a][b] : PALETTES[st][a]; return typeof d === 'string' && d[0] === '@' ? d.slice(1) : null; };
+  const nameOf = k => (colorGroups(st).flatMap(g => g.slots).find(s => s.k === k) || {}).name || k;
+  const pvVars = () => cssVars({ ...baseTokens(st, mode), ...tokenDiff(st, draft, mode) });
+  // a note when a colour is shown differently than picked, is hard to see, or follows another one
   const note = k => {
-    const c = cur(k);
-    if (k === 'bg') return draft.bg && darkBg(c) !== c ? T('Shown a little darker, so text stays easy to read.') : '';
-    if (!draft[k]) return '';
-    if (contrastOf(c, draft.bg ? darkBg(draft.bg) : '#000000') < 2) return T('Hard to see on the dark background.');
-    return readable(c, '#FFFFFF', k === 'accent' ? 3 : k === 'gold' ? 2.2 : 2.6) !== c ? T('In light mode it’s shown a little darker, so it reads on white.') : '';
+    const c = own(k);
+    if (!c) { const f = follows(k); return f ? T('Same as {name} unless you pick one.', { name: nameOf(f) }) : ''; }
+    if (k.startsWith('s.')) {
+      const shown = tokens(st, draft, mode)[tokenOf(k)];
+      if (shown === c) return '';
+      if (k === 's.bg' || k === 's.panel') return mode === 'dark' ? T('Shown a little darker, so text stays easy to read.') : T('Shown a little lighter, so text stays easy to read.');
+      return T('Adjusted a little so it stays easy to read.');
+    }
+    if (contrastOf(c, tokens(st, draft, 'dark')['--panel']) < 2) return T('Hard to see on the dark background.');
+    return tokens(st, draft, 'light')[tokenOf(k)] !== c ? T('In light mode it’s shown a little darker, so it reads on white.') : '';
   };
+  const swatchList = s => SWATCHES[s.sw === 'bg' || s.sw === 'panel' || s.sw === 'ink' || s.sw === 'ink2' ? s.sw + mode : s.sw];
   const slotHTML = s => {
-    const c = cur(s.k), list = SWATCHES[s.k === 'bg' ? 'bg' : 'any'];
+    const c = cur(s.k);
     return `<section class="cslot" data-k="${s.k}">
-      <div class="cslot-h"><span class="cdot" style="background:${c}"></span><div><b>${s.name()}</b><small>${s.desc()}</small></div><button class="link cslot-reset" data-a="reset" data-k="${s.k}" ${draft[s.k] ? '' : 'hidden'}>${T('Default')}</button></div>
-      <div class="cswatches">${list.map(v => `<button class="csw ${v === c ? 'on' : ''}" style="--c:${v}" data-a="pick" data-k="${s.k}" data-v="${v}" aria-label="${v}" aria-pressed="${v === c}"></button>`).join('')}
-        <label class="csw any" title="${T('Any colour')}"><input type="color" data-ck="${s.k}" value="${c.toLowerCase()}" aria-label="${esc(T('{name}: any colour', { name: s.name() }))}"></label>
-        <input class="chex" data-hex="${s.k}" value="${c}" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="characters" aria-label="${esc(T('{name}: hex code', { name: s.name() }))}"></div>
+      <div class="cslot-h">${s.badge ? `<span class="badge filled t-${s.badge} cslot-badge" ${window.AR_TERMS ? '' : 'lang="en"'}>${esc(SET_TYPES[s.badge].short)}</span>` : `<span class="cdot" style="background:${c}"></span>`}<div><b>${esc(s.name)}</b>${s.desc ? `<small>${s.desc}</small>` : ''}</div><button class="link cslot-reset" data-a="reset" data-k="${s.k}" ${own(s.k) ? '' : 'hidden'}>${T('Default')}</button></div>
+      <div class="cswatches">${swatchList(s).map(v => `<button class="csw ${v === c ? 'on' : ''}" style="--c:${v}" data-a="pick" data-k="${s.k}" data-v="${v}" aria-label="${v}" aria-pressed="${v === c}"></button>`).join('')}
+        <label class="csw any" title="${T('Any colour')}"><input type="color" data-ck="${s.k}" value="${c.toLowerCase()}" aria-label="${esc(T('{name}: any colour', { name: s.name }))}"></label>
+        <input class="chex" data-hex="${s.k}" value="${c}" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="characters" aria-label="${esc(T('{name}: hex code', { name: s.name }))}"></div>
       <p class="cnote">${note(s.k)}</p></section>`;
   };
-  // after a change: the preview, and that colour's dot, swatches, wheel, code, note and reset
+  // a whole look in a small picture: the page, a card, and its main colours
+  const presetHTML = ([n, p], i) => {
+    const tk = tokens(st, p, mode), dots = y ? ['--cyan', '--magenta', '--good'] : ['--accent', '--good', '--gold'];
+    return `<button class="cpreset" data-a="preset" data-i="${i}"><span class="cpreset-mock" style="background:${tk['--bg']}; border-color:${y ? tk['--cobalt'] : tk['--line-2']}"><i style="background:${tk['--panel']}"></i><span>${dots.map(d => `<b style="background:${tk[d]}"></b>`).join('')}</span></span>${esc(T(n))}</button>`;
+  };
+  const keepOpen = d => { for (const el of $$('details[data-sec]', d.el)) { if (el.open) shut.delete(el.dataset.sec); else shut.add(el.dataset.sec); } };
+  const redraw = d => { keepOpen(d); refreshSheet(d); };
+  // after a change: the preview, and that colour's dot, swatches, wheel, code, note and reset; the other notes may change too
   const paint = (d, k, from) => {
     $('.cpv', d.el).style.cssText = pvVars();
     const sec = $(`.cslot[data-k="${k}"]`, d.el);
     if (!sec) return;
-    const c = cur(k);
-    $('.cdot', sec).style.background = c;
+    const c = cur(k), dot = $('.cdot', sec);
+    if (dot) dot.style.background = c;
     for (const b of $$('.csw[data-v]', sec)) { b.classList.toggle('on', b.dataset.v === c); b.setAttribute('aria-pressed', b.dataset.v === c); }
     if (from !== 'wheel') $('input[type="color"]', sec).value = c.toLowerCase();
     if (from !== 'hex') $('.chex', sec).value = c;
-    $('.cslot-reset', sec).hidden = !draft[k];
-    $('.cnote', sec).textContent = note(k);
-    if (k === 'bg') for (const kk of ['accent', 'good', 'left', 'right', 'gold']) { const n = $(`.cslot[data-k="${kk}"] .cnote`, d.el); if (n) n.textContent = note(kk); }
+    $('.cslot-reset', sec).hidden = !own(k);
+    for (const n of $$('.cslot', d.el)) $('.cnote', n).textContent = note(n.dataset.k);
+    // colours that follow this one: their dots and codes too
+    for (const n of $$('.cslot', d.el)) if (n !== sec && !own(n.dataset.k)) { const cc = cur(n.dataset.k), dd = $('.cdot', n); if (dd) dd.style.background = cc; $('.chex', n).value = cc; $('input[type="color"]', n).value = cc.toLowerCase(); }
   };
-  const set = (k, v) => { if (!v || v === slotDef(k)) delete draft[k]; else draft[k] = v; };
+  const set = (k, v) => {
+    const [a, b] = path(k).split('.');
+    const same = v && v === (b ? PALETTES[st][a][b] : PALETTES[st][a]); // a default that follows another colour is kept if picked
+    if (b) { const o = { ...(draft[a] || {}) }; if (!v || same) delete o[b]; else o[b] = v; if (Object.keys(o).length) draft[a] = o; else delete draft[a]; }
+    else if (!v || same) delete draft[a]; else draft[a] = v;
+  };
   openSheet({
     cls: 'wide colors-sheet',
     label: T('Colours'),
@@ -1459,11 +1615,13 @@ function colorsSheet() {
       <div class="sheet-body pad">
         <div class="cpv-box"><div class="cpv-bar"><b>${T('Preview')}</b><div class="seg" role="group">${['dark', 'light'].map(m => `<button class="${mode === m ? 'on' : ''}" data-a="mode" data-v="${m}" aria-pressed="${mode === m}">${m === 'dark' ? T('Dark') : T('Light')}</button>`).join('')}</div></div>
           <div class="cpv" style="${pvVars()}" inert>${colorPreview()}</div></div>
+        <p class="muted small cstyle-note">${y ? T('These are the Y2K style’s colours; the Clean style keeps its own.') : T('These are the Clean style’s colours; the Y2K style keeps its own.')}</p>
         <h3 class="sub-h">${T('Ready-made')}</h3>
-        <div class="cpresets">${COLOR_PRESETS.map(([n, c], i) => `<button class="cpreset" data-a="preset" data-i="${i}"><span class="cpreset-dots">${['accent', 'good', 'gold'].map(k => `<i style="background:${c[k] || slotDef(k)}"></i>`).join('')}</span><span class="cpreset-bg" style="background:${c.bg || '#000000'}"></span>${esc(T(n))}</button>`).join('')}</div>
-        ${COLOR_SLOTS.map(slotHTML).join('')}
+        <div class="cpresets">${COLOR_PRESETS[st].map(presetHTML).join('')}</div>
+        ${colorGroups(st).map(g => `<details class="csec" data-sec="${g.id}" ${shut.has(g.id) ? '' : 'open'}><summary><b>${g.h}</b>${g.surf ? `<span class="csec-mode">${mode === 'dark' ? T('Dark mode') : T('Light mode')}</span>` : ''}${icon('down')}</summary>
+          ${g.surf ? `<p class="muted small">${mode === 'dark' ? T('For dark mode. Switch the preview to Light to change light mode’s.') : T('For light mode. Switch the preview to Dark to change dark mode’s.')}</p>` : ''}
+          ${g.slots.map(slotHTML).join('')}</details>`).join('')}
         <div class="row-btns left"><button class="btn ghost" data-a="resetAll">${icon('reset')}${T('All back to default')}</button></div>
-        ${state.settings.style === 'y2k' ? `<p class="muted small">${T('Y2K keeps its own colours; these are for the Clean style.')}</p>` : ''}
       </div>`,
     onInput: (el, d) => {
       if (el.dataset.ck) { set(el.dataset.ck, normHex(el.value)); paint(d, el.dataset.ck, 'wheel'); }
@@ -1471,12 +1629,12 @@ function colorsSheet() {
     },
     actions: {
       pick: (b, d) => { set(b.dataset.k, b.dataset.v); paint(d, b.dataset.k); },
-      reset: (b, d) => { delete draft[b.dataset.k]; paint(d, b.dataset.k); },
-      preset: (b, d) => { draft = { ...COLOR_PRESETS[+b.dataset.i][1] }; refreshSheet(d); },
-      resetAll: (b, d) => { draft = {}; refreshSheet(d); },
-      mode: (b, d) => { mode = b.dataset.v; refreshSheet(d); },
+      reset: (b, d) => { set(b.dataset.k, null); paint(d, b.dataset.k); },
+      preset: (b, d) => { draft = JSON.parse(JSON.stringify(COLOR_PRESETS[st][+b.dataset.i][1])); redraw(d); },
+      resetAll: (b, d) => { draft = {}; redraw(d); },
+      mode: (b, d) => { mode = b.dataset.v; redraw(d); },
       save: (b, d) => {
-        state.settings.colors = { ...draft };
+        state.settings[palKey(st)] = cleanPal(draft);
         save(); applyColors(); closeSheet(d); render(); renderWorkout();
         toast(T('Colours saved.'));
       }
@@ -1492,16 +1650,22 @@ function startY2k() {
     l.href = 'https://fonts.googleapis.com/css2?family=DotGothic16&family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Silkscreen:wght@400;700&family=VT323&display=swap';
     document.head.append(l);
   }
-  if (!document.documentElement.style.getPropertyValue('--numgrid')) {
-    let seed = 11, txt = '';
-    const rnd = () => (seed = seed * 16807 % 2147483647) % 10;
-    for (let r = 0; r < 14; r++) { let line = ''; for (let c = 0; c < 22; c++) line += rnd(); txt += `<text x="0" y="${r * 20 + 14}">${line}</text>`; }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280"><g fill="#1F3BFF" fill-opacity=".12" font-family="monospace" font-size="12.5" letter-spacing="0">${txt}</g></svg>`;
-    document.documentElement.style.setProperty('--numgrid', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
-  }
+  numGrid();
   renderHud();
   clearInterval(hudTimer);
   hudTimer = setInterval(() => { if (state.settings.style === 'y2k' && !document.hidden) tickHud(); else if (state.settings.style !== 'y2k') clearInterval(hudTimer); }, 1000);
+}
+// the faint grid of numbers behind everything, in the frame colour
+let numGridFor = '';
+function numGrid() {
+  const c = colorOf('frame', 'y2k');
+  if (c === numGridFor) return;
+  numGridFor = c;
+  let seed = 11, txt = '';
+  const rnd = () => (seed = seed * 16807 % 2147483647) % 10;
+  for (let r = 0; r < 14; r++) { let line = ''; for (let c = 0; c < 22; c++) line += rnd(); txt += `<text x="0" y="${r * 20 + 14}">${line}</text>`; }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280"><g fill="${c}" fill-opacity=".12" font-family="monospace" font-size="12.5" letter-spacing="0">${txt}</g></svg>`;
+  document.documentElement.style.setProperty('--numgrid', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
 }
 function renderHud() {
   const el = $('#hud');
@@ -2822,7 +2986,7 @@ const recKind = k => ({ 'Est. 1RM': T('Est. 1RM'), Heaviest: T('Heaviest'), 'Mos
 // confetti on one canvas over everything, thrown from a point on the screen; none with Reduce Motion
 // in your colours (Settings → Colours): the record gold, or the accent, done and side colours with a few more
 const fxColors = kind => {
-  if (state.settings.style === 'y2k') return ['#19F0FF', '#FF2D8F', '#1F3BFF', '#E8F0FF', '#A9B8F5'];
+  if (styleNow() === 'y2k') { const tk = tokens('y2k', userPal('y2k'), 'dark'); return [tk['--cyan'], tk['--magenta'], tk['--cobalt'], tk['--ink'], tk['--ink-2']]; }
   const g = colorOf('gold');
   return kind === 'gold' ? [g, mixHex(g, '#FFFFFF', 0.45), mixHex(g, '#FF3B00', 0.35), mixHex(g, '#FFFFFF', 0.8), '#FFFFFF']
     : [colorOf('accent'), colorOf('good'), g, '#FF375F', colorOf('right'), '#64D2FF', '#FFFFFF'];
@@ -3022,10 +3186,16 @@ const CARD_W = 360, CARD_H = 450;
 const CARD_FONT = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'SF Arabic', 'Geeza Pro', 'Noto Sans Arabic', sans-serif`;
 let cardSeq = 0;
 function cardCtx(k, label) {
-  const g = colorOf('gold'), bg = (state.settings.colors || {}).bg && darkBg(state.settings.colors.bg);
-  const c = state.settings.style === 'y2k'
-    ? { bg1: '#05060F', bg2: '#101A57', line: '#1F3BFF', ink: '#E8F0FF', ink2: '#A9B8F5', dim: '#6C7BC7', accent: '#19F0FF', gold: ['#FFFFFF', '#19F0FF', '#FF2D8F'], good: '#19F0FF', flame: ['#E8F0FF', '#19F0FF', '#FF2D8F'], body: '#2A3A8A', muscle: '#1E2A6E', hot: ['#19F0FF', '#FF2D8F'], font: `'Courier New', ui-monospace, Menlo, monospace` }
-    : { bg1: bg || '#0A0A0E', bg2: bg ? mixHex(bg, '#FFFFFF', 0.09) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: '#F5F5F7', ink2: '#A1A1AA', dim: '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+  // in your colours (as in dark mode); what you left alone keeps the cards' own
+  const st = styleNow(), g = colorOf('gold'), dk = tokenDiff(st, userPal(st), 'dark');
+  let c;
+  if (st === 'y2k') {
+    const F = colorOf('frame'), A = colorOf('accent'), H = colorOf('hot'), B = dk['--bg'] || '#05060F', ink = dk['--ink'] || '#E8F0FF', tint = dk['--cobalt'] || dk['--bg'];
+    c = { bg1: B, bg2: tint ? mixHex(B, F, 0.27) : '#101A57', line: F, ink, ink2: dk['--ink-2'] || '#A9B8F5', dim: dk['--muted'] || '#6C7BC7', accent: A, gold: ['#FFFFFF', A, H], good: colorOf('good'), flame: [ink, A, H], body: tint ? mixHex(B, F, 0.42) : '#2A3A8A', muscle: tint ? mixHex(B, F, 0.3) : '#1E2A6E', hot: [A, H], font: `'Courier New', ui-monospace, Menlo, monospace` };
+  } else {
+    const bg = dk['--bg'];
+    c = { bg1: bg || '#0A0A0E', bg2: dk['--panel'] ? mixHex(dk['--panel'], '#FFFFFF', 0.03) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: dk['--ink'] || '#F5F5F7', ink2: dk['--ink-2'] || '#A1A1AA', dim: dk['--muted'] || '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+  }
   return Object.assign(c, { k, label, rtl: RTL, id: `cd${++cardSeq}` });
 }
 let measure = null;
@@ -4427,16 +4597,11 @@ function kpCell() {
 const rirStep = (x, s) => state.settings.padRir !== false && state.settings.effort !== 'off' && !!s && s.t !== 'W' && hasReps(getEx(x.exId).k);
 // a one-row left/right set: its rows, first side first
 const sidesInOrder = (x, s) => isCompact(x) && s.side && partnerOf(x, s) ? setRows(x, s).sort((a, b) => (b.side === firstSide(x)) - (a.side === firstSide(x))) : [s];
-function canLog(w, x, s) {
-  const ph = placeholder(x, x.sets.indexOf(s), exCtx(w, x)), c = { ...s };
-  for (const f of ['w', 'r', 'sec', 'dist']) if (c[f] == null && ph[f] != null) c[f] = ph[f];
-  return hasValue(getEx(x.exId).k, x, c);
-}
-// move the pad to another box; `then: 'log'` logs the set once its RIR is picked
-function kpGo(s, f, then) {
+// move the pad to another box
+function kpGo(s, f) {
   const fld = kpField();
   ui.kp.s = s; ui.kp.f = f; ui.kp.sid = fld && fld.x.sets[s] && fld.x.sets[s].id;
-  ui.kp.fresh = true; ui.kp.buf = null; ui.kp.then = then || null;
+  ui.kp.fresh = true; ui.kp.buf = null;
   renderKeypad(); markKpCell(true);
 }
 function kpCurrent() {
@@ -5210,6 +5375,7 @@ VIEWS.settings = function () {
   return `<header class="page-h"><div><p class="eyebrow">${T('Saved on this device')}</p><h1>${T('Settings')}</h1></div></header>
   <div class="card list-card guide-row">
     ${row(T('Guide'), T('A plan that fits you, a tour of the app, the words you’ll see and tips as you go.'), `<button class="btn sm" data-a="openGuide">${icon('info')}${T('Open')}</button>`)}
+    ${row(T('What’s new'), T('What changed in the last few updates.'), `<button class="btn sm" data-a="openNews">v${APP_VERSION}</button>`)}
   </div>
   <h2 class="section-h">${T('Logging')}</h2><div class="card list-card">
     ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', term('kg')], ['lb', term('lb')]]))}
@@ -5221,7 +5387,7 @@ VIEWS.settings = function () {
     ${row(T('Layout'), T('One exercise at a time with big next and previous buttons, or every exercise in one list.'), seg('setView', s.view, [['focus', T('One at a time')], ['list', T('List')]]))}
     ${row(T('One-side exercises'), T('How left and right are logged on one-arm and one-leg exercises. You can also change it on each exercise.'), seg('setUniStyle', s.uniStyle || 'rows', [['rows', T('Separate rows')], ['one', T('One row')]]))}
     ${row(T('Number pad'), T('Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.'), seg('setKeypad', s.keypad, [['auto', T('Auto')], ['app', T('In-app pad')], ['system', T('Keyboard')]]))}
-    ${s.effort !== 'off' ? row(T('{eff} on the number pad', { eff: effName() }), T('Next and Log go from weight to reps to {eff}, and one tap on a choice moves on. Off: the pad skips it, and you tap the {eff} box to set it.', { eff: effName() }), toggle(s.padRir !== false, 'tgl', 'data-k="padRir"')) : ''}
+    ${s.effort !== 'off' ? row(T('{eff} on the number pad', { eff: effName() }), T('Next goes from weight to reps to {eff}, and one tap on a choice moves on to the next set; Log logs the set straight away. Off: Next skips it, and you tap the {eff} box to set it.', { eff: effName() }), toggle(s.padRir !== false, 'tgl', 'data-k="padRir"')) : ''}
     ${row(T('Default rest'), T('Each exercise can have its own.'), `<label class="select-wrap sm"><select data-f="rest">${REST_PRESETS.map(v => `<option value="${v}" ${v === s.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>`)}
     ${row(T('Start rest timer when a set is checked'), '', toggle(s.autoRest, 'tgl', 'data-k="autoRest"'))}
     ${row(T('Move to the next exercise when one is done'), T('Slides to it one at a time, or scrolls down to it in the list.'), toggle(s.autoNext, 'tgl', 'data-k="autoNext"'))}
@@ -5234,7 +5400,7 @@ VIEWS.settings = function () {
     ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
-    ${row(T('Colours'), s.style === 'y2k' ? T('Your own accent, done, left and right, record and background colours, with a preview. Y2K keeps its own; they show in the Clean style.') : T('Your own accent, done, left and right, record and background colours, with a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${['accent', 'good', 'left', 'right', 'gold'].map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
+    ${row(T('Colours'), s.style === 'y2k' ? T('Every colour of the Y2K style: frame, neons, background, cards, text, set types and more, with a preview before you save.') : T('Every colour: accent, background, cards, text, greys, set types and more, with ready-made looks and a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${(s.style === 'y2k' ? ['frame', 'accent', 'hot', 'dark.bg'] : ['accent', 'good', 'gold', 'dark.bg']).map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
   </div>
   <h2 class="section-h">${T('Your data')}</h2><div class="card list-card">
@@ -5252,6 +5418,48 @@ VIEWS.settings = function () {
   <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })} · ${T('Muscle map on the end-of-workout cards: {lib} (MIT)', { lib: '<a href="https://github.com/GV79/react-body-highlighter" target="_blank" rel="noopener">react-body-highlighter</a>' })}</p>
   <p class="muted small center fit-info" id="fitInfo" lang="en" dir="ltr">${(screenGap(), fitLine())}</p>`;
 };
+/* ----- What's new: a short note once after each update (not on a first launch), and again from Settings ----- */
+// kept on the device, not in your data, so a restored backup doesn't bring old notes back
+const NEWS_KEY = 'liftingsanity:seen-version';
+const CHANGELOG = [
+  { v: 38, items: [
+    ['sliders', 'Every colour is yours', 'Background, cards, text, greys, the delete red and each set type, for dark and light mode. Ready-made looks too, like X Dim, Graphite and Midnight.'],
+    ['layout', 'Y2K gets its own colours', 'Change its frame, neon and highlight, or pick a look like Vaporwave, Matrix or Amber. The Clean style keeps its own.'],
+    ['check', 'Log logs straight away', 'On the number pad, Log logs the set at once. The RIR step still comes up when you press Next.'],
+    ['info', 'This note', 'It shows once after each update. Find it again in Settings, under Guide.']
+  ] },
+  { v: 37, items: [
+    ['sliders', 'Your own colours', 'Pick the accent, done, sides, records and background colours, with a live preview.'],
+    ['chart', 'More to see at the end', 'A body map of the muscles you worked, your exercises with pictures, and how much stronger you got.']
+  ] },
+  { v: 36, items: [
+    ['trophy', 'A new end of workout', 'A full-screen celebration with cards to share: your workout, records, streak and more.'],
+    ['flame', 'Records feel like records', 'Beat one and a gold banner, confetti and a fanfare tell you, right as you log the set.']
+  ] }
+];
+let firstRun = false;
+const seenVersion = () => { try { return +localStorage.getItem(NEWS_KEY) || 0; } catch (e) { return APP_VERSION; } };
+const markSeen = () => { try { localStorage.setItem(NEWS_KEY, String(APP_VERSION)); } catch (e) { /* shown again next time */ } };
+function newsSheet(all) {
+  const since = seenVersion() || APP_VERSION - 1;
+  const list = all ? CHANGELOG : CHANGELOG.filter(c => c.v > since && c.v <= APP_VERSION).slice(0, 3);
+  markSeen();
+  return openSheet({
+    cls: 'news-sheet',
+    label: T('What’s new'),
+    render: () => `${sheetHead(T('What’s new'))}
+      <div class="sheet-body pad">${list.map((c, i) => `<section class="news-v">
+        <p class="news-vh"><span>${i === 0 && c.v === APP_VERSION ? T('In this update') : T('Earlier')}</span><i>v${c.v}</i></p>
+        ${c.items.map(([ic, h, txt]) => `<div class="news-item"><span class="news-ic">${icon(ic)}</span><div><b>${T(h)}</b><p>${T(txt)}</p></div></div>`).join('')}</section>`).join('')}
+        <button class="btn primary wide news-ok" data-a="sheetClose">${T('Got it')}</button></div>`
+  });
+}
+// once after an update, when nothing else is open; a first launch starts at this version with nothing to show
+function maybeNews() {
+  if (firstRun || saveBlocked) { markSeen(); return; }
+  if (seenVersion() >= APP_VERSION || state.active || sheets.length) return;
+  newsSheet(false);
+}
 function exportData() {
   return JSON.stringify({ app: 'liftingsanity', version: 1, exported: Date.now(), data: { ...state, rest: null }, photos: Object.fromEntries(photos) });
 }
@@ -5606,33 +5814,27 @@ const ACT = {
     if (!nx) { kpClose(); return; }
     kpGo(+nx.dataset.s, nx.dataset.f);
   },
-  // Log asks for the RIR first (each side of a one-row set), then logs; on the RIR step it logs straight away
+  // Log logs the set straight away (the RIR comes up on Next); a target RIR shown is logged with it, like ✓
   kpLog: () => {
     const fld = kpField();
     if (!fld) { kpClose(); return; }
-    const { w, x } = fld, rows = sidesInOrder(x, fld.set), two = rows.length > 1;
+    const { x } = fld, rows = sidesInOrder(x, fld.set), two = rows.length > 1;
     if (fld.set.done && !two) { kpClose(); return; }
     if (rows.every(o => o.done)) { kpClose(); return; }
-    const open = rows.filter(o => !o.done);
-    if (ui.kp.f !== 'rir' && open.every(o => canLog(w, x, o))) {
-      const ask = open.find(o => o.rir == null && rirStep(x, o));
-      if (ask) { kpGo(x.sets.indexOf(ask), 'rir', 'log'); return; }
-    }
     if (two) toggleBoth(ui.kp.e, Math.min(...rows.map(o => x.sets.indexOf(o))), true);
     else toggleSet(ui.kp.e, ui.kp.s, true);
   },
-  // a RIR choice on the pad: then the other side, the log it was asked for, or on to the next set
+  // a RIR choice on the pad: then the other side of a one-row set, or on to the next set
   kpEff: b => {
     const fld = kpField();
     if (!fld || ui.kp.f !== 'rir') return;
-    const { x, set } = fld, then = ui.kp.then;
+    const { x, set } = fld;
     if (b.dataset.v === '') { delete set.rir; save(); renderWorkout(); return; }
     set.rir = +b.dataset.v;
     save(); renderWorkout();
     const sides = sidesInOrder(x, set), mate = sides.length > 1 && sides[0] === set ? sides[1] : null;
-    if (mate && (!then || (!mate.done && mate.rir == null))) { kpGo(x.sets.indexOf(mate), 'rir', then); return; }
-    if (then === 'log') ACT.kpLog();
-    else if (state.settings.padRir !== false) ACT.kpNext();
+    if (mate) { kpGo(x.sets.indexOf(mate), 'rir'); return; }
+    if (state.settings.padRir !== false) ACT.kpNext();
     else kpClose();
   },
   kpClose: () => kpClose(),
@@ -5706,6 +5908,7 @@ const ACT = {
   },
   setMotion: b => { state.settings.motion = b.dataset.v === 'on'; save(); mvStopAll(); render(); renderWorkout(); },
   openColors: () => colorsSheet(),
+  openNews: () => newsSheet(true),
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
@@ -6069,6 +6272,7 @@ mvWatch();
 requestAnimationFrame(() => { ui.booted = true; placePill(true); });
 // the welcome stays until it's used or skipped (switching language on it starts the page again with it open)
 if (state.flags.newUser && !state.flags.welcomed) setTimeout(welcomeSheet, 350);
+setTimeout(maybeNews, 900);
 setTimeout(keepCopy, 2000);
 fitSoon(500);
 document.documentElement.classList.toggle('ios-app', homeScreenApp());

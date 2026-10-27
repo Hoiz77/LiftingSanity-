@@ -40,8 +40,7 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   await check(2, 0);
   r.ok(await banner() === null, 'an exercise done for the first time sets no record (nothing to beat yet)');
   await t.ev('woGo(1)'); await p.waitForTimeout(400);
-  await t.click('#workout .cell[data-e="1"][data-s="0"][data-f="r"]', 250); await t.click('#keypad [data-a="kpStep"][data-d="1"]', 150); await t.click('#keypad [data-a="kpLog"]', 250);
-  await t.click('#keypad [data-a="kpEff"][data-v="1"]', 300);
+  await t.click('#workout .cell[data-e="1"][data-s="0"][data-f="r"]', 250); await t.click('#keypad [data-a="kpStep"][data-d="1"]', 150); await t.click('#keypad [data-a="kpLog"]', 550);
   const b2 = await banner();
   r.ok(/New PR!/i.test(b2 || '') && /Seated Cable Row/.test(b2) && /Est\. 1RM/.test(b2), 'logging on the number pad celebrates too', b2);
   await t.click('#prfx .prfx-card', 450);
