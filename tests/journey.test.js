@@ -74,7 +74,10 @@ const { open, report, ENGINE } = require('./lib');
   if (await p.evaluate(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); return !!(w && w.querySelector('[data-a="ok"]')); })) await t.inSheet('[data-a="ok"]', 1200);
   await p.waitForTimeout(600);
   s = await t.state();
-  r.ok(!s.active && s.workouts.length === 1 && s.workouts[0].ex.every(x => x.sets.every(st => st.done)) && /Nice work|Workout saved|done/i.test(await t.sheetText()), 'Finish saves the workout and shows the summary', { workouts: s.workouts.length, sheet: (await t.sheetText()).slice(0, 80) });
+  r.ok(!s.active && s.workouts.length === 1 && s.workouts[0].ex.every(x => x.sets.every(st => st.done)) && /First workout done!/.test(await t.sheetText()), 'Finish saves the workout and celebrates the first one', { workouts: s.workouts.length, sheet: (await t.sheetText()).slice(0, 80) });
+  // in Safari's engine too: a card drawn into a picture, the way Share makes it
+  const pic = await t.ev(`(async () => { try { const b = await cardPNG(finCards(workoutStory(state.workouts[0]))[1]); return b ? b.size : 0; } catch (e) { return 'error: ' + e.message; } })()`);
+  r.ok(pic > 10000, 'a card from the end screen can be made into a picture to share', pic);
   await closeSheets();
   await t.tab('history');
   r.ok(await p.evaluate(() => document.querySelectorAll('#view .hist-card').length === 1), 'History shows the workout');

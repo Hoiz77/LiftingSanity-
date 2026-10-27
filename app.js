@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1885,7 +1885,7 @@ function openSheet(def) {
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap' + (def.full ? ' full' : '') + (def.cls ? ' ' + def.cls : '');
   wrap.dataset.sheet = def.id;
-  wrap.innerHTML = `<div class="sheet-backdrop" data-a="sheetClose"></div><div class="sheet" role="dialog" aria-modal="true"></div>`;
+  wrap.innerHTML = `<div class="sheet-backdrop" data-a="sheetClose"></div><div class="sheet" role="dialog" aria-modal="true"${def.label ? ` aria-label="${esc(def.label)}"` : ''}></div>`;
   $('#sheets').append(wrap);
   def.el = wrap;
   refreshSheet(def);
@@ -2636,7 +2636,7 @@ function finishWorkout() {
   render();
   renderWorkout();
   renderRest();
-  if (canMove() && !calm()) setTimeout(() => summarySheet(w.id, !editing), 280); else summarySheet(w.id, !editing);
+  if (canMove() && !calm()) setTimeout(() => finishScreen(w.id, editing ? 'edit' : 'new'), 280); else finishScreen(w.id, editing ? 'edit' : 'new');
   keepCopy();
 }
 function discardActive() {
@@ -2652,53 +2652,511 @@ function discardActive() {
 }
 // record names are saved in English (old logs have them that way too); shown in the chosen language
 const recKind = k => ({ 'Est. 1RM': T('Est. 1RM'), Heaviest: T('Heaviest'), 'Most reps': T('Most reps'), Longest: T('Longest'), Farthest: T('Farthest') })[k] || k;
-function summarySheet(id, fresh) {
+/* ============================== Celebrations: confetti, a fanfare, a stronger tap ============================== */
+
+// confetti on one canvas over everything, thrown from a point on the screen; none with Reduce Motion
+const FX_COLORS = {
+  party: ['#0A84FF', '#30D158', '#FFD60A', '#FF375F', '#BF5AF2', '#64D2FF', '#FFFFFF'],
+  gold: ['#FFD60A', '#FFE680', '#FF9F0A', '#FFF6CC', '#FFB800', '#FFFFFF'],
+  y2k: ['#19F0FF', '#FF2D8F', '#1F3BFF', '#E8F0FF', '#A9B8F5']
+};
+const fxColors = kind => state.settings.style === 'y2k' ? FX_COLORS.y2k : FX_COLORS[kind];
+let fxCv = null, fxBits = [], fxRaf = 0, fxLast = 0, fxEnd = 0, fxFrames = 0;
+function confetti(x, y, { n = 120, colors = fxColors('party'), angle = -Math.PI / 2, spread = Math.PI * 2, power = 1 } = {}) {
+  if (calm() || !window.requestAnimationFrame) return;
+  if (!fxCv) { fxCv = document.createElement('canvas'); fxCv.id = 'fx'; fxCv.setAttribute('aria-hidden', 'true'); document.body.append(fxCv); }
+  for (let i = 0; i < n; i++) {
+    const a = angle + (Math.random() - 0.5) * spread, v = (4 + Math.random() * 9) * power;
+    fxBits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.35, w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[i % colors.length], s: i % 4, t: 0, life: 90 + Math.random() * 70, f: Math.random() * 6.3 });
+  }
+  fxEnd = performance.now() + 4000; fxFrames = 0;
+  if (!fxRaf) { fxLast = performance.now(); fxRaf = requestAnimationFrame(fxTick); }
+}
+// one frame: each piece slows in the air, falls, sways and flips; the canvas is cleared once the last one is gone,
+// after 4 seconds (or 400 frames, whatever the clock says) at most, or straight away when the page was put away mid-burst
+function fxTick(now) {
+  if (now > fxEnd || now - fxLast > 1000 || ++fxFrames > 400) fxBits = [];
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+  if (fxCv.width !== Math.round(W * dpr) || fxCv.height !== Math.round(H * dpr)) { fxCv.width = Math.round(W * dpr); fxCv.height = Math.round(H * dpr); }
+  const g = fxCv.getContext('2d'), k = Math.min(3, Math.max(0.2, (now - fxLast) / 16.7));
+  fxLast = now;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  fxBits = fxBits.filter(b => b.t < b.life && b.y < H + 30);
+  for (const b of fxBits) {
+    const drag = Math.pow(0.97, k);
+    b.t += k; b.vx *= drag; b.vy = b.vy * drag + 0.28 * k; b.f += 0.12 * k;
+    b.x += (b.vx + Math.sin(b.f) * 0.8) * k; b.y += b.vy * k; b.r += b.vr * k;
+    g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.scale(1, Math.cos(b.f * 1.4));
+    g.globalAlpha = Math.min(1, (b.life - b.t) / 25);
+    g.fillStyle = b.c;
+    if (b.s === 0) { g.beginPath(); g.arc(0, 0, b.h * 0.7, 0, 6.283); g.fill(); }
+    else if (b.s === 1) { g.beginPath(); g.moveTo(0, -b.w * 0.6); g.lineTo(b.w * 0.55, b.w * 0.45); g.lineTo(-b.w * 0.55, b.w * 0.45); g.fill(); }
+    else g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+    g.restore();
+  }
+  fxRaf = fxBits.length ? requestAnimationFrame(fxTick) : 0;
+  if (!fxRaf) g.clearRect(0, 0, W, H);
+}
+// a short rising fanfare (with Settings → Sound): a bigger one for a finished workout than for a record
+function fanfare(big) {
+  if (!state.settings.sound) return;
+  unlockAudio();
+  if (!actx) return;
+  try {
+    const t0 = actx.currentTime + 0.02, notes = big ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [659.25, 830.61, 987.77, 1318.5];
+    notes.forEach((f, i) => {
+      const last = i === notes.length - 1, at = t0 + i * (big ? 0.1 : 0.075), len = last ? 0.9 : 0.18;
+      for (const [type, mul, vol] of [['triangle', 1, 0.22], ['sine', 2, 0.06]]) {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = type; o.frequency.value = f * mul;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(vol, at + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+        o.connect(g).connect(actx.destination);
+        o.start(at); o.stop(at + len + 0.05);
+      }
+    });
+  } catch (e) { /* audio unavailable */ }
+}
+// a stronger pattern of taps than a checked set's, for a record or a finished workout
+function hapticBurst() {
+  if (navigator.vibrate) { try { navigator.vibrate([16, 50, 24, 50, 40]); } catch (e) { /* no vibration */ } return; }
+  haptic(); setTimeout(haptic, 120); setTimeout(haptic, 240);
+}
+
+/* ============================== Records: what each one beat ============================== */
+
+const GAIN_METRIC = { 'Est. 1RM': 'e1rm', Heaviest: 'top', 'Most reps': 'reps', Longest: 'sec', Farthest: 'dist' };
+// a record and the best before it, each in its own measure (kg for 1RM and heaviest, reps, seconds, metres)
+function gainOf(kind, s, r, rec) {
+  const [now, was] = kind === 'Est. 1RM' ? [e1rm(s.w, r), rec.e1rm] : kind === 'Heaviest' ? [s.w, rec.w] : kind === 'Most reps' ? [r, rec.reps] : kind === 'Longest' ? [s.sec || 0, rec.sec] : [s.dist || 0, rec.dist];
+  return { kind, now, was };
+}
+const gainNow = (g, k) => fmtMetric(GAIN_METRIC[g.kind], g.now, k);
+function gainPlus(g, k) {
+  const m = GAIN_METRIC[g.kind], d = g.now - g.was;
+  if (!(d > 1e-9)) return '';
+  return signed('+' + (m === 'reps' ? TN(Math.round(d), '{n} rep', '{n} reps') : m === 'sec' ? fmtClock(d) : m === 'dist' ? `${dispDist(d, k)} ${distUnit(k)}` : fmtW(d, m === 'e1rm' ? 1 : null)));
+}
+// the records a set just set, worked out the way its flags are: against history, then the sets before it today
+function setGains(w, x, j) {
+  const k = getEx(x.exId).k, s = x.sets[j];
+  if (!s || !s.done || NO_RECORD.has(s.t)) return [];
+  const rec = records(x.exId, baselineAt(x.exId, w.start), w.start, w.id);
+  for (const o of w.ex) { if (o === x) break; if (o.exId === x.exId) for (const q of o.sets) addToRec(rec, o, q, k); }
+  for (let n = 0; n < j; n++) addToRec(rec, x, x.sets[n], k);
+  return setPRs(x, s, rec, k).map(kind => gainOf(kind, s, recReps(x, s), rec));
+}
+// a saved record against the best before that workout
+function savedGain(w, p) {
+  const rec = records(p.exId, baselineAt(p.exId, w.start), w.start, w.id);
+  return gainOf(p.kind, p.set, recReps({ exId: p.exId, uni: p.uni }, p.set), rec);
+}
+
+/* ----- a record while you train: a gold banner, confetti, a fanfare and a stronger tap ----- */
+let prTimer = null;
+function prParty(x, gains) {
+  let el = $('#prfx');
+  if (!el) { el = document.createElement('div'); el.id = 'prfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
+  const ex = getEx(x.exId), k = ex.k;
+  el.innerHTML = `<button class="prfx-card" data-a="prfxHide"><span class="prfx-medal" aria-hidden="true"><span class="prfx-rays"></span>${icon('trophy')}</span>
+    <span class="prfx-txt"><b class="prfx-kick">${TN(gains.length, 'New PR!', 'New PRs!')}</b><span class="prfx-ex">${esc(ex.name)}</span>
+    ${gains.map(g => `<span class="prfx-line"><span>${esc(recKind(g.kind))}</span> <b>${esc(gainNow(g, k))}</b>${gainPlus(g, k) ? ` <em>${esc(gainPlus(g, k))}</em>` : ''}</span>`).join('')}</span></button>`;
+  el.hidden = false;
+  el.classList.remove('in', 'out'); void el.offsetWidth; el.classList.add('in');
+  setTimeout(() => {
+    const m = $('.prfx-medal', el);
+    if (!m || el.hidden) return;
+    const r = m.getBoundingClientRect();
+    confetti(r.left + r.width / 2, r.top + r.height / 2, { n: 110, colors: fxColors('gold'), angle: Math.PI / 2, spread: Math.PI * 1.7, power: 0.95 });
+  }, calm() ? 0 : 160);
+  fanfare(false);
+  hapticBurst();
+  clearTimeout(prTimer);
+  prTimer = setTimeout(prHide, 3800);
+}
+function prHide() {
+  const el = $('#prfx');
+  clearTimeout(prTimer);
+  if (!el || el.hidden) return;
+  el.classList.remove('in'); el.classList.add('out');
+  setTimeout(() => { if (el.classList.contains('out')) { el.hidden = true; el.classList.remove('out'); } }, calm() ? 0 : 320);
+}
+// records in the open workout, for the trophy count in its header (worked out again only when a set changes)
+let prCount = ['', 0];
+function woPRCount(w) {
+  const key = w.id + '|' + w.ex.map(x => x.exId + ':' + x.sets.map(s => s.done ? `${s.t}${s.w}x${s.r}x${s.sec}x${s.dist}` : '-').join(',')).join(';');
+  if (key !== prCount[0]) prCount = [key, workoutPRs(w).length];
+  return prCount[1];
+}
+
+/* ============================== The end of a workout ============================== */
+
+// everything the end screen and its cards tell about one saved workout
+const COUNT_MARKS = [1, 5, 10, 25, 50, 75, 100, 150, 200, 250, 300, 365, 400, 500, 750, 1000];
+const LIFE_MARKS = [1e3, 5e3, 1e4, 25e3, 5e4, 1e5, 25e4, 5e5, 1e6, 25e5, 5e6, 1e7];
+function workoutStory(w) {
+  const all = state.workouts, i = all.indexOf(w), n = sessionNumber(w), disp = kg => isLb() ? kg * KG_LB : kg;
+  const vol = workoutVolume(w), life = disp(sum(all.slice(0, i + 1), workoutVolume)), before = life - disp(vol);
+  const reps = sum(w.ex, x => hasReps(getEx(x.exId).k) ? sum(x.sets, s => s.done && s.t !== 'W' ? recReps(x, s) : 0) : 0);
+  // last time on the same day of the plan (or a workout with the same name)
+  const prev = all.slice(0, i).reverse().find(o => w.tplId ? o.tplId === w.tplId : o.name === w.name) || null;
+  // the week it was in, Monday first, with the days that had a workout
+  const wk = weekStart(w.start), days = [];
+  for (let d = 0; d < 7; d++) {
+    const a = new Date(wk); a.setDate(a.getDate() + d);
+    const b = new Date(a); b.setDate(b.getDate() + 1);
+    days.push({ t: a.getTime(), on: all.some(o => o.start >= a && o.start < b), now: a.getTime() === dayStart(w.start) });
+  }
+  return {
+    w, n, vol, reps, life, prev, days,
+    dur: Math.max(0, (w.end || w.start) - w.start), sets: workingSets(w), muscles: muscleSets([w]),
+    prs: (w.prs || []).map(p => ({ ...p, ...savedGain(w, p) })),
+    count: COUNT_MARKS.includes(n) || (n > 1000 && n % 250 === 0) ? n : null,
+    mark: LIFE_MARKS.filter(m => before < m && life >= m).pop() || null,
+    streak: streakAt(w.start), weekCount: all.filter(o => weekStart(o.start) === wk).length,
+    cmp: prev ? compareTo(w, prev) : null
+  };
+}
+// weeks in a row with a workout, up to the week of `ts`
+function streakAt(ts) {
+  const weeks = new Set(state.workouts.filter(o => o.start <= ts).map(o => weekStart(o.start)));
+  let wk = weekStart(ts), n = 0;
+  while (weeks.has(wk)) { n++; wk = weekStart(wk - 3 * DAY); }
+  return n;
+}
+// against last time: volume, sets, time, and how many exercises went up (best est. 1RM, or weight, reps, time, distance)
+function compareTo(w, p) {
+  const best = (wo, id) => { const k = getEx(id).k, rec = emptyRec(); for (const x of wo.ex) if (x.exId === id) for (const s of x.sets) addToRec(rec, x, s, k); return rec; };
+  const ids = [...new Set(w.ex.filter(x => x.sets.some(s => s.done && s.t !== 'W')).map(x => x.exId))].filter(id => p.ex.some(x => x.exId === id && x.sets.some(s => s.done)));
+  let up = 0, top = null;
+  for (const id of ids) {
+    const k = getEx(id).k, a = best(w, id), b = best(p, id);
+    const m = k === 'wr' ? (a.e1rm && b.e1rm ? 'e1rm' : 'w') : k === 'bw' || k === 'aw' ? 'reps' : k === 'dur' || k === 'wdur' ? 'sec' : 'dist';
+    if (!(a[m] > b[m] + 1e-6)) continue;
+    up++;
+    const g = b[m] ? (a[m] - b[m]) / b[m] : 1;
+    if (!top || g > top.g) top = { id, g, k, gain: { kind: { e1rm: 'Est. 1RM', w: 'Heaviest', reps: 'Most reps', sec: 'Longest', dist: 'Farthest' }[m], now: a[m], was: b[m] } };
+  }
+  return { vol: workoutVolume(p), sets: workingSets(p), dur: Math.max(0, (p.end || p.start) - p.start), up, of: ids.length, top, name: p.name, when: p.start };
+}
+// how heavy, in things: "as heavy as 1.6 school buses"
+const HEAVY = [[150000, 'As heavy as {n} blue whale', 'As heavy as {n} blue whales'], [11000, 'As heavy as {n} school bus', 'As heavy as {n} school buses'], [6000, 'As heavy as {n} elephant', 'As heavy as {n} elephants'], [1500, 'As heavy as {n} car', 'As heavy as {n} cars'], [400, 'As heavy as {n} grand piano', 'As heavy as {n} grand pianos']];
+function heavyAs(kg) {
+  for (const [w, one, other] of HEAVY) {
+    const n = kg / w;
+    if (n >= 1) { const v = n < 10 ? +trimNum(n, 1) : Math.round(n); return TN(v, one, other, { n: v.toLocaleString(LOC) }); }
+  }
+  return '';
+}
+
+/* ----- the cards: drawn as SVG, so what's on screen is the picture that's shared ----- */
+const CARD_W = 360, CARD_H = 450;
+const CARD_FONT = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'SF Arabic', 'Geeza Pro', 'Noto Sans Arabic', sans-serif`;
+let cardSeq = 0;
+function cardCtx(k, label) {
+  const c = state.settings.style === 'y2k'
+    ? { bg1: '#05060F', bg2: '#101A57', line: '#1F3BFF', ink: '#E8F0FF', ink2: '#A9B8F5', dim: '#6C7BC7', accent: '#19F0FF', gold: ['#FFFFFF', '#19F0FF', '#FF2D8F'], good: '#19F0FF', flame: ['#E8F0FF', '#19F0FF', '#FF2D8F'], body: '#131B4D', muscle: '#1E2A6E', hot: ['#19F0FF', '#FF2D8F'], font: `'Courier New', ui-monospace, Menlo, monospace` }
+    : { bg1: '#0A0A0E', bg2: '#1A1A22', line: 'rgba(255,255,255,.1)', ink: '#F5F5F7', ink2: '#A1A1AA', dim: '#6B6B73', accent: '#0A84FF', gold: ['#FFF3B0', '#FFD60A', '#FF9F0A'], good: '#30D158', flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#24242B', muscle: '#33333B', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+  return Object.assign(c, { k, label, rtl: RTL, id: `cd${++cardSeq}` });
+}
+let measure = null;
+function textW(str, size, weight, font) {
+  if (!measure) measure = document.createElement('canvas').getContext('2d');
+  measure.font = `${weight} ${size}px ${font}`;
+  return measure.measureText(str).width;
+}
+// a line of text made to fit: smaller first, then cut short
+function fitText(str, max, size, weight, font, min, ls = 0) {
+  const wid = (t, s) => textW(t, s, weight, font) + ls * t.length;
+  let s = size;
+  while (s > min && wid(str, s) > max) s -= 1;
+  let t = str;
+  if (wid(t, s) > max) { while (t.length > 1 && wid(t + '…', s) > max) t = t.slice(0, -1); t = t.trimEnd() + '…'; }
+  return [t, s];
+}
+// text on a card: x from the reading side, anchored at its start, middle or end. In Arabic it's mirrored, and the
+// text is set right to left inside it (browsers don't agree on what start and end mean in right-to-left SVG)
+const ANCHOR_RTL = { start: 'end', end: 'start', middle: 'middle' };
+const bidi = (c, t) => c.rtl ? `\u2067${t}\u2069` : t;
+function ctext(c, x, y, str, { size = 14, weight = 600, fill = c.ink, anchor = 'middle', max = 0, min = 0, ls = 0, attrs = '' } = {}) {
+  const sp = c.rtl ? 0 : ls;
+  let t = String(str), s = size;
+  if (max) [t, s] = fitText(t, max, size, weight, c.font, min || Math.round(size * 0.62), sp);
+  return `<text x="${c.rtl ? CARD_W - x : x}" y="${y}" font-size="${s}" font-weight="${weight}" fill="${fill}" text-anchor="${c.rtl ? ANCHOR_RTL[anchor] : anchor}"${sp ? ` letter-spacing="${sp}"` : ''}${attrs}>${esc(bidi(c, t))}</text>`;
+}
+const cx_ = (c, x, w = 0) => c.rtl ? CARD_W - x - w : x;
+const grad = (id, cols, v = true) => `<linearGradient id="${id}" x1="0" y1="0" x2="${v ? 0 : 1}" y2="${v ? 1 : 0}">${cols.map((col, i) => `<stop offset="${i / (cols.length - 1)}" stop-color="${col}"/>`).join('')}</linearGradient>`;
+const glow = (id, col, op) => `<radialGradient id="${id}"><stop offset="0" stop-color="${col}" stop-opacity="${op}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient>`;
+// light rays from a point, for the records and milestone cards
+const rays = (x, y, r, col, op) => Array.from({ length: 16 }, (_, i) => `<path d="M${x} ${y}L${x + r * Math.cos((i * 22.5 - 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 - 3) * Math.PI / 180)}L${x + r * Math.cos((i * 22.5 + 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 + 3) * Math.PI / 180)}Z" fill="${col}" opacity="${op}"/>`).join('');
+const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('');
+function cardFrame(c, inner, defs = '') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}" font-family="${c.font}" role="img" aria-label="${esc(c.label)}">
+<defs>${grad(c.id + 'bg', [c.bg2, c.bg1])}${defs}</defs><rect width="${CARD_W}" height="${CARD_H}" rx="26" fill="url(#${c.id}bg)"/>${inner}
+<rect x=".75" y=".75" width="${CARD_W - 1.5}" height="${CARD_H - 1.5}" rx="25.5" fill="none" stroke="${c.line}" stroke-width="1.5"/>${ctext({ ...c, rtl: false }, 180, 432, 'LIFTING SANITY', { size: 10.5, weight: 800, fill: c.dim, ls: 3.2 })}</svg>`;
+}
+// the body, front or back, with each trained muscle coloured by how many sets it got
+function cardFigure(c, view, heat, x, y, h) {
+  const body = `<g fill="${c.body}">${FIG_BODY}${FIG_LIMBS}<g transform="${MIRROR}">${FIG_LIMBS}</g></g>`;
+  const mus = (view === 'front' ? FIG_FRONT : FIG_BACK).map(([m, d, mir]) => `<g fill="${heat[m] ? mixHex(c.hot[0], c.hot[1], heat[m]) : c.muscle}">${d}${mir ? `<g transform="${MIRROR}">${d}</g>` : ''}</g>`).join('');
+  return `<svg x="${x}" y="${y}" width="${h / 2}" height="${h}" viewBox="0 0 100 200">${body}${mus}</svg>`;
+}
+function cardWorkout(st) {
+  const c = cardCtx('workout', T('The workout')), { w } = st, unitTxt = ' ' + U();
+  const v = Math.round(isLb() ? st.vol * KG_LB : st.vol), num = v.toLocaleString(LOC);
+  let h = ctext(c, 180, 46, `${T('Workout #{n}', { n: st.n })} · ${fmtShort(w.start)}`.toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 82, w.name, { size: 28, weight: 800, max: 312 });
+  h += ctext(c, 180, 112, T('Weight lifted').toLocaleUpperCase(LOC), { size: 10, weight: 700, fill: c.ink2, ls: 1.6, max: 300 });
+  const s = fitText(num + unitTxt, 300, 46, 900, c.font, 26)[1];
+  const numT = `<tspan data-count="${v}" data-fmt="int">${esc(num)}</tspan>`, unitT = `<tspan font-size="${Math.round(s * 0.5)}" font-weight="700" fill="${c.ink2}">${esc(unitTxt)}</tspan>`;
+  h += `<text x="180" y="156" font-size="${s}" font-weight="900" fill="${c.ink}" text-anchor="middle">${c.rtl && /[\u0600-\u06ff]/.test(unitTxt) ? `<tspan font-size="${Math.round(s * 0.5)}" font-weight="700" fill="${c.ink2}">${esc(U())} </tspan>${numT}` : numT + unitT}</text>`;
+  const heavy = heavyAs(st.vol);
+  if (heavy) h += ctext(c, 180, 180, heavy, { size: 12.5, weight: 700, fill: c.gold[1], max: 300 });
+  const stats = [[fmtDuration(st.dur), T('Time'), `data-count="${st.dur}" data-fmt="dur"`], [st.sets, T('Working sets'), `data-count="${st.sets}" data-fmt="num"`]];
+  if (st.reps) stats.push([st.reps, T('Reps'), `data-count="${st.reps}" data-fmt="int"`]);
+  if (st.prs.length) stats.push([st.prs.length, T('Records'), '', c.gold[1]]);
+  const cw = 312 / stats.length;
+  stats.forEach(([val, label, attrs, fill], i) => {
+    const x = 24 + cw * (i + 0.5);
+    h += `<text x="${c.rtl ? CARD_W - x : x}" y="222" font-size="${fitText(String(val), cw - 8, 21, 800, c.font, 14)[1]}" font-weight="800" fill="${fill || c.ink}" text-anchor="middle"><tspan ${attrs}>${esc(bidi(c, String(val)))}</tspan></text>`;
+    h += ctext(c, x, 239, label.toLocaleUpperCase(LOC), { size: 9, weight: 700, fill: c.ink2, ls: 1, max: cw - 6 });
+  });
+  // the muscles worked, front and back
+  const most = st.muscles.length ? st.muscles[0][1] : 1, heat = {};
+  for (const [m, n] of st.muscles) {
+    const t = 0.25 + 0.75 * Math.min(1, n / Math.max(4, most));
+    for (const mm of m === 'fullbody' ? ['chest', 'quads', 'abs', 'frontdelts', 'lats', 'glutes', 'hamstrings', 'upperback'] : [m]) heat[mm] = Math.max(heat[mm] || 0, t);
+  }
+  h += cardFigure(c, 'front', heat, 98, 252, 148) + cardFigure(c, 'back', heat, 188, 252, 148);
+  if (st.muscles.length) h += ctext(c, 180, 414, st.muscles.slice(0, 3).map(([m, n]) => `${MUSCLES[m]} ${trimNum(n, 1)}`).join(' · '), { size: 11, weight: 600, fill: c.ink2, max: 312 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h) };
+}
+// a filled trophy on a 100-unit grid
+const TROPHY = (f, x, y, sc) => `<g transform="translate(${x} ${y}) scale(${sc})"><path d="M26 18H12v8c0 11 8 18 18 18M74 18h14v8c0 11-8 18-18 18" fill="none" stroke="${f}" stroke-width="7" stroke-linecap="round"/><path d="M24 8h52v26c0 16-12 30-26 30S24 50 24 34Z" fill="${f}"/><path d="M44 62h12v14H44Z" fill="${f}"/><path d="M30 80h40a4 4 0 0 1 4 4v8H26v-8a4 4 0 0 1 4-4Z" fill="${f}"/><path d="M36 16v16c0 6 3 11 8 14" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"/></g>`;
+function cardRecords(st) {
+  const c = cardCtx('records', T('New records')), n = st.prs.length, g = `url(#${c.id}g)`;
+  let h = `<circle cx="180" cy="96" r="170" fill="url(#${c.id}r)"/>${rays(180, 96, 190, c.gold[1], 0.07)}`;
+  h += TROPHY(g, 140, 46, 0.8);
+  h += `<text x="180" y="190" font-size="50" font-weight="900" fill="${g}" text-anchor="middle">${n}</text>`;
+  h += ctext(c, 180, 214, TN(n, 'New record', 'New records').toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: c.gold[1], ls: 2.4, max: 300 });
+  st.prs.slice(0, 4).forEach((p, i) => {
+    const y = 250 + i * 40, k = getEx(p.exId).k, plus = gainPlus(p, k);
+    h += ctext(c, 28, y, getEx(p.exId).name, { size: 14.5, weight: 700, anchor: 'start', max: plus ? 196 : 300 });
+    h += ctext(c, 28, y + 17, `${recKind(p.kind)} · ${gainNow(p, k)}`, { size: 11.5, weight: 600, fill: c.ink2, anchor: 'start', max: plus ? 196 : 300 });
+    if (plus) {
+      const [t, s] = fitText(plus, 92, 13.5, 800, c.font, 10), wd = textW(t, s, 800, c.font) + 20;
+      h += `<rect x="${cx_(c, 332 - wd, wd)}" y="${y - 6}" width="${wd}" height="24" rx="12" fill="${c.gold[1]}" fill-opacity=".16"/>`;
+      h += ctext(c, 332 - wd / 2, y + 11, t, { size: s, weight: 800, fill: c.gold[1] });
+    }
+  });
+  if (n > 4) h += ctext(c, 180, 250 + 4 * 40 - 4, T('+{n} more', { n: n - 4 }), { size: 12, weight: 700, fill: c.ink2 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.32)) };
+}
+const FLAME_OUT = 'M50 4C58 22 84 36 84 70C84 96 68 114 50 114S16 96 16 70C16 52 26 40 34 32C34 46 40 54 48 56C42 38 44 20 50 4Z';
+const FLAME_IN = 'M50 50C56 62 68 70 68 86C68 100 60 110 50 110S32 100 32 86C32 76 38 70 43 64C44 72 47 76 52 77C48 68 47 59 50 50Z';
+function cardStreak(st) {
+  const c = cardCtx('streak', T('Week streak')), n = st.streak, f = `url(#${c.id}f)`;
+  let h = `<circle cx="180" cy="140" r="150" fill="url(#${c.id}r)"/>`;
+  h += `<g transform="translate(110 30) scale(1.4)"><path d="${FLAME_OUT}" fill="${f}"/><path d="${FLAME_IN}" fill="${c.flame[0]}" fill-opacity=".55"/></g>`;
+  h += `<text x="180" y="196" font-size="${n > 99 ? 56 : 70}" font-weight="900" fill="#FFFFFF" stroke="${c.bg1}" stroke-width="9" paint-order="stroke" stroke-linejoin="round" text-anchor="middle">${n}</text>`;
+  h += ctext(c, 180, 256, TN(n, '{n}-week streak!', '{n}-week streak!'), { size: 27, weight: 900, fill: c.flame[1], max: 312 });
+  h += ctext(c, 180, 282, n > 1 ? TN(n, 'You’ve trained {n} week in a row', 'You’ve trained {n} weeks in a row') : T('Train next week to keep it going'), { size: 13, weight: 600, fill: c.ink2, max: 312 });
+  st.days.forEach((d, i) => {
+    const x = cx_(c, 180 + (i - 3) * 42);
+    h += d.now ? `<circle cx="${x}" cy="330" r="21" fill="none" stroke="${c.flame[1]}" stroke-opacity=".55" stroke-width="2"/>` : '';
+    h += d.on ? `<circle cx="${x}" cy="330" r="16" fill="${f}"/><path d="M${x - 6} 330.5l4 4 8.5-9" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`
+      : `<circle cx="${x}" cy="330" r="15" fill="none" stroke="${c.ink2}" stroke-opacity=".35" stroke-width="2"/>`;
+    h += `<text x="${x}" y="368" font-size="11" font-weight="700" fill="${d.on ? c.ink : c.dim}" text-anchor="middle">${esc(new Date(d.t).toLocaleDateString(LOC, { weekday: 'narrow' }))}</text>`;
+  });
+  h += ctext(c, 180, 402, TN(st.weekCount, '{n} workout this week', '{n} workouts this week'), { size: 13.5, weight: 700, max: 312 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'f', c.flame) + glow(c.id + 'r', c.flame[1], 0.28)) };
+}
+function cardCompare(st) {
+  const c = cardCtx('compare', T('Against last time')), m = st.cmp, pct = m.vol ? Math.round((st.vol - m.vol) / m.vol * 100) : 0;
+  let h = ctext(c, 180, 46, T('Against last time').toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 68, `${m.name} · ${fmtShort(m.when)}`, { size: 12, weight: 600, fill: c.ink2, max: 300 });
+  h += `<text x="180" y="146" font-size="62" font-weight="900" fill="${pct > 0 ? c.good : pct < 0 ? c.ink2 : c.ink}" text-anchor="middle">${esc(signed(`${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`))}</text>`;
+  h += ctext(c, 180, 172, pct > 0 ? T('more weight lifted than last time') : pct < 0 ? T('less weight lifted than last time') : T('the same weight lifted as last time'), { size: 12.5, weight: 600, fill: c.ink2, max: 312 });
+  const top = Math.max(st.vol, m.vol) || 1;
+  [[T('Last time'), m.vol, c.dim, 206], [T('Today'), st.vol, c.accent, 236]].forEach(([label, v, col, y]) => {
+    h += ctext(c, 28, y + 4, label, { size: 11, weight: 700, fill: c.ink2, anchor: 'start', max: 70 });
+    h += `<rect x="${cx_(c, 102, 160)}" y="${y - 7}" width="160" height="12" rx="6" fill="${c.line}"/><rect x="${cx_(c, 102, Math.max(6, 160 * v / top))}" y="${y - 7}" width="${Math.max(6, 160 * v / top)}" height="12" rx="6" fill="${col}"/>`;
+    h += ctext(c, 332, y + 4, fmtVol(v), { size: 11.5, weight: 800, anchor: 'end', max: 64 });
+  });
+  const dSets = +trimNum(st.sets - m.sets, 1), dMin = Math.round((st.dur - m.dur) / 60000);
+  const lines = [];
+  if (m.of) lines.push([TN(m.of, 'Better than last time on {up} of {n} exercise', 'Better than last time on {up} of {n} exercises', { up: m.up }), m.up ? c.good : c.ink]);
+  lines.push([`${T('Working sets')}: ${st.sets}${dSets ? ` (${signed((dSets > 0 ? '+' : '−') + Math.abs(dSets))})` : ''}`, c.ink]);
+  lines.push([`${T('Time')}: ${fmtDuration(st.dur)}${dMin ? ` (${signed((dMin > 0 ? '+' : '−') + T('{n} min', { n: Math.abs(dMin) }))})` : ''}`, c.ink]);
+  if (m.top) lines.push([`${T('Biggest jump')}: ${getEx(m.top.id).name} ${gainPlus(m.top.gain, m.top.k)}`, c.gold[1]]);
+  lines.forEach(([t, col], i) => { h += ctext(c, 180, 290 + i * 30, t, { size: 13.5, weight: 700, fill: col, max: 312 }); });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h) };
+}
+function cardMilestone(st) {
+  const c = cardCtx('milestone', T('Milestone')), g = `url(#${c.id}g)`, byCount = !!st.count;
+  const big = byCount ? String(st.n) : compact(st.mark), small = byCount ? (st.n === 1 ? T('First') : T('Workouts')) : U();
+  let h = `<circle cx="180" cy="150" r="170" fill="url(#${c.id}r)"/>${rays(180, 150, 200, c.gold[1], 0.08)}`;
+  h += `<path d="M146 196L128 262L152 250L166 270L178 210Z" fill="${c.accent}"/><path d="M214 196L232 262L208 250L194 270L182 210Z" fill="${c.accent}" fill-opacity=".8"/>`;
+  h += `<circle cx="180" cy="150" r="74" fill="${g}"/><circle cx="180" cy="150" r="61" fill="${c.bg1}"/><circle cx="180" cy="150" r="55" fill="none" stroke="${g}" stroke-width="1.5" stroke-dasharray="2 5"/>`;
+  h += `<text x="180" y="${small ? 160 : 168}" font-size="${big.length > 3 ? 40 : 52}" font-weight="900" fill="${g}" text-anchor="middle">${esc(big)}</text>`;
+  h += ctext({ ...c, rtl: false }, 180, 184, small.toLocaleUpperCase(LOC), { size: 10, weight: 800, fill: c.gold[1], ls: 2, max: 96 });
+  const title = byCount ? (st.n === 1 ? T('First workout done!') : TN(st.n, '{n} workout!', '{n} workouts!')) : T('{v} lifted!', { v: `${compact(st.mark)} ${U()}` });
+  const sub = byCount ? (st.n === 1 ? T('The first of many.') : TN(st.n, 'That’s {n} time you showed up.', 'That’s {n} times you showed up.')) : T('In total, across all your workouts.');
+  h += ctext(c, 180, 308, title, { size: 27, weight: 900, max: 312 });
+  h += ctext(c, 180, 334, sub, { size: 13, weight: 600, fill: c.ink2, max: 312 });
+  if (byCount && st.mark) h += ctext(c, 180, 372, T('And {v} lifted in total!', { v: `${compact(st.mark)} ${U()}` }), { size: 13.5, weight: 800, fill: c.gold[1], max: 312 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.3)) };
+}
+function finCards(st) {
+  const out = [];
+  if (st.count || st.mark) out.push(cardMilestone(st));
+  out.push(cardWorkout(st));
+  if (st.prs.length) out.push(cardRecords(st));
+  out.push(cardStreak(st));
+  if (st.cmp && st.cmp.vol) out.push(cardCompare(st));
+  return out;
+}
+// a card as a 1080 × 1350 picture (the size phones share best)
+function cardPNG(cd) {
+  const svg = cd.svg.replace(`width="${CARD_W}" height="${CARD_H}"`, `width="${CARD_W * 3}" height="${CARD_H * 3}"`);
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = CARD_W * 3; cv.height = CARD_H * 3;
+        const g = cv.getContext('2d');
+        g.fillStyle = cd.bg; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        cv.toBlob(b => b ? res(b) : rej(new Error('no picture')), 'image/png');
+      } catch (e) { rej(e); }
+    };
+    img.onerror = () => rej(new Error('the card did not draw'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+// the numbers on a card count up as it appears
+const COUNT_FMT = { int: v => Math.round(v).toLocaleString(LOC), num: v => trimNum(v, 0), dur: v => fmtDuration(Math.max(60000, v)) };
+function countUp(root, delay) {
+  if (calm() || !root) return;
+  for (const el of root.querySelectorAll('[data-count]')) {
+    const to = +el.dataset.count, fmt = COUNT_FMT[el.dataset.fmt], end = el.textContent, t0 = performance.now() + delay;
+    if (!fmt || !(to > 0)) continue;
+    el.textContent = fmt(0);
+    let frames = 0;
+    const step = now => {
+      if (!el.isConnected) return;
+      // done after 1.2 s, or after 240 frames whatever the clock says
+      const p = ++frames > 240 ? 1 : Math.min(1, Math.max(0, (now - t0) / 1200));
+      el.textContent = p < 1 ? fmt(to * (1 - Math.pow(1 - p, 3))) : end;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+// mode: 'new' a workout just finished (the celebration), 'edit' changes saved, 'past' opened from History
+function finishScreen(id, mode = 'new') {
   const w = state.workouts.find(o => o.id === id);
   if (!w) return;
-  const n = sessionNumber(w), times = w.tplId ? state.workouts.filter(o => o.tplId === w.tplId && o.start <= w.start).length : 0;
-  const ms = muscleSets([w]);
-  openSheet({
-    cls: 'wide',
-    render: () => `${sheetHead(fresh ? T('Workout saved') : T('Changes saved'))}
-    <div class="sheet-body pad summary">
-      <p class="eyebrow accent">${T('Session #{n}', { n })}${times > 1 ? ` · ${esc(w.name)} #${times}` : ''}</p>
-      <h2 class="big-title">${esc(w.name)}</h2>
-      <div class="tiles">
-        <div class="tile"><span>${T('Time')}</span><b>${fmtDuration(w.end - w.start)}</b></div>
-        <div class="tile"><span>${T('Working sets')}</span><b>${workingSets(w)}</b></div>
-        <div class="tile"><span>${T('Volume')}</span><b>${fmtVol(workoutVolume(w))}</b></div>
-        <div class="tile"><span>${T('Records')}</span><b>${w.prs.length}</b></div>
+  const st = workoutStory(w), cards = finCards(st), fresh = mode === 'new', past = mode === 'past';
+  const mood = st.count || st.mark ? 'milestone' : st.prs.length ? 'pr' : 'done';
+  const pick = [T('Great work!'), T('Strong session!'), T('Nice work!'), T('Another one done!')];
+  const title = past ? w.name : !fresh ? T('Changes saved') : st.n === 1 ? T('First workout done!') : st.count ? T('Workout #{n}!', { n: st.n })
+    : st.prs.length ? TN(st.prs.length, 'New record!', 'New records!') : pick[[...String(w.id)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % pick.length];
+  // under a title that already has the number in it, the workout's name and day instead
+  const sub = past ? `${fmtDate(w.start)} · ${T('Workout #{n}', { n: st.n })}` : fresh && (st.count || st.n === 1) ? `${w.name} · ${fmtDate(w.start)}` : `${T('Your workout number {n}', { n: st.n })} · ${w.name}`;
+  const face = st.count ? `<b>${st.n}</b>` : mood === 'done' ? icon('check') : icon('trophy');
+  const maxM = st.muscles.length ? st.muscles[0][1] : 1;
+  let cur = 0, timer = null;
+  const pics = new Map();
+  const prep = i => { if (cards[i] && !pics.has(i)) pics.set(i, cardPNG(cards[i]).catch(() => null)); return pics.get(i); };
+  const def = openSheet({
+    cls: 'finish',
+    label: title,
+    render: () => `<div class="fin" data-mood="${mood}"${fresh ? ' data-fresh' : ''}>
+      <div class="fin-glow" aria-hidden="true"></div>
+      <header class="fin-top"><button class="fin-btn" data-a="sheetClose" aria-label="${T('Close')}">${icon('x')}</button><button class="fin-btn" data-a="finShare" aria-label="${T('Share')}">${icon('share')}</button></header>
+      <div class="sheet-body fin-body">
+        <section class="fin-hero">
+          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span><svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${face}</span></div>
+          <h1 class="fin-title">${esc(title)}</h1>
+          <p class="fin-sub">${esc(sub)}</p>
+        </section>
+        <div class="fin-cards" role="region" aria-label="${T('Cards to share')}" tabindex="0">${cards.map((cd, i) => `<figure class="fin-card" data-i="${i}" style="--d:${i * 0.08}s" aria-label="${esc(T('{i} of {n}: {name}', { i: i + 1, n: cards.length, name: cd.label }))}">${cd.svg}</figure>`).join('')}</div>
+        ${cards.length > 1 ? `<div class="fin-dots">${cards.map((cd, i) => `<button class="${i ? '' : 'on'}" data-a="finDot" data-i="${i}" aria-label="${esc(cd.label)}" aria-current="${!i}"></button>`).join('')}</div>` : ''}
+        ${past ? '' : `<section class="fin-more">
+          ${st.prs.length ? `<h3 class="fin-h">${icon('trophy')}${TN(st.prs.length, '{n} new record', '{n} new records')}</h3><ul class="fin-prs">${st.prs.map(p => { const k = getEx(p.exId).k, plus = gainPlus(p, k); return `<li><span><b>${esc(getEx(p.exId).name)}</b><small>${esc(recKind(p.kind))} · ${esc(gainNow(p, k))}</small></span>${plus ? `<em>${esc(plus)}</em>` : ''}</li>`; }).join('')}</ul>` : ''}
+          ${st.muscles.length ? `<h3 class="fin-h">${T('Sets per muscle')}</h3><div class="fin-ms">${st.muscles.slice(0, 8).map(([m, n]) => `<div><span>${esc(MUSCLES[m])}</span><i style="--p:${Math.max(0.06, n / maxM)}"></i><b>${trimNum(n, 1)}</b></div>`).join('')}</div>` : ''}
+          <label class="field wnote"><span>${icon('note')} ${T('How did it go?')}</span><textarea data-f="wnote" rows="2" placeholder="${T('Energy, sleep, anything to remember')}">${esc(w.note || '')}</textarea></label>
+          <div class="chips wrap note-chips wnote-chips">${WNOTE_CHIPS.map(([en, c]) => `<button class="chip ${noteHas(w.note, en, c) ? 'on' : ''}" data-a="wnoteChip" data-v="${esc(c)}" aria-pressed="${noteHas(w.note, en, c)}">${esc(c)}</button>`).join('')}</div>
+          <div class="row-btns left">
+            ${w.tplId && tplById(w.tplId) ? `<button class="btn" data-a="updTpl">${T('Update “{name}” to match', { name: esc(tplById(w.tplId).name) })}</button>` : ''}
+            <button class="btn" data-a="saveTpl">${T('Save as new template')}</button>
+          </div>
+        </section>`}
       </div>
-      ${w.prs.length ? `<h3 class="sub-h">${icon('trophy')}${T('New records')}</h3><ul class="pr-list">${w.prs.map(p => `<li><b>${esc(getEx(p.exId).name)}</b><span>${esc(recKind(p.kind))}</span><span class="num">${esc(fmtSet({ uni: p.uni, exId: p.exId }, p.set))}</span></li>`).join('')}</ul>` : ''}
-      ${ms.length ? `<h3 class="sub-h">${T('Sets per muscle')}</h3><div class="msets">${ms.slice(0, 8).map(([m, c]) => `<span class="pill">${esc(MUSCLES[m])} <b>${trimNum(c, 1)}</b></span>`).join('')}</div>` : ''}
-      <label class="field wnote"><span>${icon('note')} ${T('How did it go?')}</span><textarea data-f="wnote" rows="2" placeholder="${T('Energy, sleep, anything to remember')}">${esc(w.note || '')}</textarea></label>
-      <div class="chips wrap note-chips wnote-chips">${WNOTE_CHIPS.map(([en, c]) => `<button class="chip ${noteHas(w.note, en, c) ? 'on' : ''}" data-a="wnoteChip" data-v="${esc(c)}" aria-pressed="${noteHas(w.note, en, c)}">${esc(c)}</button>`).join('')}</div>
-      <div class="row-btns">
-        ${w.tplId && tplById(w.tplId) ? `<button class="btn" data-a="updTpl">${T('Update “{name}” to match', { name: esc(tplById(w.tplId).name) })}</button>` : ''}
-        <button class="btn" data-a="saveTpl">${T('Save as new template')}</button>
-        <button class="btn primary" data-a="sheetClose">${T('Done')}</button>
-      </div>
+      <footer class="fin-foot"><button class="btn fin-share" data-a="finShare">${icon('share')}${T('Share')}</button><button class="btn primary" data-a="sheetClose">${T('Done')}</button></footer>
     </div>`,
     onInput: el => { if (el.dataset.f === 'wnote') { w.note = el.value; save(); } },
     actions: {
       // tap a word to add it to the note, tap again to take it out (the text box keeps anything typed)
       // the word goes in as shown; the same word saved in English counts as it too
-      wnoteChip: (b, def) => {
+      wnoteChip: (b, d) => {
         const parts = noteParts(w.note), c = b.dataset.v, en = (WNOTE_CHIPS.find(o => o[1] === c) || [c])[0], same = p => p === c || p === en;
         w.note = (parts.some(same) ? parts.filter(p => !same(p)) : [...parts, c]).join(', ');
         save();
-        const t = $('textarea[data-f="wnote"]', def.el);
+        const t = $('textarea[data-f="wnote"]', d.el);
         if (t) t.value = w.note;
         b.classList.toggle('on', noteHas(w.note, en, c)); b.setAttribute('aria-pressed', b.classList.contains('on'));
       },
       saveTpl: () => templateFromWorkout(w),
-      updTpl: (b, def) => {
+      updTpl: (b, d) => {
         const t = tplById(w.tplId);
         t.ex = tplExFromWorkout(w, t);
-        save(); closeSheet(def); render(); toast(T('{name} now matches this workout.', { name: t.name }));
+        save(); b.disabled = true; render(); toast(T('{name} now matches this workout.', { name: t.name }));
+      },
+      finDot: b => { const c = $$('.fin-card', def.el)[+b.dataset.i]; if (c) c.scrollIntoView({ behavior: calm() ? 'auto' : 'smooth', inline: 'center', block: 'nearest' }); },
+      // the card in view, as a picture: to the share sheet where there is one, or saved as a file
+      finShare: async () => {
+        const cd = cards[cur], blob = await prep(cur);
+        if (!blob) { toast(T('The picture couldn’t be made on this device.')); return; }
+        const file = new File([blob], `lifting-sanity-${new Date(w.start).toISOString().slice(0, 10)}-${cd.k}.png`, { type: 'image/png' });
+        try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file); a.download = file.name;
+        document.body.append(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        toast(T('Picture saved.'));
       }
     }
   });
+  const el = def.el, strip = $('.fin-cards', el), dots = $$('.fin-dots button', el);
+  // the dot under the card in view; its picture is made while you look at it, ready for Share
+  strip.addEventListener('scroll', () => {
+    const a = strip.children[0], b = strip.children[1];
+    const i = b ? Math.round(Math.abs(strip.scrollLeft) / Math.abs(b.offsetLeft - a.offsetLeft)) : 0;
+    if (i !== cur && cards[i]) { cur = i; dots.forEach((d, n) => { d.classList.toggle('on', n === i); d.setAttribute('aria-current', n === i); }); }
+    clearTimeout(timer); timer = setTimeout(() => prep(cur), 250);
+  }, { passive: true });
+  setTimeout(() => prep(0), 1200);
+  if (fresh) {
+    countUp($('.fin-card[data-i="' + (cards[0].k === 'milestone' ? 1 : 0) + '"]', el), 900);
+    setTimeout(() => {
+      if (!el.isConnected) return;
+      const m = $('.fin-medal', el).getBoundingClientRect(), x = m.left + m.width / 2, y = m.top + m.height / 2, cols = fxColors(mood === 'done' ? 'party' : 'gold');
+      confetti(x, y, { n: 150, colors: cols, power: 1.1 });
+      setTimeout(() => {
+        confetti(0, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI / 3, spread: 0.7, power: 1.6 });
+        confetti(innerWidth, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI * 2 / 3, spread: 0.7, power: 1.6 });
+      }, 240);
+      fanfare(true);
+      hapticBurst();
+    }, calm() ? 0 : 650);
+  }
+  return def;
 }
 function tplExFromWorkout(w, oldTpl) {
   return w.ex.map(x => {
@@ -2876,10 +3334,11 @@ function workoutParts(w) {
   // the sets-done count bumps when a check completes a set (both sides of a pair)
   const bump = ui.flash && w.ex.some(x => { const s = x.sets.find(o => o.id === ui.flash), m = s && partnerOf(x, s); return s && s.t !== 'W' && s.done && (!m || m.done); });
   const num = editing && w.editOf ? sessionNumber(state.workouts.find(o => o.id === w.editOf)) : state.workouts.length + 1;
+  const prN = editing ? 0 : woPRCount(w);
   const head = `<header class="wo-h">
     <button class="icon-btn" data-a="woMin" aria-label="${T('Minimize workout')}">${icon('down')}</button>
     <div class="wo-title"><button class="wo-name" data-a="woRename">${esc(w.name)}</button>
-      <div class="wo-meta">${editing ? `<span>${esc(fmtDate(w.start))} · ${fmtDuration((w.end || w.start) - w.start)}</span>` : `<span class="clock" data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span>`}<span>${T('Session #{n}', { n: num })}</span><span>${T('<b class="{bump}">{done}</b>/{total} sets', { bump: bump ? 'bump' : '', done, total })}</span><span>${fmtVol(workoutVolume(w))}</span></div></div>
+      <div class="wo-meta">${editing ? `<span>${esc(fmtDate(w.start))} · ${fmtDuration((w.end || w.start) - w.start)}</span>` : `<span class="clock" data-clock>${fmtClock((Date.now() - w.start) / 1000)}</span>`}<span>${T('Session #{n}', { n: num })}</span><span>${T('<b class="{bump}">{done}</b>/{total} sets', { bump: bump ? 'bump' : '', done, total })}</span><span>${fmtVol(workoutVolume(w))}</span>${prN ? `<span class="wo-prs" aria-label="${esc(TN(prN, '{n} new record', '{n} new records'))}">${icon('trophy')}<b class="${ui.prBump && ui.flash === ui.prBump ? 'bump' : ''}">${prN}</b></span>` : ''}</div></div>
     ${editing ? '' : `<button class="icon-btn" data-a="woRest" aria-label="${T('Start a rest timer')}">${icon('timer')}</button>`}
     <button class="icon-btn" data-a="woMenu" aria-label="${T('Workout options')}">${icon('dots')}</button>
     <button class="btn primary" data-a="woFinish">${editing ? T('Save') : T('Finish')}</button>
@@ -3048,7 +3507,7 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
     : `<input class="cell" data-f="${f}" data-e="${i}" data-s="${j}" inputmode="${mode}" enterkeyhint="done" autocomplete="off" value="${esc(val)}" placeholder="${esc(pv)}" aria-label="${esc(aria)}">`;
   const n = s.side ? (s.side === 'L' ? T('left side') : T('right side')) : T('set {n}', { n: j + 1 });
   const above = s.done ? null : setAbove(x, j);
-  const cls = ['set-row', s.done ? 'done' : '', s.t === 'W' ? 'warm' : '', s.side ? 'side-' + s.side : '', s.done && ui.flash === s.id ? 'just' : ''].join(' ');
+  const cls = ['set-row', s.done ? 'done' : '', s.t === 'W' ? 'warm' : '', s.side ? 'side-' + s.side : '', s.done && ui.flash === s.id ? 'just' : '', prs.length && s.done && ui.flash === s.id ? 'pr-hit' : ''].join(' ');
   let h = `<div class="row-wrap"><button class="row-del" data-a="rowDel" data-e="${i}" data-s="${j}" tabindex="-1">${icon('trash')}<span>${T('Delete')}</span></button><div class="${cls}" data-s="${j}">`;
   h += badge(s.t, setLabel(x.sets, j), `data-a="setType" data-e="${i}" data-s="${j}"`, s.side);
   // "same as above" copies the set you just did; the line under it is last session's set
@@ -3135,7 +3594,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   const up = upA || upB ? `${upA && upA.w != null && hasWeight(k) ? dispW(upA.w) + ' × ' : ''}${upA ? upA.r ?? '–' : '–'}/${upB ? upB.r ?? '–' : '–'}` : '';
   const sp = x.sets[p], sq = x.sets[q];
   let h = `<div class="row-wrap"><button class="row-del" data-a="rowDel" data-e="${i}" data-s="${j}" tabindex="-1">${icon('trash')}<span>${T('Delete')}</span></button>`
-    + `<div class="set-row one ${done ? 'done' : ''} ${part ? 'part' : ''} ${a.t === 'W' ? 'warm' : ''} ${done && (ui.flash === a.id || ui.flash === b.id) ? 'just' : ''}" data-s="${j}">`;
+    + `<div class="set-row one ${done ? 'done' : ''} ${part ? 'part' : ''} ${a.t === 'W' ? 'warm' : ''} ${done && (ui.flash === a.id || ui.flash === b.id) ? 'just' : ''} ${done && (ui.flash === a.id || ui.flash === b.id) && ((ctx.prs[j] || []).length || (ctx.prs[j + 1] || []).length) ? 'pr-hit' : ''}" data-s="${j}">`;
   h += `<button class="badge t-${a.t} ${a.t === 'N' ? 'lr' : ''}" data-a="setType" data-e="${i}" data-s="${j}" aria-label="${T('Set {n}, left and right. Change type', { n: esc(oneLabel(x.sets, j)) })}">${esc(oneLabel(x.sets, j))}</button>`;
   h += `<div class="prev">${up ? `<button class="same" data-a="copyAbove" data-e="${i}" data-s="${j}" aria-label="${T('Same as the set above, {v}', { v: esc(up) })}">${icon('same')}<span>${esc(up)}</span></button>` : ''}`
     + (last ? `<button class="last ${ctx.lp.archived ? 'archived' : ''}" data-a="usePrev" data-e="${i}" data-s="${j}" aria-label="${T('Use last time, {v}', { v: esc(last) })}">${up ? '' : `<i>${T('Last')}</i>`}${esc(last)}</button>` : up ? '' : '<span class="none">—</span>') + `</div>`;
@@ -3177,7 +3636,7 @@ function toggleBoth(i, j, viaPad) {
   }
   Object.assign(a, ca);
   if (!b.done) Object.assign(b, cb);
-  if (!a.done) { keepShownEffort(a, k); a.done = true; a.at = Date.now(); }
+  if (!a.done) { keepShownEffort(a, k); a.done = true; a.at = Date.now(); ui.prFirst = { x, gains: setGains(w, x, j) }; }
   // the rest timer and moving on happen as the second row is checked; a right side done earlier keeps its time
   const at = b.done ? b.at : null;
   if (b.done) b.done = false;
@@ -3307,6 +3766,13 @@ function toggleSet(i, j, viaPad) {
   if (exComplete(x)) ui.flashEx = x.id; // and the whole exercise when this was its last set
   ui.kp = null;
   haptic();
+  // a new record: the banner, confetti and fanfare (with the first side of a one-row left/right set, if it set one too)
+  const first = ui.prFirst && ui.prFirst.x === x ? ui.prFirst.gains : [];
+  ui.prFirst = null;
+  if (w.mode !== 'edit') {
+    const gains = [...first, ...setGains(w, x, j)].reduce((out, g) => { const o = out.find(q => q.kind === g.kind); if (!o) out.push(g); else if (g.now > o.now) Object.assign(o, g); return out; }, []);
+    if (gains.length) { ui.prBump = s.id; setTimeout(() => prParty(x, gains), 140); }
+  }
   // first side of a left/right set: no rest yet, straight on to the other side
   const mate = partnerOf(x, s);
   if (mate && !mate.done) {
@@ -4200,11 +4666,12 @@ function workoutSheet(id) {
             <button class="wd-name" data-a="openEx" data-id="${x.exId}"><b>${esc(ex.name)}</b></button>${x.note ? `<p class="muted small">${esc(x.note)}</p>` : ''}
             <ol class="lines">${x.sets.map((s, j) => `<li>${lineTag(x.sets, j)}<span class="num">${esc(fmtLine(x, s, k))}</span>${prSets.has(s.id) ? `<span class="pill good">${icon('trophy')}${T('Record')}</span>` : ''}</li>`).join('')}</ol></div></div>`;
         }).join('')}
-        <div class="row-btns left"><button class="btn" data-a="repeat">${icon('play')}${T('Do it again')}</button><button class="btn" data-a="saveTpl">${icon('copy')}${T('Save as template')}</button><button class="btn danger ghost" data-a="del">${icon('trash')}${T('Delete')}</button></div>
+        <div class="row-btns left"><button class="btn" data-a="cards">${icon('share')}${T('Share')}</button><button class="btn" data-a="repeat">${icon('play')}${T('Do it again')}</button><button class="btn" data-a="saveTpl">${icon('copy')}${T('Save as template')}</button><button class="btn danger ghost" data-a="del">${icon('trash')}${T('Delete')}</button></div>
       </div>`;
     },
     actions: {
       edit: () => editWorkout(id),
+      cards: () => finishScreen(id, 'past'),
       repeat: () => repeatWorkout(state.workouts.find(o => o.id === id)),
       saveTpl: () => templateFromWorkout(state.workouts.find(o => o.id === id)),
       del: (b, def) => confirmSheet({ title: T('Delete this workout?'), text: T('It’s removed from your history, charts and records.'), ok: T('Delete workout'), danger: true,
@@ -4877,6 +5344,7 @@ const ACT = {
     else kpClose();
   },
   kpClose: () => kpClose(),
+  prfxHide: () => prHide(),
   effPick: b => {
     const x = A().ex[+b.dataset.e], s = x.sets[+b.dataset.s];
     // data-one: just this side (one-row left/right), and the choices stay open until both sides have one

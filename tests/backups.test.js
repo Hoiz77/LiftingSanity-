@@ -2,7 +2,9 @@
 const { open, report } = require('./lib');
 (async () => {
   const r = report('Backups: reminders and copies on the device');
-  const t = await open({ clock: new Date('2026-10-01T09:00:00') });
+  // with Reduce Motion: the end-of-workout confetti and counting numbers run on animation frames, and the fake clock's
+  // jumps (days at a time here) can get lost while frames are firing
+  const t = await open({ clock: new Date('2026-10-01T09:00:00'), reducedMotion: 'reduce' });
   const p = t.p;
   const nudge = () => t.text('.backup-nudge');
   const backupRow = async () => { await t.tab('settings'); return p.evaluate(() => [...document.querySelectorAll('.set-item')].map(r => r.textContent).find(x => /Back up/.test(x)) || ''); };
