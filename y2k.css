@@ -196,6 +196,9 @@
 [data-style="y2k"] .kp-k { font: 400 30px var(--lcd); color: #05060F; background: var(--chrome); border: 2px solid; border-color: #fff #3a4370 #3a4370 #fff; }
 [data-style="y2k"] .kp-k.fn { font: 700 11px var(--pixel); background: linear-gradient(180deg, #2A3A9A, #101A5C); color: var(--cyan); border-color: #4A64FF #05072A #05072A #4A64FF; }
 [data-style="y2k"] .kp-k.log { background: linear-gradient(180deg, #7FF8FF, #19F0FF 50%, #08B8C4 52%, #5DF5FF); color: #05060F; font: 700 12px var(--pixel); }
+[data-style="y2k"] .kp-k.on { background: linear-gradient(180deg, #7FF8FF, #19F0FF); border-color: #fff #08B8C4 #08B8C4 #fff; }
+[data-style="y2k"] .kp-k.target { box-shadow: inset 0 0 0 2px var(--cobalt); }
+[data-style="y2k"] .kp-q { font: 700 10px var(--pixel); color: var(--cyan); text-transform: uppercase; }
 
 /* ---------- EQ bars, charts, rating dots ---------- */
 [data-style="y2k"] .mbar-t { height: 14px; background: #020414; border: 1px solid var(--line); }

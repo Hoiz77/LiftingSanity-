@@ -31,12 +31,12 @@ or the page throws an error.
 | `welcome` | A new phone opens with the welcome: kg or lb, a ready-made plan (without anyone else's starting weights), building your own, sample workouts, skipping; it never comes back; someone who already has data never sees it. |
 | `arabic` | Switching to العربية turns the app right to left; every screen (tabs, workout, menus, number pad, rest timer, summary, details, plan review, a plan's page and the version switch, the welcome) is scanned for English that isn't meant to be there; switching back to English. |
 | `selfcheck` | The app's own self-check of its calculation rules: working sets, left/right pairs, warm-ups, 1RM limits, kg ↔ lb, backup validation. |
-| `logging` | One tap logs what's shown; a set that can't be checked changes nothing; suggestions follow the set type (warm-up, back-off, drop, second side, "120s" targets); the number pad never types into the wrong set; the RIR picker; one-row left/right; supersets (rest at the end of a round, moving on, unlinking); replacing an exercise; the finish prompt. |
+| `logging` | One tap logs what's shown; a set that can't be checked changes nothing; suggestions follow the set type (warm-up, back-off, drop, second side, "120s" targets); the number pad never types into the wrong set; the pad going weight → reps → RIR (Next and Log, warm-ups skipped, RPE, each side of a one-row set, and with the step turned off in Settings); the RIR picker with the keyboard; one-row left/right; supersets (rest at the end of a round, moving on, unlinking); replacing an exercise; the finish prompt. |
 | `records-and-plans` | Records stay right when history changes (past workouts, deletes, the same exercise twice, resets during a workout); weekly volume across clock changes; chart labels; early saves; splits keep "up next" when days are removed or moved; blocks; Enter on Cancel; custom exercises. |
 | `data-safety` | Odd saves are mended on opening; unreadable data is never written over; a deleted template can't leave a dead day; backups hold everything (photos too); damaged backups change nothing; restores set the old data aside; two tabs at once. |
 | `backups` | The last-backup line in Settings, the reminder on the Train page (and "Later"), the daily copies kept on the device, going back to one, and Erase removing them. |
 | `lifecycle` | Locking the phone or swiping the app away saves what you just typed; a full device is reported; the rest timer keeps time across a locked screen. |
-| `redraw` | The workout screen redraws only what changed (that's what keeps it smooth); after 19 kinds of change, it must match drawing everything again. |
+| `redraw` | The workout screen redraws only what changed (that's what keeps it smooth); after 20 kinds of change, it must match drawing everything again. |
 | `transitions` | The workout growing out of / shrinking into its bar, tab crossfades and the moving highlight, sheets sliding and pull-to-close, the card following a finger; fast repeated taps; Reduce Motion. |
 | `offline` | The installed app opens and logs sets with no signal; a new version found as the app starts switches over by itself, one that arrives while you use it waits until you tap Reload; either way the open workout stays and the old files are cleared. |
 | `review` | The plan review: topics in a fixed order, the most pressing point first, counts at the top that match, every point labelled as studies (with a link) or a rule of thumb, the key that explains those, badges on one line, exercise links that open. |
@@ -71,5 +71,6 @@ the log you use.
 3. **Backup and restore (Safari tab).** Settings → Back up → Save file, into Files. Erase everything → Erase (type
    ERASE). Restore → Choose file, and pick it in Files. The workout, the plan and the settings are back; close Safari and reopen to check again.
 4. **The Home Screen app (your own data).** Start a workout: it reaches the bottom edge with no black strip, and
-   dragging the rest timer doesn't move the page. Leave for other apps for 10 minutes or more and come back: the
+   dragging the rest timer doesn't move the page. Type a set's reps and press Next: the RIR keys come up, and one tap
+   moves the pad to the next set's weight. Leave for other apps for 10 minutes or more and come back: the
    workout and timer are as you left them. Back up → Save file here too, and check the file is in Files.

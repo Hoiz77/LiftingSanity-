@@ -1,5 +1,5 @@
 // logging a workout: one tap logs what's shown, suggestions follow the set's type, the number pad never types into
-// the wrong set, left/right pairs, supersets, replacing an exercise, the finish prompt
+// the wrong set and goes weight → reps → RIR, left/right pairs, supersets, replacing an exercise, the finish prompt
 const { open, report } = require('./lib');
 const D = 864e5;
 const set = (id, t, extra = {}) => ({ id, t, done: false, ...extra });
@@ -33,14 +33,14 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   await tap('#workout [data-a="toggleSet"][data-e="0"][data-s="1"]');
   r.ok(taps === 1 && (await S()).ex[0].sets[1].done, 'a set done as planned: 1 tap');
   taps = 0;
-  await tap('#workout .cell[data-e="0"][data-s="2"][data-f="r"]'); await tap('#keypad [data-a="kpStep"][data-d="1"]', 120); await tap('#keypad [data-a="kpLog"]');
+  await tap('#workout .cell[data-e="0"][data-s="2"][data-f="r"]'); await tap('#keypad [data-a="kpStep"][data-d="1"]', 120); await tap('#keypad [data-a="kpLog"]'); await tap('#keypad [data-a="kpEff"][data-v="1"]');
   a = await S();
-  r.ok(taps === 3 && a.ex[0].sets[2].done && a.ex[0].sets[2].r === 9, 'one more rep than planned: 3 taps (reps box, +1, Log)', a.ex[0].sets[2]);
+  r.ok(taps === 4 && a.ex[0].sets[2].done && a.ex[0].sets[2].r === 9 && a.ex[0].sets[2].rir === 1, 'one more rep than planned: 4 taps (reps box, +1, Log, the RIR)', a.ex[0].sets[2]);
   taps = 0;
   await t.ev(`(() => { A().ex[0].sets[0].done = false; renderWorkout(); })()`); await t.p.waitForTimeout(150);
-  await tap('#workout .cell[data-e="0"][data-s="0"][data-f="w"]'); await tap('#keypad [data-a="kpStep"][data-d="1"]', 120); await tap('#keypad [data-a="kpLog"]');
+  await tap('#workout .cell[data-e="0"][data-s="0"][data-f="w"]'); await tap('#keypad [data-a="kpStep"][data-d="1"]', 120); await tap('#keypad [data-a="kpLog"]'); await tap('#keypad [data-a="kpEff"][data-v="2"]');
   a = await S();
-  r.ok(taps === 3 && a.ex[0].sets[0].done && a.ex[0].sets[0].w === 32.5, 'a little heavier: 3 taps (weight box, +2.5, Log)', a.ex[0].sets[0]);
+  r.ok(taps === 4 && a.ex[0].sets[0].done && a.ex[0].sets[0].w === 32.5 && a.ex[0].sets[0].rir === 2, 'a little heavier: 4 taps (weight box, +2.5, Log, the RIR)', a.ex[0].sets[0]);
 
   // a set that can't be checked yet changes nothing
   await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { trir: 2 })])] });
@@ -72,12 +72,102 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   r.ok(a.ex[0].sets[0].t === 'W' && a.ex[0].sets[0].w == null && a.ex[0].sets[1].w === 50, 'adding a warm-up while typing: the typing still goes into the set you started on', a.ex[0].sets.map(s => [s.t, s.w]));
   await t.click('#keypad [data-a="kpClose"]', 400);
 
-  // the RIR picker opens again after tapping a number box
-  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8 })])] });
+  // the number pad goes weight → reps → RIR: fixed choices on the pad, one tap each
+  const kp = () => t.ev('ui.kp && { s: ui.kp.s, f: ui.kp.f, then: ui.kp.then }');
+  const key = async (k, wait = 80) => t.click(`#keypad [data-a="kpKey"][data-k="${k}"]`, wait);
+  const pad = async (a, wait = 300) => t.click(`#keypad [data-a="${a}"]`, wait);
+  const pick = async (v, wait = 350) => t.click(`#keypad [data-a="kpEff"][data-v="${v}"]`, wait);
+  // the choices on the pad: * the target (ringed), ! the one picked (filled)
+  const choices = () => t.p.evaluate(() => [...document.querySelectorAll('#keypad [data-a="kpEff"]:not([data-v=""])')].map(b => b.textContent + (b.classList.contains('target') ? '*' : '') + (b.classList.contains('on') ? '!' : '')));
+  await load({ ex: [ex('x0', 'barbell-curl', [set('w', 'W', { w: 20, r: 10 }), set('a', 'N', { tr: '8-10', trir: 2 }), set('b', 'N', { tr: '8-10', trir: 2 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="1"][data-f="w"]', 300);
+  await key(3); await key(0); await pad('kpNext', 200); await key(9); await pad('kpNext');
+  let k = await kp();
+  r.ok(k && k.s === 1 && k.f === 'rir' && JSON.stringify(await choices()) === '["0","1","2*","3","4","5+"]' && /Set 1 · RIR/.test(await t.text('#keypad .kp-title')), 'Next after the reps goes to the RIR: 0 to 5+ on the pad, the target ringed', { k, choices: await choices() });
+  r.ok(await t.p.evaluate(() => document.querySelector('#workout .cell.eff[data-s="1"]').classList.contains('kp-on')), 'the RIR box is marked as the one being filled in');
+  await pick(1);
+  a = await S(); k = await kp();
+  r.ok(a.ex[0].sets[1].rir === 1 && !a.ex[0].sets[1].done && k && k.s === 2 && k.f === 'w', 'one tap on a choice puts the RIR in and moves on to the next set’s weight', { set: a.ex[0].sets[1], k });
+  await pad('kpNext', 200); await key(8); await pad('kpLog');
+  k = await kp(); a = await S();
+  r.ok(k && k.s === 2 && k.f === 'rir' && k.then === 'log' && !a.ex[0].sets[2].done, 'Log on the reps asks for the RIR before logging', k);
+  await t.ev('state.rest = null');
+  await pick(0, 450);
+  a = await S();
+  r.ok(a.ex[0].sets[2].done && a.ex[0].sets[2].r === 8 && a.ex[0].sets[2].rir === 0 && !(await kp()) && await t.ev('!!state.rest'), 'picking it logs the set with that RIR, and the rest timer starts', a.ex[0].sets[2]);
+  // warm-ups have no RIR step; a set with its RIR in already logs straight away
+  await t.ev('state.rest = null');
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpNext');
+  k = await kp();
+  r.ok(k && k.s === 1 && k.f === 'w', 'a warm-up has no RIR step: Next goes from its reps to the next set', k);
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpLog', 400);
+  r.ok((await S()).ex[0].sets[0].done && !(await kp()), 'and Log logs a warm-up straight away');
+  await t.click('#workout .cell[data-e="0"][data-s="1"][data-f="r"]', 300); await pad('kpLog', 400);
+  a = await S();
+  r.ok(a.ex[0].sets[1].done && a.ex[0].sets[1].rir === 1 && !(await kp()), 'a set whose RIR is already in logs straight away', a.ex[0].sets[1]);
+  // Log again on the RIR step logs what's shown, like ✓; no reps yet: Log says so, without asking for the RIR
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8, trir: 2 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpLog'); await pad('kpLog', 400);
+  a = await S();
+  r.ok(a.ex[0].sets[0].done && a.ex[0].sets[0].rir === 2, 'Log again on the RIR step logs the set with the target RIR shown, like ✓', a.ex[0].sets[0]);
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { trir: 2 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="w"]', 300); await pad('kpLog');
+  k = await kp();
+  r.ok(k && k.s === 0 && k.f === 'w' && /Type how many reps/.test(await t.text('#toast')), 'with no reps in yet, Log says so instead of asking for the RIR', k);
+  // the RIR box opens the choices on the pad; Clear; again after a number box
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8, rir: 3, trir: 2 })])] });
   await t.click('#workout .cell.eff[data-e="0"][data-s="0"]', 300);
+  k = await kp();
+  r.ok(k && k.f === 'rir' && JSON.stringify(await choices()) === '["0","1","2","3!","4","5+"]', 'tapping the RIR box opens its choices on the pad, the one in it filled', await choices());
+  await t.click('#keypad [data-a="kpEff"][data-v=""]', 300);
+  r.ok((await S()).ex[0].sets[0].rir == null && (await kp()).f === 'rir' && (await choices()).includes('2*'), 'Clear empties it and stays on the RIR, the target ringed again');
   await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="w"]', 300);
   await t.click('#workout .cell.eff[data-e="0"][data-s="0"]', 300);
-  r.ok(await t.p.evaluate(() => !!document.querySelector('#workout .eff-pick')), 'the RIR picker opens again after tapping a number box');
+  r.ok((await kp()).f === 'rir', 'the RIR choices open again after tapping a number box');
+  await pad('kpClose', 400);
+  // RPE: 6 to 10 in halves
+  await t.ev(`state.settings.effort = 'rpe'`);
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8, trir: 2 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpNext');
+  const rpe = await choices();
+  await pick(1.5);
+  r.ok(JSON.stringify(rpe) === '["6","7","7.5","8*","8.5","9","9.5","10"]' && (await S()).ex[0].sets[0].rir === 1.5, 'with RPE the pad offers 6 to 10 in halves (the target ringed), and 8.5 is kept as 1.5 reps in the tank', rpe);
+  await t.ev(`state.settings.effort = 'rir'`);
+  // one-row left/right: each side's RIR, then both are logged
+  await load({ ex: [ex('x0', 'single-arm-cable-fly', [set('l', 'N', { side: 'L', pair: 'p', w: 15, r: 10, trir: 2 }), set('r', 'N', { side: 'R', pair: 'p', w: 15, r: 9, trir: 2 })], { uni: true })] });
+  await t.ev(`(() => { state.exPrefs['single-arm-cable-fly'] = { uniStyle: 'one' }; renderWorkout(true); })()`); await t.p.waitForTimeout(300);
+  await t.click('#workout .set-row.one .cell[data-f="r"]', 300); await pad('kpLog');
+  const k1 = await kp(), t1 = await t.text('#keypad .kp-title'), m1 = await t.p.evaluate(() => (document.querySelector('#workout .cell.eff.sides .kp-side') || {}).className);
+  await pick(1);
+  const k2 = await kp(), t2 = await t.text('#keypad .kp-title'), m2 = await t.p.evaluate(() => (document.querySelector('#workout .cell.eff.sides .kp-side') || {}).className);
+  await pick(2, 500);
+  a = await S();
+  r.ok(k1 && k1.f === 'rir' && /Left side · RIR/.test(t1) && /side-L/.test(m1) && k2 && k2.f === 'rir' && /Right side · RIR/.test(t2) && /side-R/.test(m2), 'one-row left/right: Log asks for the left side’s RIR, then the right’s, marking the side asked for', { k1, t1, m1, k2, t2, m2 });
+  r.ok(a.ex[0].sets.every(s => s.done) && a.ex[0].sets[0].rir === 1 && a.ex[0].sets[1].rir === 2, 'then logs both sides, each with its own RIR', a.ex[0].sets);
+  await t.ev(`delete state.exPrefs['single-arm-cable-fly']`);
+  // separate left/right rows: the left side is logged, then on to the right side
+  await load({ ex: [ex('x0', 'single-arm-cable-fly', [set('l', 'N', { side: 'L', pair: 'p', w: 15, r: 10 }), set('r', 'N', { side: 'R', pair: 'p', w: 15, r: 9 })], { uni: true })] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpLog'); await pick(2, 450);
+  a = await S(); k = await kp();
+  r.ok(a.ex[0].sets[0].done && a.ex[0].sets[0].rir === 2 && !a.ex[0].sets[1].done && k && k.s === 1 && k.f === 'w', 'separate left/right rows: the left side is logged with its RIR and the pad moves on to the right side', { sets: a.ex[0].sets, k });
+  // turned off in Settings: the pad skips the RIR, as before
+  await t.ev('state.settings.padRir = false');
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, trir: 2 }), set('b', 'N', { w: 30 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await key(8); await pad('kpNext');
+  k = await kp();
+  r.ok(k && k.s === 1 && k.f === 'w', 'with the RIR step turned off, Next goes from the reps straight to the next set', k);
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpLog', 400);
+  a = await S();
+  r.ok(a.ex[0].sets[0].done && a.ex[0].sets[0].r === 8 && a.ex[0].sets[0].rir === 2 && !(await kp()), 'and Log logs straight away (with the target RIR shown)', a.ex[0].sets[0]);
+  await t.click('#workout .cell.eff[data-e="0"][data-s="0"]', 300); await pick(3, 450);
+  r.ok((await S()).ex[0].sets[0].rir === 3 && !(await kp()), 'its box still opens the choices, and a choice closes the pad');
+  await t.ev('state.settings.padRir = true');
+  // with the normal keyboard, the RIR box opens the choices under the set
+  await t.ev(`state.settings.keypad = 'system'`);
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8 })])] });
+  await t.click('#workout .cell.eff[data-e="0"][data-s="0"]', 300);
+  r.ok(await t.p.evaluate(() => !!document.querySelector('#workout .eff-pick') && !document.querySelector('#keypad .kp-k')), 'with the normal keyboard, the RIR box opens the choices under the set');
+  await t.ev(`state.settings.keypad = 'app'`);
 
   // one-row left/right: with one side done, the check finishes the other side
   await load({ ex: [ex('x0', 'single-arm-cable-fly', [set('l', 'N', { side: 'L', pair: 'p', w: 15, r: 10, done: true }), set('r', 'N', { side: 'R', pair: 'p', w: 15, r: 9 })], { uni: true })] });
@@ -125,5 +215,13 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   await t.inSheet('[data-a="ok"]', 900);
   const saved = await t.ev('state.workouts[state.workouts.length - 1].ex.map(x => x.sets.length)');
   r.ok(JSON.stringify(saved) === '[1]', 'only the finished sets are saved', saved);
+
+  // Settings: the RIR step can be turned off, and isn't offered with effort off
+  await t.tab('settings');
+  const row = await t.p.evaluate(() => { const b = document.querySelector('[data-a="tgl"][data-k="padRir"]'); return b && b.closest('.set-item').textContent; });
+  await t.click('[data-a="tgl"][data-k="padRir"]', 300);
+  const off = (await t.state()).settings.padRir;
+  await t.click('[data-a="setEffort"][data-v="off"]', 300);
+  r.ok(/RIR on the number pad/.test(row || '') && off === false && !(await t.p.evaluate(() => document.querySelector('[data-k="padRir"]'))), 'Settings has “RIR on the number pad” (on to start) to turn the step off, hidden when effort is off', { row, off });
   await r.done(t);
 })();

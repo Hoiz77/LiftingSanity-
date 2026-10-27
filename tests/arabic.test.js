@@ -57,6 +57,7 @@ const ENGLISH = (names) => {
   await t.click('#workout [data-a="woMenu"]', 500); left.push(...await scan('workout menu')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.click('#workout [data-a="exMenu"]', 500); left.push(...await scan('exercise menu')); await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await p.evaluate(() => document.querySelectorAll('#workout .cell[data-f="r"]')[1].click()); await p.waitForTimeout(500); left.push(...await scan('number pad'));
+  await p.evaluate(() => document.querySelectorAll('#workout .cell.eff')[1].click()); await p.waitForTimeout(400); left.push(...await scan('number pad, RIR'));
   await t.click('#keypad [data-a="kpClose"]', 400);
   await p.evaluate(() => document.querySelectorAll('#workout .set-row:not(.head) .check')[1].click()); await p.waitForTimeout(700); left.push(...await scan('rest timer'));
   await t.ev(`(() => { state.settings.view = 'list'; save(true); renderWorkout(true); })()`); await p.waitForTimeout(500);

@@ -832,6 +832,7 @@ window.LS_AR = {
 "New template": "قالب جديد",
 "New to this? Start lighter than you think and focus on clean reps. The app suggests when to add weight.": "جديد على هذا؟ ابدأ بوزن أخف مما تظن، وركّز على أداء التكرارات بشكل سليم. وسيقترح عليك التطبيق متى تزيد الوزن.",
 "Next": "التالي",
+"Next and Log go from weight to reps to {eff}, and one tap on a choice moves on. Off: the pad skips it, and you tap the {eff} box to set it.": "«التالي» و«تسجيل» ينتقلان من الوزن إلى التكرارات ثم إلى {eff}، ولمسة واحدة على اختيار تنقلك إلى ما بعده. عند الإيقاف تتخطاه اللوحة، وتلمس خانة {eff} لتحدده.",
 "Next month": "الشهر التالي",
 "Next up: <b>{name}</b> {when}": "التالي: <b>{name}</b> {when}",
 "Next up: <b>{name}</b> {when} · {n} exercises": {
@@ -1287,6 +1288,7 @@ window.LS_AR = {
 "Tap ✓ when a set went as shown. Tap a number to change it first. Swipe a set sideways to delete it.": "اضغط ✓ إذا أدّيت المجموعة كما هو معروض. لتغيير رقم، اضغطه أولًا. اسحب المجموعة جانبًا لحذفها.",
 "Target reps": "التكرارات المستهدفة",
 "Target {eff}": "{eff} المستهدف",
+"Target {v}": "المستهدف {v}",
 "Template": "قالب",
 "Template name": "اسم القالب",
 "Template · done {n} time": {
@@ -1719,6 +1721,7 @@ window.LS_AR = {
 },
 "{done}/{total} sets": "المجموعات {done}/{total}",
 "{eff} for each side, {set}: {side1} {v1}, {side2} {v2}": "{eff} لكل جانب، {set}: {side1} {v1}، {side2} {v2}",
+"{eff} on the number pad": "{eff} في لوحة الأرقام",
 "{eff}, {set}": "{eff}، {set}",
 "{h}h {m}m": "{h} س {m} د",
 "{icon}Back": "{icon}رجوع",

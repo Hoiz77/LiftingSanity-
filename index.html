@@ -1210,6 +1210,10 @@ input.cell::placeholder { font-weight: 500; opacity: .6; }
 /* a checked set: everything is logged, so no tiles or outlines, just the numbers on the green row */
 .set-row.done .cell, .set-row.done .cell:not(.empty) { background: transparent; box-shadow: none; }
 .cell.kp-on::after { content: ""; width: 2px; height: 22px; margin-inline-start: 2px; background: var(--accent); animation: blink 1s steps(1) infinite; flex-shrink: 0; }
+/* the RIR box takes a choice, not typing: no cursor; on a one-row left/right set, the side being asked for is marked */
+.cell.eff.kp-on::after { content: none; }
+.cell.eff.sides > span { justify-self: center; padding: 1px 6px; border-radius: 6px; }
+.cell.eff.sides > span.kp-side { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 #keypad { position: fixed; z-index: 62; left: 0; right: 0; bottom: 0; background: var(--bar-bg); border-top: 1px solid var(--line-2); box-shadow: 0 -12px 32px rgba(0, 0, 0, .35); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
 .kp-head { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: 0 2px 8px; }
 .kp-title { flex: 1; min-width: 0; display: grid; }
@@ -1225,6 +1229,17 @@ input.cell::placeholder { font-weight: 500; opacity: .6; }
 .kp-k.log { background: var(--good); color: var(--on-good); font-size: 18px; font-weight: 700; }
 .kp-k .i { width: 22px; height: 22px; }
 .kp-k.log .i { stroke-width: 3; }
+/* the RIR (or RPE) step: fixed choices, one tap each, the one picked filled and the target ringed */
+.kp-eff { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kp-eff.rpe { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kp-eff.rpe .log { grid-column: span 2; }
+.kp-eff .kp-k { min-height: 60px; }
+.kp-eff .kp-k:not(.fn):not(.log) { font-weight: 700; }
+.kp-q { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 0 2px; font-size: 13px; color: var(--ink-2); }
+.kp-q span { color: var(--accent); font-weight: 700; white-space: nowrap; }
+.kp-k.on { background: var(--accent); color: var(--on-accent); }
+.kp-k.target { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
+.kp-k:disabled { opacity: .4; }
 body.kp-open #restbar { display: none !important; }
 body.kp-open .wo-spacer { height: calc(330px + env(safe-area-inset-bottom, 0px)); }
 body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !important; }
@@ -1286,6 +1301,7 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 :root[lang="ar"] { --display: system-ui, -apple-system, "SF Arabic", "Geeza Pro", "Noto Sans Arabic", sans-serif; }
 /* number pad, charts, diagrams and curves read left to right in any language */
 .kp-grid, svg, .sci-curve, .sci-curve-box, .sci-axis, .chart { direction: ltr; }
+[dir="rtl"] .kp-q { direction: rtl; }
 [dir="rtl"] .mbar-t { transform: scaleX(-1); }
 [dir="rtl"] .nav-ex { padding: 4px 4px 4px 12px; }
 [dir="rtl"] .exc-setup { box-shadow: inset -3px 0 0 var(--warn); }

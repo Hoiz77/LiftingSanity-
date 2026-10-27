@@ -51,7 +51,11 @@ const CUT = () => {
     await t.start();
     await check('workout');
     for (let k = 0; k < 5; k++) { await t.click('#workout [data-a="woNext"]', 450).catch(() => {}); await check('workout, exercise ' + (k + 2)); }
-    await p.evaluate(() => document.querySelectorAll('#workout .cell.eff')[1].click()); await check('RIR picker');
+    await p.evaluate(() => document.querySelectorAll('#workout .cell.eff')[1].click()); await check('RIR on the number pad');
+    await t.click('#keypad [data-a="kpClose"]', 400);
+    await t.ev(`(() => { state.settings.keypad = 'system'; renderWorkout(true); })()`); await p.waitForTimeout(300);
+    await p.evaluate(() => document.querySelectorAll('#workout .cell.eff')[1].click()); await check('RIR picker (keyboard)');
+    await t.ev(`(() => { state.settings.keypad = 'auto'; ui.effOpen = null; renderWorkout(true); })()`); await p.waitForTimeout(300);
     for (const a of ['woRest', 'woMenu']) { await t.click(`#workout [data-a="${a}"]`, 500); await check(a); await p.keyboard.press('Escape'); await p.waitForTimeout(500); }
     await t.ev(`(() => { state.settings.view = 'list'; state.settings.uniStyle = 'one'; save(true); renderWorkout(true); })()`); await p.waitForTimeout(500);
     for (let y = 0; y < 10; y++) { await check('workout list @' + y); await p.evaluate(() => document.querySelector('#workout .wo-main').scrollBy(0, innerHeight * 0.8)); }

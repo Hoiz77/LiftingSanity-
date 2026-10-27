@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -528,7 +528,7 @@ function defaults() {
     v: 1,
     settings: {
       unit: 'kg', effort: 'rir', rest: 120, autoRest: true, autoNext: true, view: 'focus',
-      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows'
+      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows', padRir: true
     },
     custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null,
     workouts: [], active: null, rest: null,
@@ -3058,7 +3058,7 @@ function setRowHTML(i, x, j, k, ctx, effOn, two) {
   if (hasReps(k)) h += two ? inp('r', s.r ?? '', ph.r ?? '', 'numeric', T('Reps, {set}', { set: n })).replace('class="cell', 'class="cell span2') : inp('r', s.r ?? '', ph.r ?? '', 'numeric', T('Reps, {set}', { set: n }));
   if (hasDist(k)) h += inp('dist', s.dist != null ? dispDist(s.dist, k) : '', ph.dist != null ? dispDist(ph.dist, k) : '', 'decimal', T('Distance, {set}', { set: n }));
   if (hasTime(k)) h += inp('sec', s.sec != null ? fmtClock(s.sec) : '', ph.sec != null ? fmtClock(ph.sec) : '0:00', 'numeric', T('Time, {set}', { set: n }));
-  if (effOn) h += `<button class="cell eff ${s.rir != null ? 'has' : 'empty'}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${T('{eff}, {set}', { eff: effName(), set: n })}">${s.rir != null ? esc(effDisp(s.rir)) : s.trir != null ? `<span class="ph">${esc(effDisp(s.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
+  if (effOn) h += `<button class="cell eff ${s.rir != null ? 'has' : 'empty'}" ${pad ? 'data-a="kp" data-f="rir"' : 'data-a="effort"'} data-e="${i}" data-s="${j}" aria-label="${T('{eff}, {set}', { eff: effName(), set: n })}">${s.rir != null ? esc(effDisp(s.rir)) : s.trir != null ? `<span class="ph">${esc(effDisp(s.trir))}</span>` : '<span class="ph">–</span>'}</button>`;
   h += ui.delMode === x.id ? delBtn(i, j, n)
     : `<button class="check" data-a="toggleSet" data-e="${i}" data-s="${j}" aria-pressed="${!!s.done}" aria-label="${s.done ? T('Uncheck {set}', { set: n }) : T('Check {set}', { set: n })}">${icon('check')}</button>`;
   h += `</div></div>`;
@@ -3146,7 +3146,7 @@ function oneRowHTML(i, x, j, k, ctx, effOn) {
   h += inp(q, 'r', sq.r ?? '', phq.r ?? '', 'numeric', T('{side} reps, {set}', { side: sideName(otherSide(f1)), set: n }), 'side-' + otherSide(f1) + (sq.done ? ' got' : ''));
   // effort for each side, stacked in the side colours (first side on top)
   const ev = o => o.rir != null ? esc(effDisp(o.rir)) : `<span class="ph">${o.trir != null ? esc(effDisp(o.trir)) : '–'}</span>`;
-  if (effOn) h += `<button class="cell eff sides ${sp.rir != null || sq.rir != null ? 'has' : 'empty'}" data-a="effort" data-e="${i}" data-s="${j}" aria-label="${T('{eff} for each side, {set}: {side1} {v1}, {side2} {v2}', { eff: effName(), set: n, side1: sideName(f1), v1: sp.rir != null ? effDisp(sp.rir) : T('not set'), side2: sideName(otherSide(f1)), v2: sq.rir != null ? effDisp(sq.rir) : T('not set') })}"><span class="side-${f1}">${ev(sp)}</span><span class="side-${otherSide(f1)}">${ev(sq)}</span></button>`;
+  if (effOn) h += `<button class="cell eff sides ${sp.rir != null || sq.rir != null ? 'has' : 'empty'}" ${pad ? `data-a="kp" data-f="rir" data-e="${i}" data-s="${p}"` : `data-a="effort" data-e="${i}" data-s="${j}"`} aria-label="${T('{eff} for each side, {set}: {side1} {v1}, {side2} {v2}', { eff: effName(), set: n, side1: sideName(f1), v1: sp.rir != null ? effDisp(sp.rir) : T('not set'), side2: sideName(otherSide(f1)), v2: sq.rir != null ? effDisp(sq.rir) : T('not set') })}"><span class="side-${f1}">${ev(sp)}</span><span class="side-${otherSide(f1)}">${ev(sq)}</span></button>`;
   h += ui.delMode === x.id ? delBtn(i, j, n)
     : `<button class="check" data-a="toggleBoth" data-e="${i}" data-s="${j}" aria-pressed="${done}" aria-label="${done ? T('Uncheck {set}, both sides', { set: n }) : T('Check {set}, both sides', { set: n })}">${icon('check')}</button>`;
   h += `</div></div>`;
@@ -3218,14 +3218,16 @@ function repeatSet(i) {
   save(); renderWorkout();
   toast(T('Added another {set}. Tap ✓ when it’s done.', { set: fmtSet(x, last, null, false) }));
 }
+// the effort choices, as [RIR, shown]: RPE 6–10 in halves, or RIR 0–5+ (under the set, and on the number pad)
+const effVals = () => state.settings.effort === 'rpe' ? [[4, '6'], [3, '7'], [2.5, '7.5'], [2, '8'], [1.5, '8.5'], [1, '9'], [0.5, '9.5'], [0, '10']] : [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5+']];
+const effQ = two => state.settings.effort === 'rpe' ? (two ? T('How hard was it? (RPE), each side') : T('How hard was it? (RPE)')) : (two ? T('Reps left in the tank (RIR), each side') : T('Reps left in the tank (RIR)'));
 // with a second set (the other side of a one-row left/right set), each side gets its own row of choices
 function effPicker(i, j, s, j2, s2) {
-  const rpe = state.settings.effort === 'rpe';
-  const vals = rpe ? [[4, '6'], [3, '7'], [2.5, '7.5'], [2, '8'], [1.5, '8.5'], [1, '9'], [0.5, '9.5'], [0, '10']] : [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5+']];
+  const rpe = state.settings.effort === 'rpe', vals = effVals();
   // one even row of choices (RPE: two rows of four); the target, while nothing is picked, gets a ring
   const chips = (jj, o, one) => `<div class="eff-chips ${rpe ? 'rpe' : ''}">${vals.map(([v, l]) =>
     `<button class="${o.rir === v ? 'on' : o.rir == null && o.trir === v ? 'target' : ''}" data-a="effPick" data-e="${i}" data-s="${jj}" data-v="${v}"${one} aria-pressed="${o.rir === v}">${l}</button>`).join('')}</div>`;
-  const q = rpe ? (s2 != null ? T('How hard was it? (RPE), each side') : T('How hard was it? (RPE)')) : (s2 != null ? T('Reps left in the tank (RIR), each side') : T('Reps left in the tank (RIR)'));
+  const q = effQ(s2 != null);
   // Clear empties this set (both sides of a one-row left/right set)
   const head = `<div class="eff-head"><span class="eff-q">${q}</span><button class="eff-clear" data-a="effPick" data-e="${i}" data-s="${j}" data-v="">${T('Clear')}</button></div>`;
   if (s2 == null) return `<div class="eff-pick">${head}${chips(j, s, '')}</div>`;
@@ -3653,17 +3655,41 @@ function kpField() {
   const x = w.ex[k.e], set = x && x.sets[k.s];
   if (!set) return null;
   const kind = getEx(x.exId).k;
-  return rowFields(x, kind).includes(k.f) ? { w, x, set, k: kind } : null;
+  const ok = k.f === 'rir' ? state.settings.effort !== 'off' && hasReps(kind) : rowFields(x, kind).includes(k.f);
+  return ok ? { w, x, set, k: kind } : null;
 }
-function kpCell() { const k = ui.kp; return k ? $(`#workout .cell[data-e="${k.e}"][data-s="${k.s}"][data-f="${k.f}"]`) : null; }
+// a one-row left/right set has one RIR box for both sides
+function kpCell() {
+  const k = ui.kp;
+  if (!k) return null;
+  const x = k.f === 'rir' && A() && A().ex[k.e], s = x && x.sets[k.s];
+  const rows = s && s.side && isCompact(x) ? setRows(x, s).map(o => x.sets.indexOf(o)) : [k.s];
+  return $(rows.map(n => `#workout .cell[data-e="${k.e}"][data-s="${n}"][data-f="${k.f}"]`).join(','));
+}
+// the pad asks for the RIR after the reps (Settings → RIR on the number pad), on all but warm-ups
+const rirStep = (x, s) => state.settings.padRir !== false && state.settings.effort !== 'off' && !!s && s.t !== 'W' && hasReps(getEx(x.exId).k);
+// a one-row left/right set: its rows, first side first
+const sidesInOrder = (x, s) => isCompact(x) && s.side && partnerOf(x, s) ? setRows(x, s).sort((a, b) => (b.side === firstSide(x)) - (a.side === firstSide(x))) : [s];
+function canLog(w, x, s) {
+  const ph = placeholder(x, x.sets.indexOf(s), exCtx(w, x)), c = { ...s };
+  for (const f of ['w', 'r', 'sec', 'dist']) if (c[f] == null && ph[f] != null) c[f] = ph[f];
+  return hasValue(getEx(x.exId).k, x, c);
+}
+// move the pad to another box; `then: 'log'` logs the set once its RIR is picked
+function kpGo(s, f, then) {
+  const fld = kpField();
+  ui.kp.s = s; ui.kp.f = f; ui.kp.sid = fld && fld.x.sets[s] && fld.x.sets[s].id;
+  ui.kp.fresh = true; ui.kp.buf = null; ui.kp.then = then || null;
+  renderKeypad(); markKpCell(true);
+}
 function kpCurrent() {
   const fld = kpField();
-  if (!fld) return '';
+  if (!fld || ui.kp.f === 'rir') return '';
   const v = fld.set[ui.kp.f], f = ui.kp.f;
   if (v == null) return '';
   return f === 'w' ? dispW(v) : f === 'sec' ? fmtClock(v) : f === 'dist' ? dispDist(v, fld.k) : String(v);
 }
-function kpShow(buf) { const c = kpCell(); if (c) { c.innerHTML = buf ? esc(buf) : `<span class="ph">${esc(c.dataset.ph || '')}</span>`; c.classList.toggle('empty', !buf); } }
+function kpShow(buf) { const c = ui.kp.f !== 'rir' && kpCell(); if (c) { c.innerHTML = buf ? esc(buf) : `<span class="ph">${esc(c.dataset.ph || '')}</span>`; c.classList.toggle('empty', !buf); } }
 function kpSet(buf) { ui.kp.buf = buf; woSetField(ui.kp.e, ui.kp.s, ui.kp.f, buf); kpShow(buf); }
 function kpClose() { ui.kp = null; renderWorkout(); }
 const KP_NAMES = { w: T('Weight'), r: T('Reps'), sec: T('Time'), dist: T('Distance') };
@@ -3678,16 +3704,30 @@ function renderKeypad() {
     return;
   }
   const { x, k } = fld, f = ui.kp.f;
+  const head = name => `<div class="kp-head"><div class="kp-title"><b>${esc(getEx(x.exId).name)}</b><span>${esc(kpRowName(x, ui.kp.s))} · ${name}</span></div>
+    <span class="kp-rest" data-kprest hidden></span><button class="kp-hide" data-a="kpClose" aria-label="${T('Hide number pad')}">${icon('down')}</button></div>`;
+  const log = `<button class="kp-k log" data-a="kpLog">${icon('check')}${T('Log')}</button>`;
+  if (f === 'rir') {
+    // fixed choices, one tap each: the one picked is filled, the target ringed
+    const s = fld.set, rpe = state.settings.effort === 'rpe';
+    el.innerHTML = `${head(effName())}<div class="kp-grid kp-eff${rpe ? ' rpe' : ''}" role="group" aria-label="${esc(effQ())}">
+      <p class="kp-q">${esc(effQ())}${s.trir != null ? ` <span>${T('Target {v}', { v: esc(effDisp(s.trir)) })}</span>` : ''}</p>
+      ${effVals().map(([v, l]) => `<button class="kp-k ${s.rir === v ? 'on' : s.rir == null && s.trir === v ? 'target' : ''}" data-a="kpEff" data-v="${v}" aria-pressed="${s.rir === v}">${l}</button>`).join('')}
+      <button class="kp-k fn" data-a="kpEff" data-v="" ${s.rir == null ? 'disabled' : ''}>${T('Clear')}</button><button class="kp-k fn" data-a="kpNext">${T('Next')}</button>${log}</div>`;
+    slidePanel(el, true);
+    document.body.classList.add('kp-open');
+    tickRest();
+    return;
+  }
   const unit = f === 'w' ? weightLabel(k) : f === 'dist' ? distUnit(k) : f === 'sec' ? T('min:sec') : '';
   const step = f === 'w' ? trimNum(state.settings.step) : f === 'sec' ? '15s' : f === 'dist' ? (k === 'wdist' ? '5' : '0.1') : '1';
   const dot = f === 'sec' ? ':' : f === 'w' || f === 'dist' ? '.' : '';
   const key = c => `<button class="kp-k" data-a="kpKey" data-k="${c}">${c}</button>`;
-  el.innerHTML = `<div class="kp-head"><div class="kp-title"><b>${esc(getEx(x.exId).name)}</b><span>${esc(kpRowName(x, ui.kp.s))} · ${KP_NAMES[f]}${unit ? ` (${esc(unit)})` : ''}</span></div>
-    <span class="kp-rest" data-kprest hidden></span><button class="kp-hide" data-a="kpClose" aria-label="${T('Hide number pad')}">${icon('down')}</button></div>
+  el.innerHTML = `${head(`${KP_NAMES[f]}${unit ? ` (${esc(unit)})` : ''}`)}
     <div class="kp-grid">${key('1')}${key('2')}${key('3')}<button class="kp-k fn" data-a="kpBack" aria-label="${T('Delete')}">${icon('backspace')}</button>
     ${key('4')}${key('5')}${key('6')}<button class="kp-k fn" data-a="kpStep" data-d="-1">−${step}</button>
     ${key('7')}${key('8')}${key('9')}<button class="kp-k fn" data-a="kpStep" data-d="1">+${step}</button>
-    ${dot ? key(dot) : '<span></span>'}${key('0')}<button class="kp-k fn" data-a="kpNext">${T('Next')}</button><button class="kp-k log" data-a="kpLog">${icon('check')}${T('Log')}</button></div>`;
+    ${dot ? key(dot) : '<span></span>'}${key('0')}<button class="kp-k fn" data-a="kpNext">${T('Next')}</button>${log}</div>`;
   slidePanel(el, true);
   document.body.classList.add('kp-open');
   tickRest();
@@ -3697,6 +3737,8 @@ function markKpCell(scroll) {
   const c = kpCell();
   if (!c) return;
   c.classList.add('kp-on');
+  const s = c.classList.contains('sides') && A().ex[ui.kp.e].sets[ui.kp.s];
+  for (const n of c.querySelectorAll(':scope > span')) n.classList.toggle('kp-side', !!s && n.classList.contains('side-' + s.side));
   if (!scroll) return;
   requestAnimationFrame(() => {
     const main = $('#workout .wo-main'), kp = $('#keypad');
@@ -4421,6 +4463,7 @@ VIEWS.settings = function () {
     ${row(T('Layout'), T('One exercise at a time with big next and previous buttons, or every exercise in one list.'), seg('setView', s.view, [['focus', T('One at a time')], ['list', T('List')]]))}
     ${row(T('One-side exercises'), T('How left and right are logged on one-arm and one-leg exercises. You can also change it on each exercise.'), seg('setUniStyle', s.uniStyle || 'rows', [['rows', T('Separate rows')], ['one', T('One row')]]))}
     ${row(T('Number pad'), T('Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.'), seg('setKeypad', s.keypad, [['auto', T('Auto')], ['app', T('In-app pad')], ['system', T('Keyboard')]]))}
+    ${s.effort !== 'off' ? row(T('{eff} on the number pad', { eff: effName() }), T('Next and Log go from weight to reps to {eff}, and one tap on a choice moves on. Off: the pad skips it, and you tap the {eff} box to set it.', { eff: effName() }), toggle(s.padRir !== false, 'tgl', 'data-k="padRir"')) : ''}
     ${row(T('Default rest'), T('Each exercise can have its own.'), `<label class="select-wrap sm"><select data-f="rest">${REST_PRESETS.map(v => `<option value="${v}" ${v === s.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>`)}
     ${row(T('Start rest timer when a set is checked'), '', toggle(s.autoRest, 'tgl', 'data-k="autoRest"'))}
     ${row(T('Move to the next exercise when one is done'), T('Slides to it one at a time, or scrolls down to it in the list.'), toggle(s.autoNext, 'tgl', 'data-k="autoNext"'))}
@@ -4763,7 +4806,7 @@ const ACT = {
     renderKeypad(); markKpCell(true);
   },
   kpKey: b => {
-    if (!kpField()) return;
+    if (!kpField() || ui.kp.f === 'rir') return;
     const ch = b.dataset.k;
     let buf = ui.kp.fresh ? '' : (ui.kp.buf ?? kpCurrent());
     ui.kp.fresh = false;
@@ -4774,14 +4817,14 @@ const ACT = {
     kpSet(buf + ch);
   },
   kpBack: () => {
-    if (!kpField()) return;
+    if (!kpField() || ui.kp.f === 'rir') return;
     const buf = ui.kp.fresh ? '' : (ui.kp.buf ?? kpCurrent()).slice(0, -1);
     ui.kp.fresh = false;
     kpSet(buf);
   },
   kpStep: b => {
     const fld = kpField();
-    if (!fld) return;
+    if (!fld || ui.kp.f === 'rir') return;
     const d = +b.dataset.d, f = ui.kp.f, k = fld.k;
     const cur = fld.set[f] ?? placeholder(fld.x, ui.kp.s, exCtx(fld.w, fld.x))[f] ?? 0;
     let buf;
@@ -4792,27 +4835,46 @@ const ACT = {
     kpSet(buf);
     ui.kp.fresh = true;
   },
+  // across the row and on to the next set: weight, reps, then RIR (unless that's turned off, or it's a warm-up)
   kpNext: () => {
     const fld = kpField();
     if (!fld) { kpClose(); return; }
     kpShow(kpCurrent());
-    const cells = $$(`#workout .exc[data-e="${ui.kp.e}"] .cell[data-a="kp"]`), nx = cells[cells.indexOf(kpCell()) + 1];
+    const { x } = fld, sides = sidesInOrder(x, fld.set);
+    if (ui.kp.f === 'rir' && sides.length > 1 && sides[0] === fld.set) { kpGo(x.sets.indexOf(sides[1]), 'rir'); return; }
+    const cells = $$(`#workout .exc[data-e="${ui.kp.e}"] .cell[data-a="kp"]`);
+    const nx = cells.slice(cells.indexOf(kpCell()) + 1).find(c => c.dataset.f !== 'rir' || rirStep(x, x.sets[+c.dataset.s]));
     if (!nx) { kpClose(); return; }
-    ui.kp.s = +nx.dataset.s; ui.kp.f = nx.dataset.f; ui.kp.sid = fld.x.sets[ui.kp.s] && fld.x.sets[ui.kp.s].id;
-    ui.kp.fresh = true; ui.kp.buf = null;
-    renderKeypad(); markKpCell(true);
+    kpGo(+nx.dataset.s, nx.dataset.f);
   },
+  // Log asks for the RIR first (each side of a one-row set), then logs; on the RIR step it logs straight away
   kpLog: () => {
     const fld = kpField();
     if (!fld) { kpClose(); return; }
-    if (fld.set.done && !isCompact(fld.x)) { kpClose(); return; }
-    if (isCompact(fld.x) && fld.set.side && partnerOf(fld.x, fld.set)) {
-      const rows = setRows(fld.x, fld.set);
-      if (rows.every(o => o.done)) { kpClose(); return; }
-      toggleBoth(ui.kp.e, fld.x.sets.indexOf(rows[0]), true);
-      return;
+    const { w, x } = fld, rows = sidesInOrder(x, fld.set), two = rows.length > 1;
+    if (fld.set.done && !two) { kpClose(); return; }
+    if (rows.every(o => o.done)) { kpClose(); return; }
+    const open = rows.filter(o => !o.done);
+    if (ui.kp.f !== 'rir' && open.every(o => canLog(w, x, o))) {
+      const ask = open.find(o => o.rir == null && rirStep(x, o));
+      if (ask) { kpGo(x.sets.indexOf(ask), 'rir', 'log'); return; }
     }
-    toggleSet(ui.kp.e, ui.kp.s, true);
+    if (two) toggleBoth(ui.kp.e, Math.min(...rows.map(o => x.sets.indexOf(o))), true);
+    else toggleSet(ui.kp.e, ui.kp.s, true);
+  },
+  // a RIR choice on the pad: then the other side, the log it was asked for, or on to the next set
+  kpEff: b => {
+    const fld = kpField();
+    if (!fld || ui.kp.f !== 'rir') return;
+    const { x, set } = fld, then = ui.kp.then;
+    if (b.dataset.v === '') { delete set.rir; save(); renderWorkout(); return; }
+    set.rir = +b.dataset.v;
+    save(); renderWorkout();
+    const sides = sidesInOrder(x, set), mate = sides.length > 1 && sides[0] === set ? sides[1] : null;
+    if (mate && (!then || (!mate.done && mate.rir == null))) { kpGo(x.sets.indexOf(mate), 'rir', then); return; }
+    if (then === 'log') ACT.kpLog();
+    else if (state.settings.padRir !== false) ACT.kpNext();
+    else kpClose();
   },
   kpClose: () => kpClose(),
   effPick: b => {
