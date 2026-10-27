@@ -72,9 +72,11 @@ const { open, report, ENGINE } = require('./lib');
   r.ok(done, 'every set of the workout can be logged', { logged, total });
   await t.click('#workout [data-a="woFinish"]', 700);
   if (await p.evaluate(() => { const w = [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop(); return !!(w && w.querySelector('[data-a="ok"]')); })) await t.inSheet('[data-a="ok"]', 1200);
-  await p.waitForTimeout(600);
+  const shown = await p.waitForFunction(() => document.querySelector('#sheets .sheet-wrap.finish.in'), null, { timeout: 6000 }).then(() => true, () => false);
   s = await t.state();
-  r.ok(!s.active && s.workouts.length === 1 && s.workouts[0].ex.every(x => x.sets.every(st => st.done)) && /First workout done!/.test(await t.sheetText()), 'Finish saves the workout and celebrates the first one', { workouts: s.workouts.length, sheet: (await t.sheetText()).slice(0, 80) });
+  // if the end screen didn't come up: what's open, and what happens when it's asked for directly
+  const why = shown ? null : await t.ev(`(() => { const open = [...document.querySelectorAll('#sheets .sheet-wrap')].map(w => w.className); try { finishScreen(state.workouts[0].id); return { open, direct: 'opened' }; } catch (e) { return { open, direct: String(e && e.stack || e).slice(0, 400) }; } })()`);
+  r.ok(shown && !s.active && s.workouts.length === 1 && s.workouts[0].ex.every(x => x.sets.every(st => st.done)) && /First workout done!/.test(await t.sheetText()), 'Finish saves the workout and celebrates the first one', { workouts: s.workouts.length, sheet: (await t.sheetText()).slice(0, 80), why });
   // in Safari's engine too: a card drawn into a picture, the way Share makes it
   const pic = await t.ev(`(async () => { try { const b = await cardPNG(finCards(workoutStory(state.workouts[0]))[1]); return b ? b.size : 0; } catch (e) { return 'error: ' + e.message; } })()`);
   r.ok(pic > 10000, 'a card from the end screen can be made into a picture to share', pic);
