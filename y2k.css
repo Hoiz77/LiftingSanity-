@@ -318,6 +318,9 @@
 [data-style="y2k"] .fin-title { font-family: var(--display); text-transform: uppercase; letter-spacing: .04em; text-shadow: none; }
 [data-style="y2k"] .fin-sub { font-family: var(--ui); }
 [data-style="y2k"] .fin-wave { border-radius: 0; }
+[data-style="y2k"] .rank-src details, [data-style="y2k"] .rank-src summary small { border-radius: 0; }
+[data-style="y2k"] .rank-src details { border: 1px solid var(--line); }
+[data-style="y2k"] .rank-src summary { font-family: var(--pixel); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 [data-style="y2k"] .fin-btn { border-radius: 0; background: color-mix(in srgb, var(--cobalt) 25%, transparent); border: 1px solid var(--cobalt); }
 [data-style="y2k"] .fin-card { border-radius: 26px; }
 [data-style="y2k"] .fin-dots button.on::after { background: var(--cyan); }

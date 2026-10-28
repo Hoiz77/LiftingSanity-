@@ -10,6 +10,8 @@
    - Other exercises are ranked against the nearest of the three lifts by a typical ratio (an incline bench is about
      82% of a flat one, a dumbbell press about 40% of the bench in each hand). Those are rules of thumb, marked
      "estimated". Machines and cables are marked "rough": the same number reads differently on every machine.
+   - REFS and SOURCES: the studies and data behind all this, grouped by what they support, each with what it found;
+     an exercise's own ratio names its studies in `src`.
    No app state is used here: basis(ex, pattern) needs { name, eq, k, uni }, and ladder() a profile { sex, bw, age }. */
 window.LS_RANKS = (() => {
   const TIERS = [
@@ -53,12 +55,99 @@ window.LS_RANKS = (() => {
     return f[i] + (f[i + 1] - f[i]) * t;
   }
 
+  // ---------- the studies and data behind the ranks ----------
+  // each with a link where there's one to give; SOURCES groups them by what they support, with what each one found
+  const REFS = {
+    opl: { cite: 'OpenPowerlifting', title: 'Public-domain powerlifting meet records', url: 'https://www.openpowerlifting.org' },
+    vandenhoek2024: { cite: 'van den Hoek et al. 2024, J Sci Med Sport', title: 'Normative data for the squat, bench press and deadlift exercises in powerlifting: data from 809,986 competition entries', url: 'https://doi.org/10.1016/j.jsams.2024.07.005' },
+    vandenhoek2026: { cite: 'van den Hoek et al. 2026, J Strength Cond Res', title: 'The evolution of normative strength values in powerlifting from 2000 to 2024', url: 'https://doi.org/10.1519/JSC.0000000000005294' },
+    vandenhoekPart: { cite: 'van den Hoek et al. 2024, Int J Sports Sci Coach', title: 'Powerlifting participation and engagement across all ages: a retrospective, longitudinal, population analysis with comparison to community strength norms', url: 'https://acuresearchbank.acu.edu.au/item/91x58/powerlifting-participation-and-engagement-across-all-ages-a-retrospective-longitudinal-population-analysis-with-comparison-to-community-strength-norms' },
+    kilgore: { cite: 'Rippetoe & Kilgore, Practical Programming; Kilgore, ExRx', title: 'Strength standards, untrained to elite, by bodyweight', url: 'https://exrx.net/Testing/WeightLifting/StrengthStandards' },
+    strengthlevel: { cite: 'Strength Level', title: 'Strength standards from self-reported lifts', url: 'https://strengthlevel.com/strength-standards' },
+    acsm: { cite: 'ACSM’s Guidelines for Exercise Testing and Prescription', title: 'General-population strength norms (Cooper Institute)', url: '' },
+    jaric2002: { cite: 'Jaric 2002, Sports Med', title: 'Muscle strength testing: use of normalisation for body size', url: 'https://doi.org/10.2165/00007256-200232100-00002' },
+    batterham1997: { cite: 'Batterham & George 1997, J Appl Physiol', title: 'Allometric modeling does not determine a dimensionless power function ratio for maximal muscular function', url: 'https://doi.org/10.1152/jappl.1997.83.6.2158' },
+    vanderburgh1999: { cite: 'Vanderburgh & Batterham 1999, Med Sci Sports Exerc', title: 'Validation of the Wilks powerlifting formula', url: 'https://doi.org/10.1097/00005768-199912000-00027' },
+    dooman2000: { cite: 'Dooman & Vanderburgh 2000, J Strength Cond Res', title: 'Allometric modeling of the bench press and squat: who is the strongest regardless of body mass?', url: '' },
+    cleather2006: { cite: 'Cleather 2006, J Strength Cond Res', title: 'Adjusting powerlifting performances for differences in body mass', url: '' },
+    markovic2006: { cite: 'Marković & Sekulić 2006, Coll Antropol', title: 'Modeling the influence of body size on weightlifting and powerlifting performance', url: 'https://hrcak.srce.hr/en/27582' },
+    ford2000: { cite: 'Ford et al. 2000, J Appl Physiol', title: 'Gender- and height-related limits of muscle strength in world weightlifting champions', url: 'https://doi.org/10.1152/jappl.2000.89.3.1061' },
+    ferland2020: { cite: 'Ferland et al. 2020, Int J Exerc Sci', title: 'Efficiency of the Wilks and IPF formulas at comparing maximal strength regardless of bodyweight through analysis of the Open Powerlifting database', url: 'https://digitalcommons.wku.edu/ijes/vol13/iss4/12' },
+    ipf: { cite: 'International Powerlifting Federation', title: 'IPF Points proposal (the federation’s bodyweight formula)', url: 'https://www.powerlifting.sport/fileadmin/ipf/data/ipf-formula/IPF_Points_Proposal.pdf' },
+    latella2024: { cite: 'Latella et al. 2024, Sports Med', title: 'Using powerlifting athletes to determine strength adaptations across ages in males and females: a longitudinal growth modelling approach', url: 'https://doi.org/10.1007/s40279-023-01962-6' },
+    anton2004: { cite: 'Anton et al. 2004, Med Sci Sports Exerc', title: 'Age-related declines in anaerobic muscular performance: weightlifting and powerlifting', url: 'https://doi.org/10.1249/01.MSS.0000106283.34742.BE' },
+    solberg2019: { cite: 'Solberg et al. 2019, Int J Sports Physiol Perform', title: 'Peak age and performance progression in world-class weightlifting and powerlifting athletes', url: 'https://doi.org/10.1123/ijspp.2019-0093' },
+    lindle1997: { cite: 'Lindle et al. 1997, J Appl Physiol', title: 'Age and gender comparisons of muscle strength in 654 women and men aged 20–93 yr', url: 'https://doi.org/10.1152/jappl.1997.83.5.1581' },
+    nuzzo2023: { cite: 'Nuzzo 2023, J Strength Cond Res', title: 'Narrative review of sex differences in muscle strength, endurance, activation, size, fiber type, and strength training participation rates, preferences, motivations, injuries, and neuromuscular adaptations', url: 'https://doi.org/10.1519/JSC.0000000000004329' },
+    miller1993: { cite: 'Miller et al. 1993, Eur J Appl Physiol', title: 'Gender differences in strength and muscle fiber characteristics', url: 'https://doi.org/10.1007/BF00235103' },
+    epley1985: { cite: 'Epley 1985, Boyd Epley Workout', title: 'Poundage chart', url: '' },
+    brzycki1993: { cite: 'Brzycki 1993, J Phys Educ Recreat Dance', title: 'Strength testing: predicting a one-rep max from reps-to-fatigue', url: 'https://doi.org/10.1080/07303084.1993.10606684' },
+    lesuer1997: { cite: 'LeSuer et al. 1997, J Strength Cond Res', title: 'The accuracy of prediction equations for estimating 1-RM performance in the bench press, squat, and deadlift', url: '' },
+    reynolds2006: { cite: 'Reynolds et al. 2006, J Strength Cond Res', title: 'Prediction of one repetition maximum strength from multiple repetition maximum testing and anthropometry', url: 'https://www.unm.edu/~rrobergs/478RMStrengthPrediction.pdf' },
+    rodriguez2020: { cite: 'Rodríguez-Ridao et al. 2020, Int J Environ Res Public Health', title: 'Effect of five bench inclinations on the electromyographic activity of the pectoralis major, anterior deltoid, and triceps brachii during the bench press exercise', url: 'https://doi.org/10.3390/ijerph17197339' },
+    saeterbakken2017: { cite: 'Saeterbakken et al. 2017, J Hum Kinet', title: 'The effects of bench press variations in competitive athletes on muscle activity and performance', url: 'https://doi.org/10.1515/hukin-2017-0047' },
+    saeterbakken2011: { cite: 'Saeterbakken et al. 2011, J Sports Sci', title: 'A comparison of muscle activity and 1-RM strength of three chest-press exercises with different stability requirements', url: '' },
+    saeterbakken2013: { cite: 'Saeterbakken & Fimland 2013, J Strength Cond Res', title: 'Effects of body position and loading modality on muscle activity and strength in shoulder presses', url: '' },
+    swinton2011: { cite: 'Swinton et al. 2011, J Strength Cond Res', title: 'A biomechanical analysis of straight and hexagonal barbell deadlifts using submaximal loads', url: 'https://doi.org/10.1519/JSC.0b013e3181e73f87' },
+    camara2016: { cite: 'Camara et al. 2016, J Strength Cond Res', title: 'An examination of muscle activation and power characteristics while performing the deadlift exercise with straight and hexagonal barbells', url: 'https://doi.org/10.1519/JSC.0000000000001352' },
+    sanchez2017: { cite: 'Sánchez-Moreno et al. 2017, Int J Sports Physiol Perform', title: 'Movement velocity as indicator of relative intensity and level of effort attained during the set in pull-up exercise', url: 'https://doi.org/10.1123/ijspp.2016-0791' },
+    cotterman2005: { cite: 'Cotterman et al. 2005, J Strength Cond Res', title: 'Comparison of muscle force production using the Smith machine and free weights for bench press and squat exercises', url: 'https://doi.org/10.1519/14433.1' },
+    haugen2023: { cite: 'Haugen et al. 2023, BMC Sports Sci Med Rehabil', title: 'Effect of free-weight vs. machine-based strength training on maximal strength, hypertrophy and jump performance: a systematic review and meta-analysis', url: 'https://doi.org/10.1186/s13102-023-00713-4' }
+  };
+  const SOURCES = [
+    ['Where the standards come from', [
+      ['opl', 'Career-best squat, bench press and deadlift of raw lifters in ten federations: the data the standards are fitted to.'],
+      ['vandenhoek2024', 'Percentile norms by sex, age and bodyweight from 809,986 entries in drug-tested, unequipped meets: the same kind of data, and the same use of percentiles, as the ranks.'],
+      ['vandenhoek2026', 'Norms moved little from 2000 to 2024 (the median man’s bench press barely changed), so standards from these records stay current.'],
+      ['vandenhoekPart', 'Competitors sit far above community strength norms: why Gold, the bottom 15% of them, is already a strong gym lifter.'],
+      ['kilgore', 'The classic five-level standards by bodyweight, untrained to elite: a ladder of levels like the ranks.'],
+      ['strengthlevel', 'Percentile standards from tens of millions of self-reported lifts: a cross-check, though not verified like meet results.'],
+      ['acsm', 'General-population norms for 1RM per bodyweight: the everyday end of the scale, below competitors.']]],
+    ['Your bodyweight', [
+      ['jaric2002', 'Strength grows with about bodyweight to the power 0.67, not in proportion to it, so dividing by bodyweight is unfair to heavier lifters. The ranks use curves of the form a × bodyweight^b.'],
+      ['batterham1997', 'One power of bodyweight doesn’t fit every size, so each lift and each rank gets its own fitted curve.'],
+      ['dooman2000', 'Bench press and squat records scale with about bodyweight^0.57 and ^0.60; the deadlift fit less well.'],
+      ['cleather2006', 'Across world championships the best fit was a curve that flattens at heavier bodyweights, different for each lift and sex.'],
+      ['markovic2006', 'Simple bodyweight scaling tends to favour the middle weight classes.'],
+      ['vanderburgh1999', 'The Wilks formula was fair for the bench press and total, but biased against heavier lifters in the deadlift.'],
+      ['ferland2020', 'Wilks and the IPF formula each compared only about half of all weight-class pairs fairly: one formula struggles across every size.'],
+      ['ipf', 'The federation’s own bodyweight formula, replacing Wilks in 2019.'],
+      ['ford2000', 'Among world champions, weight lifted rose with height squared, through muscle size, which your bodyweight already carries: why height isn’t used.']]],
+    ['Age', [
+      ['latella2024', 'Lifters gain most in their first year and can keep gaining for a decade; women over 59 still improved, while men over 69 lost about 0.35% a year.'],
+      ['anton2004', 'Powerlifting records fall steadily with age, at similar rates for the bench press and the squat.'],
+      ['solberg2019', 'When world-class powerlifters reach their best, and how they progress on the way.'],
+      ['lindle1997', 'In 654 adults aged 20 to 93, strength fell with age at similar rates in women and men.']]],
+    ['Women and men', [
+      ['nuzzo2023', 'Men are stronger mainly through bigger muscles, more so in the upper body: why women have their own standards.'],
+      ['miller1993', 'Strength for the size of the muscle was alike in women and men; the bigger upper-body gap follows how lean mass is spread.']]],
+    ['Your estimated 1RM', [
+      ['epley1985', 'The formula the app uses: weight × (1 + reps / 30).'],
+      ['brzycki1993', 'The other common formula: about 10 reps can be done with 75% of a max.'],
+      ['lesuer1997', 'Predicted and tested maxes agreed closely, but every formula underestimated the deadlift.'],
+      ['reynolds2006', 'Sets of about 5 reps predicted a max best, higher reps less well: why only sets of 1 to 12 reps count.']]],
+    ['Other exercises', [
+      ['rodriguez2020', 'The bench press max fell as the bench tilted up: 88% of flat at 15°, 78% at 30°, 71% at 45°. The app uses 82% for an incline.'],
+      ['saeterbakken2017', 'Compared the loads competitive bench pressers manage with other grips, on an incline and on a decline.'],
+      ['saeterbakken2011', 'A dumbbell press max was 17% below the barbell’s, about 41% of it in each hand (the app uses 40%), and a Smith machine’s 3% below.'],
+      ['saeterbakken2013', 'Shoulder press maxes seated and standing, with a barbell and dumbbells: standing with dumbbells, the least steady way, gave the lowest.'],
+      ['kilgore', 'A press is about 60 to 67% of a bench press in these standards; the app uses 63%.'],
+      ['strengthlevel', 'The average shoulder press is about 65% of the average bench press here.'],
+      ['swinton2011', 'Powerlifters lifted 8% more with a hex bar than a straight bar (265 against 245 kg): the app’s trap bar ratio.'],
+      ['camara2016', 'Here the hex and straight bar maxes didn’t differ, so the trap bar ratio is an estimate.'],
+      ['sanchez2017', 'Pull-up strength measured as the whole load pulled, your bodyweight included, the way the ranks count pull-ups.']]],
+    ['Machines', [
+      ['cotterman2005', 'Maxes on a Smith machine and with free weights differed (a heavier squat for women, a lighter bench on the Smith): why machine ranks are rough.'],
+      ['haugen2023', 'Strength shows most on the kind of equipment you train with, so a machine’s number doesn’t carry over exactly.']]]
+  ];
+
   // ---------- which standard an exercise is measured against ----------
   // ref: S squat, B bench, D deadlift, pull (pull-ups: bodyweight + added) or dip (dips: the same); r: a share of
   // that lift; conf: data (the lift itself), est (a free-weight lift, by a typical ratio) or rough (machines, cables);
   // per: hand (each dumbbell), side (one arm or leg at a time) or total (bodyweight plus added)
   const norm = n => String(n || '').toLowerCase().replace(/\s*v\.\s*\d+|\((back|side) pov\)|в°|°/g, '').replace(/\s+/g, ' ').trim();
-  const B = (ref, r, conf, per = '') => ({ ref, r, conf, per });
+  // src: the studies behind this exercise's own ratio (machines and the big three get theirs in the app)
+  const B = (ref, r, conf, per = '', src) => ({ ref, r, conf, per, ...(src ? { src } : {}) });
   const NOT = why => ({ why });
   function basis(ex, pattern) {
     const n = norm(ex.name), eq = ex.eq, k = ex.k;
@@ -70,7 +159,7 @@ window.LS_RANKS = (() => {
     // bodyweight plus whatever you add (or minus the help an assisted machine gives)
     if (k === 'bw' || k === 'aw') {
       if (/\bdips?\b/.test(n)) return /bench dip|korean/.test(n) ? NOT('kind') : B('dip', 1, 'est', 'total');
-      if (/pull-?up|chin-?up|\bchin\b/.test(n) && !one && !/l-pull|rocky|side-to-side|gironda/.test(n)) return B('pull', 1, 'est', 'total');
+      if (/pull-?up|chin-?up|\bchin\b/.test(n) && !one && !/l-pull|rocky|side-to-side|gironda/.test(n)) return B('pull', 1, 'est', 'total', ['sanchez2017']);
       return NOT('kind');
     }
     if (/assist/.test(n)) return NOT('kind');
@@ -92,13 +181,13 @@ window.LS_RANKS = (() => {
       if (/overhead/.test(n)) return bar ? B('S', 0.6, 'est') : NOT('kind');
       if (/safety bar/.test(n)) return B('S', 0.92, 'est');
       if (bar) return /on knees|jefferson|chest/.test(n) ? NOT('kind') : /pause|box|bench squat/.test(n) ? B('S', 0.92, 'est') : /narrow|wide/.test(n) ? B('S', 0.95, 'est') : B('S', 1, 'data');
-      if (eq === 'smith') return /chair|sumo/.test(n) ? NOT('kind') : B('S', 1, 'rough');
+      if (eq === 'smith') return /chair|sumo/.test(n) ? NOT('kind') : B('S', 1, 'rough', '', ['cotterman2005']);
       if (db) return B('S', 0.28, 'est', 'hand');
       if (eq === 'landmine') return B('S', 0.5, 'rough');
       return NOT('kind');
     }
     // deadlifts, hinges, hip thrusts and leg curls
-    if (/trap bar/.test(n)) return B('D', 1.08, 'est');
+    if (/trap bar/.test(n)) return B('D', 1.08, 'est', '', ['swinton2011', 'camara2016']);
     if (/romanian|stiff[- ]leg|straight[- ]leg|\brdl\b/.test(n)) {
       if (bar) return B('D', 0.72, 'est');
       if (eq === 'smith') return B('D', 0.75, 'rough');
@@ -128,7 +217,7 @@ window.LS_RANKS = (() => {
     if (pattern === 'pressHorizontal' || /bench press|chest press|floor press/.test(n)) {
       if (bar) {
         if (/guillotine/.test(n)) return B('B', 0.75, 'est');
-        if (/incline/.test(n)) return B('B', /reverse/.test(n) ? 0.78 : 0.82, 'est');
+        if (/incline/.test(n)) return B('B', /reverse/.test(n) ? 0.78 : 0.82, 'est', '', ['rodriguez2020']);
         if (/decline/.test(n)) return B('B', 1.03, 'est');
         if (/close[- ]grip/.test(n)) return B('B', 0.9, 'est');
         if (/floor press/.test(n)) return B('B', 0.88, 'est');
@@ -138,8 +227,8 @@ window.LS_RANKS = (() => {
         if (/paused/.test(n)) return B('B', 0.96, 'est');
         return B('B', 1, 'data');
       }
-      if (db) return B('B', /incline/.test(n) ? 0.36 : /decline/.test(n) ? 0.42 : /floor/.test(n) ? 0.38 : /squeeze|hammer|palm|reverse/.test(n) ? 0.35 : 0.4, 'est', 'hand');
-      if (eq === 'smith') return B('B', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /close/.test(n) ? 0.9 : 1, 'rough');
+      if (db) return B('B', /incline/.test(n) ? 0.36 : /decline/.test(n) ? 0.42 : /floor/.test(n) ? 0.38 : /squeeze|hammer|palm|reverse/.test(n) ? 0.35 : 0.4, 'est', 'hand', /incline/.test(n) ? ['saeterbakken2011', 'rodriguez2020'] : ['saeterbakken2011']);
+      if (eq === 'smith') return B('B', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /close/.test(n) ? 0.9 : 1, 'rough', '', ['saeterbakken2011']);
       if (machine || cable) return one ? B('B', 0.5, 'rough', 'side') : B('B', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /inner/.test(n) ? 0.8 : cable ? 0.9 : 1, 'rough');
       return NOT('kind');
     }
@@ -150,8 +239,8 @@ window.LS_RANKS = (() => {
       return NOT('kind');
     }
     if (pattern === 'pressVertical') {
-      if (bar) return /push press/.test(n) ? B('B', 0.78, 'est') : /behind|bradford/.test(n) ? B('B', 0.58, 'est') : /z press/.test(n) ? B('B', 0.55, 'est') : /anti gravity/.test(n) ? NOT('kind') : B('B', /seated/.test(n) ? 0.66 : 0.63, 'est');
-      if (db) return /cuban|w-press|scott|alternate side/.test(n) ? NOT('kind') : B('B', /arnold/.test(n) ? 0.24 : 0.27, 'est', 'hand');
+      if (bar) return /push press/.test(n) ? B('B', 0.78, 'est') : /behind|bradford/.test(n) ? B('B', 0.58, 'est') : /z press/.test(n) ? B('B', 0.55, 'est') : /anti gravity/.test(n) ? NOT('kind') : B('B', /seated/.test(n) ? 0.66 : 0.63, 'est', '', ['kilgore', 'strengthlevel', 'saeterbakken2013']);
+      if (db) return /cuban|w-press|scott|alternate side/.test(n) ? NOT('kind') : B('B', /arnold/.test(n) ? 0.24 : 0.27, 'est', 'hand', ['saeterbakken2013']);
       if (eq === 'smith') return B('B', 0.66, 'rough');
       if (machine) return one ? B('B', 0.35, 'rough', 'side') : B('B', 0.7, 'rough');
       if (eq === 'kettlebell') return B('B', 0.24, 'rough', 'hand');
@@ -327,5 +416,5 @@ window.LS_RANKS = (() => {
     return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible">${defs}${back}${crown}${body}${sym}${gloss}${shine}${g}${sparks}</svg>`;
   }
   function mixc(a, b, t) { const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, k) => Math.round(v * (1 - t) + B[k] * t).toString(16).padStart(2, '0')).join(''); }
-  return { TIERS, FITS, basis, ladder, place, ageFactor, emblem };
+  return { TIERS, FITS, REFS, SOURCES, basis, ladder, place, ageFactor, emblem };
 })();

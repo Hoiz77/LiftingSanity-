@@ -1524,6 +1524,23 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .rank-tiers > span { display: grid; justify-items: center; gap: 3px; width: 64px; }
 .rank-tiers small { font: 700 10px var(--ui); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .rank-how p { margin: 0 0 10px; }
+/* the sources: one fold per topic, each study with its title and what it found */
+.rank-src { display: grid; gap: 8px; margin-bottom: 16px; }
+.rank-src details { border-radius: 16px; background: var(--panel); box-shadow: var(--hi); }
+.rank-src summary { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 16px; font-weight: 700; cursor: pointer; list-style: none; }
+.rank-src summary span { flex: 1; min-width: 0; }
+.rank-src summary::-webkit-details-marker { display: none; }
+.rank-src summary small { min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center; font: 700 12px var(--ui); color: var(--ink-2); background: var(--panel-2); }
+.rank-src summary::after { content: ""; width: 8px; height: 8px; margin-inline-start: -2px; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .2s; }
+.rank-src details[open] summary::after { transform: rotate(-135deg); }
+.rank-src ul { list-style: none; margin: 0; padding: 0 16px 14px; display: grid; gap: 12px; }
+.rank-src li { display: grid; gap: 2px; font-size: 14px; }
+.rank-src li a, .rank-src li > b { font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
+.rank-src .rs-t { font-size: 12.5px; font-style: italic; color: var(--muted); }
+.rank-src .rs-n { color: var(--ink-2); line-height: 1.45; }
+.rank-src [lang="en"], .rank-src a, .rank-src-line a { unicode-bidi: plaintext; }
+.rank-src-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; font-size: 13px; color: var(--muted); }
+.rank-src-line a { color: var(--accent); }
 .rank-ex { display: grid; gap: 12px; padding: 16px; border-radius: 22px; background: var(--panel); box-shadow: var(--hi); margin: 14px 0; }
 .rank-ex-top { display: flex; align-items: center; gap: 14px; }
 .rank-ex-top > div { display: grid; gap: 2px; }

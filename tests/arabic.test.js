@@ -3,7 +3,7 @@
 const { open, report } = require('./lib');
 // words that stay as they are in Arabic: units, abbreviations (1RM shows up as RM), names of things and plans, the
 // English choice in the language setting
-const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|EOD|PHUL|PHAT|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive|OpenPowerlifting|openpowerlifting|brachialis|brachioradialis)$/;
+const KEEP = /^(kg|lb|km|mi|yd|RIR|RPE|1RM|AMRAP|EZ|TRX|PPL|PHUL|iCloud|Safari|Chrome|Android|iPhone|iPad|Lifting|Sanity|RepDB|repdb|co|Everkinetic|Greg|Priday|MIT|CC|BY|SA|Y2K|LS|OS|SYS|OK|UTC|TYO|NYC|exercises|dataset|github|com|https|www|org|Lyfta|Hevy|Strong|Smith|Wilks|IPF|EOD|PHUL|PHAT|Bro|Arnold|Push|Pull|Legs|Upper|Lower|Full|Body|Split|Power|Hypertrophy|RM|English|LCD|HUD|Drive|OpenPowerlifting|openpowerlifting|brachialis|brachioradialis)$/;
 const ENGLISH = (names) => {
   const skip = '.steps, .refs, .credits, #hud, .term, .sci-ref, a[href^="http"], input, textarea, svg, [hidden], .lang-seg, [lang="en"]';
   const out = new Set();

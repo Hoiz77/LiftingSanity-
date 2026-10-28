@@ -545,7 +545,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -5659,11 +5659,19 @@ function ranksSheet() {
           <p>${T('If you give your age, the standards follow how strength changes with age in the same records. Height and years of training aren’t used: once your bodyweight is known, height changes little, and ranks compare what you lift.')}</p>
           <p class="muted">${T('Data: OpenPowerlifting (openpowerlifting.org), public domain.')}</p>
         </div>
+        <h3 class="sub-h">${T('Sources')}</h3>
+        <p class="muted small">${T('The studies and data behind the ranks, by what they support, each with what it found.')}</p>
+        <div class="rank-src">${RK.SOURCES.map(([h, items]) => `<details><summary><span>${T(h)}</span><small>${items.length}</small></summary><ul>${items.map(([k, note]) => `<li>${rankRef(k)}<span class="rs-t" lang="en">${esc(RK.REFS[k].title)}</span><span class="rs-n">${esc(T(note))}</span></li>`).join('')}</ul></details>`).join('')}</div>
         <div class="row-btns left"><button class="btn" data-a="details">${T('Your details')}</button></div></div>`;
     },
     actions: { details: () => rankSetup() }
   });
 }
+// a source behind the ranks: a link where there's one to give
+const rankRef = k => { const r = RK.REFS[k]; return !r ? '' : r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a>` : `<b lang="en">${esc(r.cite)}</b>`; };
+// the sources behind one exercise's standard: the meet records for the big three, the studies behind its ratio, and
+// for a machine, why machines are rough; a ratio no study gives is a rule of thumb
+const rankSrcOf = b => [...new Set([...(b.conf === 'data' ? ['opl', 'vandenhoek2024'] : []), ...(b.src || []), ...(b.conf === 'rough' ? ['cotterman2005', 'haugen2023'] : [])])];
 // in an exercise's details: its rank, the ladder for your bodyweight, and how it's worked out
 function rankBlock(id) {
   if (!rankOn()) return '';
@@ -5680,6 +5688,7 @@ function rankBlock(id) {
       <small>${o ? `${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${b.per ? ' ' + perText(b) : ''} · ${esc(rankNext(o))}` : T('Log a set to get a rank.')}</small></div></div>
     <ol class="rank-ladder">${lad.map((v, i) => `<li class="${i === cur ? 'on' : ''}" style="--tc:${tierColor(i)}">${emblem(i, 'xs')}<span class="rl-n">${tierName(i)}</span><b dir="ltr">${i ? fmtW(v, 0) + '+' : '—'}</b></li>`).reverse().join('')}</ol>
     <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
+    ${(src => `<p class="rv-src rank-src-line">${src.length ? `<span class="basis study">${icon('flask')}${T('Studies')}</span>${src.map(rankRef).join('<span class="dot"> · </span>')}` : `<span class="basis rule">${T('Rule of thumb')}</span>${T('a typical ratio to the {lift}', { lift })}`}</p>`)(rankSrcOf(b))}
     ${o ? `<div class="row-btns left"><button class="btn sm" data-a="rankShare" data-id="${id}">${icon('share')}${T('Share your rank')}</button></div>` : ''}
     ${b.conf === 'rough' ? `<div class="rank-adj"><p class="small">${T('Next to free weights, this machine reads:')}</p><div class="seg" role="group">${[[-1, TC('Light', 'machine')], [0, T('Typical')], [1, T('Heavy')]].map(([v, l]) => `<button class="${rankAdj(id) === v ? 'on' : ''}" data-a="rankAdj" data-v="${v}" aria-pressed="${rankAdj(id) === v}">${l}</button>`).join('')}</div>
       <p class="muted small">${T('Heavy: it shows bigger numbers than free weights would (long levers, light stacks), so its standards go up a quarter. Light: down a fifth.')}</p></div>` : ''}
@@ -5962,6 +5971,10 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 43, items: [
+    ['flask', 'Ranks, with their sources', 'How ranks work now lists the 35 studies and datasets behind the ranks, by topic: the standards, your bodyweight, age, women and men, the 1RM estimate, other exercises and machines, each with what it found and a link.'],
+    ['trophy', 'Each rank shows its evidence', 'An exercise’s rank names the studies behind its own standard (an incline bench, the study that measured the bench at each angle), or says plainly when its ratio is a rule of thumb.']
+  ] },
   { v: 42, items: [
     ['flame', 'A bigger finish', 'Finishing a workout is a show now: spotlights sweep the stage, the medal spins in and lands with a flash, rings of light and confetti, the cards are dealt in and fireworks go off. Tap to skip ahead.'],
     ['sliders', 'Y2K, easier to read', 'The numbers a set will log are clear now, and in light mode the scores, notes, number pad and terminal read properly again.'],

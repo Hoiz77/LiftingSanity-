@@ -52,17 +52,35 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   await t.click('.rank-card .rank-row[data-id="barbell-bench-press"]', 700);
   const ladder = await p.evaluate(() => { const l = document.querySelector('.rank-ex'); return l && { rows: l.querySelectorAll('.rank-ladder li').length, on: (l.querySelector('.rank-ladder li.on .rl-n') || {}).textContent, how: l.textContent }; });
   r.ok(ladder && ladder.rows === 9 && ladder.on === 'Gold' && /competition records/.test(ladder.how), 'its details: the ladder for your bodyweight with your rank lit, and where the standard comes from', ladder);
+  const srcLine = () => p.evaluate(() => { const l = document.querySelector('#sheets .sheet-wrap.in .rank-src-line'); return l && { text: l.textContent, links: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')) }; });
+  const benchSrc = await srcLine();
+  r.ok(benchSrc && /Studies/.test(benchSrc.text) && benchSrc.links.includes('https://www.openpowerlifting.org') && benchSrc.links.includes('https://doi.org/10.1016/j.jsams.2024.07.005'), 'and its sources: the meet records and the normative study built from them, as links', benchSrc);
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
+  // an exercise whose ratio a study measured, and one that's a rule of thumb
+  const incline = await t.ev(`(LIB.find(e => (rankBasis(e.id).src || []).includes('rodriguez2020') && /incline/i.test(e.name)) || {}).id`);
+  await t.ev(`exerciseSheet(${JSON.stringify(incline)})`); await p.waitForTimeout(600);
+  const incSrc = await srcLine();
+  r.ok(incline && incSrc && incSrc.links.includes('https://doi.org/10.3390/ijerph17197339'), 'an incline bench names the study that measured the bench press at each incline', { incline, incSrc });
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
+  const rule = await t.ev(`(LIB.find(e => { const b = rankBasis(e.id); return !b.why && b.conf === 'est' && !b.src && /curl/i.test(e.name); }) || {}).id`);
+  await t.ev(`exerciseSheet(${JSON.stringify(rule)})`); await p.waitForTimeout(600);
+  const ruleSrc = await srcLine();
+  r.ok(rule && ruleSrc && /Rule of thumb/.test(ruleSrc.text) && !ruleSrc.links.length, 'a ratio no study gives says it’s a rule of thumb', { rule, ruleSrc });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
   // a machine: rough, and you can say how it reads
   await t.ev(`exerciseSheet('lever-seated-fly')`); await p.waitForTimeout(600);
   const before = await t.ev(`rankTable().find(o => o.id === 'lever-seated-fly').lad[3]`);
   r.ok(/Rough/.test(await t.text('#sheets .sheet-wrap.in .rank-ex')) && await p.evaluate(() => !!document.querySelector('.rank-adj')), 'a machine’s rank is marked rough, and asks how the machine reads');
+  const machSrc = await srcLine();
+  r.ok(machSrc && machSrc.links.includes('https://doi.org/10.1519/14433.1') && machSrc.links.includes('https://doi.org/10.1186/s13102-023-00713-4'), 'and names the studies on why machine numbers differ from free weights', machSrc);
   await t.inSheet('[data-a="rankAdj"][data-v="1"]', 400);
   const after = await t.ev(`rankTable().find(o => o.id === 'lever-seated-fly').lad[3]`);
   r.ok(Math.abs(after / before - 1.25) < 1e-6 && (await t.state()).exPrefs['lever-seated-fly'].rankAdj === 1, '“Heavy” raises its standards by a quarter, and is kept', { before, after });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
   await t.click('[data-a="rankAll"]', 600);
   r.ok(await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet'); return s && s.querySelectorAll('.rank-tiers > span').length === 9 && /OpenPowerlifting/.test(s.textContent) && /Rough: machines/.test(s.textContent); }), 'All your ranks: the nine ranks, your lifts by how sure they are, and how ranks work (with the data’s source)');
+  const sources = await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet .rank-src'); return s && { groups: [...s.querySelectorAll('summary span')].map(x => x.textContent), items: s.querySelectorAll('li').length, notes: [...s.querySelectorAll('li')].every(li => li.querySelector('.rs-t').textContent && li.querySelector('.rs-n').textContent), links: [...s.querySelectorAll('li a')].map(a => a.getAttribute('href')), open: s.querySelectorAll('details[open]').length }; });
+  r.ok(sources && sources.groups.join('|') === 'Where the standards come from|Your bodyweight|Age|Women and men|Your estimated 1RM|Other exercises|Machines' && sources.items >= 35 && sources.notes && sources.links.length >= 28 && sources.links.every(u => /^https:\/\//.test(u)) && !sources.open, 'and its sources: 35+ studies and datasets in seven folded topics, each with its title, what it found and a link where there is one', sources && { ...sources, links: sources.links.length });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
 
   // a rank-up while you train
