@@ -148,7 +148,10 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
 
   // milestones: the first workout ever, and the tenth
   await load({ name: 'Day 1', tplId: null, ex: [ex('x0', 'leg-press', logged('a', 100, 10, 3))] }, []);
-  await t.ev('finishWorkout()'); await p.waitForTimeout(700);
+  await t.ev('finishWorkout()');
+  // tap once the show is on screen (a busy machine takes a moment to put it there)
+  await p.waitForFunction(() => { const f = document.querySelector('.sheet-wrap.finish.in .fin[data-fresh]'); return f && f.getAnimations({ subtree: true }).some(a => a.playState === 'running'); }, null, { timeout: 4000 }).catch(() => {});
+  await p.waitForTimeout(150);
   await p.mouse.click(195, 300); await p.waitForTimeout(150);
   const skipped = await p.evaluate(() => { const f = document.querySelector('.sheet-wrap.finish.in .fin'), t = f.querySelector('.fin-title .w'), c = f.querySelector('.fin-card');
     return { word: +getComputedStyle(t).opacity, card: +getComputedStyle(c).opacity, playing: f.getAnimations({ subtree: true }).filter(a => a.playState === 'running' && isFinite(a.effect.getComputedTiming().endTime)).length }; });
