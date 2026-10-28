@@ -12,6 +12,12 @@ const { open, report } = require('./lib');
   await t.ctx.setOffline(true);
   await p.reload(); await p.waitForTimeout(900);
   r.ok(await p.evaluate(() => document.querySelectorAll('#tabs .tab').length === 5 && document.querySelector('#view').innerHTML.length > 500), 'with no signal, the app still opens');
+  const body = await p.evaluate(async () => {
+    const c = await caches.open('liftingsanity-art'), keys = (await c.keys()).map(q => new URL(q.url).pathname).filter(k => k.includes('/art/body/'));
+    const got = await fetch('art/body/female-back-dark.webp').then(q => q.ok && q.headers.get('content-type')).catch(() => null);
+    return { n: keys.length, got };
+  });
+  r.ok(body.n === 8 && /webp/.test(body.got), 'the body pictures are saved on the device too (both builds, front and back, light and dark), so muscle maps show with no signal', body);
   await t.tab('library'); await p.fill('#libQ', 'barbell curl'); await p.waitForTimeout(400); await t.click('#libList .ex-row', 900);
   r.ok(await p.evaluate(() => document.querySelectorAll('.sheet-wrap.in .steps li').length) > 0, 'with no signal, how-to steps still open');
   await p.keyboard.press('Escape'); await p.waitForTimeout(500);

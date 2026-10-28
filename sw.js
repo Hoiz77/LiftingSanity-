@@ -1,14 +1,21 @@
 /* Lifting Sanity offline helper: keeps the app on the device so it opens at the gym without signal.
    Your workouts live in the app's own storage, not in this cache. */
-const CACHE = 'liftingsanity-v40';
+const CACHE = 'liftingsanity-v41';
 // exercise illustrations and fonts live in their own caches so app updates don't throw them away
 const ART = 'liftingsanity-art';
 const FONTS = 'liftingsanity-fonts';
-const SHELL = ['./', 'index.html', 'i18n.js', 'ar.js', 'ar-names.js', 'app.js', 'exercises.js', 'library-extra.js', 'visuals.js', 'science.js', 'ranks.js', 'y2k.css', 'steps.json', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const SHELL = ['./', 'index.html', 'i18n.js', 'ar.js', 'ar-names.js', 'app.js', 'exercises.js', 'library-extra.js', 'visuals.js', 'science.js', 'ranks.js', 'body.js', 'y2k.css', 'steps.json', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+
+// the body in the muscle pictures: kept with the illustrations, fetched once and then only when missing
+const BODY = ['male', 'female'].flatMap(s => ['front', 'back'].flatMap(v => ['dark', 'light'].map(m => `art/body/${s}-${v}-${m}.webp`)));
 
 self.addEventListener('install', e => {
   // straight from the server, not the browser's own cache: a new version must never be saved with old files mixed in
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil(Promise.all([
+    caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))),
+    // a picture that can't be fetched now is fetched when it's first shown: it never holds up an update
+    caches.open(ART).then(c => Promise.all(BODY.map(u => c.match(u).then(m => m || c.add(u)).catch(() => {}))))
+  ]).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

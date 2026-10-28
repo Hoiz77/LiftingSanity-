@@ -114,7 +114,7 @@ p { margin: 0; }
 .link { color: var(--accent); font-weight: 600; }
 
 /* exercise pictures: a light tile in both themes, like a printed exercise card */
-.thumb { --fig: #dde2e8; --fig-m: #c6ccd5; --hit: #ff3b30; --hit-2: #ffa29c; display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: #f4f5f7; overflow: hidden; }
+.thumb { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: radial-gradient(120% 100% at 50% 30%, #FFFFFF, #F1F2F5 55%, #E3E6EB); overflow: hidden; }
 .thumb svg { width: 100%; height: 100%; display: block; }
 .thumb.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb.art { position: relative; background: #d7f0fc; }
@@ -355,6 +355,7 @@ body.has-mini #view { padding-bottom: calc(var(--tabbar) + 120px + env(safe-area
 .upnext.resting h3 { color: var(--ink-2); }
 .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 118px; background: #d7f0fc; }
 .strip .thumb { width: 100%; height: 100%; border-radius: 0; }
+.strip .thumb:not(.art):not(.photo) { padding: 4px 2px 0; background: radial-gradient(120% 100% at 50% 30%, #FFFFFF, #F1F2F5 55%, #E3E6EB); }
 .strip .thumb.art img { transform: scale(1.3); transform-origin: 50% 52%; }
 .upnext.resting .strip { filter: saturate(.35) brightness(.85); }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-2); font-size: 14px; }
@@ -568,7 +569,7 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .exc-hero .arr { width: 22px; height: 22px; margin: 0 -8px; color: #5d8aa3; stroke-width: 2.6; flex-shrink: 0; z-index: 1; }
 .exc-hero.photo { background: var(--panel-2); }
 .exc-hero img.own { width: 100%; aspect-ratio: auto; }
-.exc-hero.maps { --fig: #dde2e8; --fig-m: #c6ccd5; --hit: #ff3b30; --hit-2: #ffa29c; background: #f4f5f7; }
+.exc-hero.maps { background: radial-gradient(90% 120% at 50% 20%, #FFFFFF, #F1F2F5 55%, #E1E4EA); }
 .hero-maps { display: flex; gap: 18px; height: 100%; padding: 12px 0; }
 .hero-maps svg { height: 100%; width: auto; }
 .hero-note { position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 12px; background: rgba(255, 255, 255, .88); color: #26495d; font: 600 12px/1.3 var(--ui); text-align: start; }
@@ -974,14 +975,14 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .exd-art.still { display: flex; }
 .exd-art.still img { position: static; width: 50%; height: 100%; }
 .exd-photo { width: min(240px, 100%); aspect-ratio: 1; object-fit: cover; border-radius: 22px; background: var(--panel-2); }
-.exd-map { --fig: #dde2e8; --fig-m: #c6ccd5; --hit: #ff3b30; --hit-2: #ffa29c; flex: 1 1 240px; display: flex; justify-content: center; gap: 12px; padding: 14px 16px; border-radius: 22px; background: #f4f5f7; }
+.exd-map { flex: 1 1 240px; display: flex; justify-content: center; gap: 12px; padding: 14px 16px; border-radius: 22px; background: radial-gradient(90% 90% at 50% 30%, #FFFFFF, #F1F2F5 55%, #E1E4EA); }
 .exd-map figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
-.exd-map svg { width: 96px; height: 192px; }
+.exd-map svg { width: 112px; height: 215px; }
 .exd-map figcaption { font: 600 11px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: #5f6672; }
 .exd-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; font-size: 14px; color: var(--ink-2); }
 .exd-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-inline-end: 6px; vertical-align: -1px; }
-.dot.hit { background: #ff3b30; }
-.dot.hit-2 { background: #ffa29c; }
+.dot.hit { background: var(--bd-hit, #ff3b30); }
+.dot.hit-2 { background: var(--bd-hit2, #5b7cfa); }
 /* how it works: mechanics, profile, ratings, studies */
 .sci { display: grid; gap: 12px; margin: 4px 0 18px; padding: 16px; border-radius: 22px; background: var(--panel-2); }
 .sci-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -1434,7 +1435,7 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .rank-maps figcaption { font: 700 12px var(--ui); color: var(--ink-2); }
 .rank-arrow .i { width: 20px; height: 20px; color: var(--muted); }
 .rank-body { display: flex; gap: 2px; }
-.rank-body svg { width: 56px; height: 124px; }
+.rank-body svg { width: 62px; height: 119px; }
 .rank-list { display: grid; }
 .rank-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: start; width: 100%; border-top: 1px solid var(--line); }
 .rank-card .rank-row:first-child { border-top: 0; }
@@ -1487,33 +1488,62 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 #rankfx { position: fixed; inset: 0; z-index: 260; display: grid; }
 #rankfx[hidden] { display: none; }
 .rkfx { position: relative; display: grid; place-content: center; justify-items: center; gap: 4px; width: 100%; height: 100%; overflow: hidden; color: #fff; text-align: center;
-  background: radial-gradient(60% 45% at 50% 40%, color-mix(in srgb, var(--tg) 45%, #000) 0%, rgba(0, 0, 0, .88) 70%); }
-.rkfx-rays { position: absolute; left: 50%; top: 40%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax; border-radius: 50%;
-  background: repeating-conic-gradient(color-mix(in srgb, var(--tg) 38%, transparent) 0deg 5deg, transparent 5deg 20deg);
-  -webkit-mask: radial-gradient(closest-side, #000 15%, transparent 70%); mask: radial-gradient(closest-side, #000 15%, transparent 70%); }
-.rkfx-glow { position: absolute; left: 50%; top: 40%; width: 70vmin; height: 70vmin; margin: -35vmin 0 0 -35vmin; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tg) 80%, #fff), transparent); filter: blur(6px); opacity: .7; }
-.rkfx .rkfx-emb { position: relative; width: min(46vw, 210px); height: min(51vw, 233px); margin-bottom: 8px; filter: drop-shadow(0 12px 30px rgba(0, 0, 0, .5)); }
-.rkfx-kick { position: relative; font: 800 14px var(--ui); letter-spacing: .3em; text-transform: uppercase; color: var(--t0); }
-.rkfx-tier { position: relative; font: 900 clamp(44px, 14vw, 72px)/1 var(--display); font-stretch: 112%; text-transform: uppercase;
-  background: linear-gradient(180deg, #fff 0%, var(--t0) 35%, var(--tc) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 18px color-mix(in srgb, var(--tg) 70%, transparent)); }
-.rkfx-ex { position: relative; font: 700 17px var(--ui); color: rgba(255, 255, 255, .9); }
-.rkfx-from { position: relative; display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .1); font: 700 13px var(--ui); color: rgba(255, 255, 255, .85); }
+  background: radial-gradient(65% 48% at 50% 38%, color-mix(in srgb, var(--tg) 50%, #000) 0%, color-mix(in srgb, var(--t2) 30%, #000) 45%, rgba(0, 0, 0, .92) 78%); }
+/* light: two sets of rays turning against each other, and a glow that breathes */
+.rkfx-rays { position: absolute; left: 50%; top: 38%; width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax; border-radius: 50%;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--tg) 42%, transparent) 0deg 4deg, transparent 4deg 18deg);
+  -webkit-mask: radial-gradient(closest-side, #000 12%, transparent 68%); mask: radial-gradient(closest-side, #000 12%, transparent 68%); }
+.rkfx-rays.r2 { background: repeating-conic-gradient(color-mix(in srgb, var(--t0) 30%, transparent) 0deg 2deg, transparent 2deg 26deg); opacity: .7; }
+.rkfx-glow { position: absolute; left: 50%; top: 38%; width: 76vmin; height: 76vmin; margin: -38vmin 0 0 -38vmin; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tg) 82%, #fff), color-mix(in srgb, var(--tg) 30%, transparent) 55%, transparent); filter: blur(8px); opacity: .75; }
+/* the emblems: the old one breaks, the new one lands; rings of light run out from where it lands */
+.rkfx-stage { position: relative; display: grid; place-items: center; width: min(50vw, 230px); height: min(55vw, 254px); margin-bottom: 10px; }
+.rkfx-stage > * { grid-area: 1 / 1; }
+.rkfx-old { width: 52%; height: 52%; display: grid; opacity: 0; }
+.rkfx-old .rank-e, .rkfx-new .rank-e { width: 100%; height: 100%; }
+.rkfx-new { width: 100%; height: 100%; display: grid; filter: drop-shadow(0 14px 34px rgba(0, 0, 0, .55)) drop-shadow(0 0 22px color-mix(in srgb, var(--tg) 60%, transparent)); }
+.rkfx-ring { width: 70%; aspect-ratio: 1; border-radius: 50%; border: 3px solid var(--t0); box-shadow: 0 0 18px var(--tg), inset 0 0 18px var(--tg); opacity: 0; }
+.rkfx-ring.r2 { border-width: 2px; border-color: #fff; }
+.rkfx-sparks { width: 0; height: 0; place-self: center; }
+.rkfx-sparks i { position: absolute; left: 0; top: 0; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px 2px var(--tg), 0 0 2px #fff; opacity: 0; transform: scale(var(--s)); }
+.rkfx-kick { position: relative; font: 800 14px var(--ui); letter-spacing: .32em; text-transform: uppercase; color: var(--t0); text-shadow: 0 0 14px color-mix(in srgb, var(--tg) 70%, transparent); }
+/* the rank's name in its metal, with a glint running across it */
+.rkfx-tier { position: relative; font: 900 clamp(46px, 15vw, 76px)/1 var(--display); font-stretch: 112%; text-transform: uppercase; padding: 0 .08em;
+  background-image: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, .95) 50%, transparent 60%), linear-gradient(180deg, #fff 0%, var(--t0) 32%, var(--tc) 72%, var(--t2) 100%);
+  background-size: 250% 100%, 100% 100%; background-position: 130% 0, 0 0; background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 20px color-mix(in srgb, var(--tg) 75%, transparent)); }
+.rkfx-ex { position: relative; font: 700 17px var(--ui); color: rgba(255, 255, 255, .92); }
+.rkfx-from { position: relative; display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); font: 700 13px var(--ui); color: rgba(255, 255, 255, .85); }
 .rkfx-from .i { width: 16px; height: 16px; }
-#rankfx.in .rkfx { animation: rkIn .35s ease-out both; }
-#rankfx.in .rkfx-emb { animation: rkEmb .9s cubic-bezier(.2, 1.6, .4, 1) both; }
-#rankfx.in .rkfx-rays { animation: rkRays 1.2s ease-out both, spin 9s linear infinite; }
-#rankfx.in .rkfx-glow { animation: rkGlow 1.1s ease-out both; }
-#rankfx.in .rkfx-kick { animation: rkUp .5s .45s ease-out both; }
-#rankfx.in .rkfx-tier { animation: rkTier .7s .55s cubic-bezier(.2, 1.5, .4, 1) both; }
-#rankfx.in .rkfx-ex, #rankfx.in .rkfx-from { animation: rkUp .5s .8s ease-out both; }
+.emb-shine { transform: translateX(-70px) skewX(-18deg); }
+#rankfx.in .rkfx { animation: rkIn .3s ease-out both; }
+#rankfx.in .rkfx-old { animation: rkOld .5s ease-in both; }
+#rankfx.in .rkfx-new { animation: rkEmb .85s .38s cubic-bezier(.2, 1.55, .4, 1) both; }
+#rankfx.in .rkfx-ring { animation: rkRing .9s .48s cubic-bezier(.1, .7, .3, 1) both; }
+#rankfx.in .rkfx-ring.r2 { animation: rkRing 1.1s .58s cubic-bezier(.1, .7, .3, 1) both; }
+#rankfx.in .rkfx-sparks i { animation: rkSpark 1.3s calc(.45s + var(--d) * .3) cubic-bezier(.15, .6, .35, 1) both; }
+#rankfx.in .rkfx-rays { animation: rkRays 1.2s .3s ease-out both, spin 12s linear infinite; }
+#rankfx.in .rkfx-rays.r2 { animation: rkRays 1.2s .4s ease-out both, spin 18s linear infinite reverse; }
+#rankfx.in .rkfx-glow { animation: rkGlow 1.2s .35s ease-out both, rkBreathe 2.4s 1.6s ease-in-out infinite; }
+#rankfx.in .emb-shine { animation: embShine 1s .95s ease-in-out both; }
+#rankfx.in .rkfx-kick { animation: rkKick .6s .7s ease-out both; }
+#rankfx.in .rkfx-tier { animation: rkTier .7s .78s cubic-bezier(.2, 1.5, .4, 1) both, rkGlint 1.4s 1.3s ease-in-out both; }
+#rankfx.in .rkfx-ex, #rankfx.in .rkfx-from { animation: rkUp .5s 1.05s ease-out both; }
 #rankfx.out .rkfx { animation: rkOut .35s ease-in both; }
 @keyframes rkIn { from { opacity: 0; } }
 @keyframes rkOut { to { opacity: 0; transform: scale(1.04); } }
-@keyframes rkEmb { 0% { opacity: 0; transform: scale(.2) rotate(-12deg); } 60% { opacity: 1; } 100% { transform: none; } }
+@keyframes rkOld { 0% { opacity: 0; transform: scale(.6); } 25% { opacity: 1; transform: scale(1); } 45% { transform: scale(.96) rotate(-4deg); } 60% { transform: scale(1.02) rotate(4deg); } 75% { opacity: 1; transform: scale(.98); filter: brightness(1); }
+  100% { opacity: 0; transform: scale(1.7); filter: brightness(3) blur(3px); } }
+@keyframes rkEmb { 0% { opacity: 0; transform: scale(1.9); filter: brightness(2.2); } 45% { opacity: 1; } 100% { transform: none; filter: none; } }
+@keyframes rkRing { 0% { opacity: .95; transform: scale(.35); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes rkSpark { 0% { opacity: 0; transform: translate(0, 0) scale(var(--s)); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), calc(var(--y) - 60px)) scale(calc(var(--s) * .3)); } }
 @keyframes rkRays { from { opacity: 0; transform: scale(.3); } }
-@keyframes rkGlow { 0% { opacity: 0; transform: scale(.2); } 40% { opacity: 1; transform: scale(1.3); } 100% { opacity: .7; transform: none; } }
+@keyframes rkGlow { 0% { opacity: 0; transform: scale(.2); } 40% { opacity: 1; transform: scale(1.35); } 100% { opacity: .75; transform: none; } }
+@keyframes rkBreathe { 50% { opacity: .95; transform: scale(1.08); } }
+@keyframes embShine { from { transform: translateX(-70px) skewX(-18deg); } to { transform: translateX(170px) skewX(-18deg); } }
+@keyframes rkKick { from { opacity: 0; letter-spacing: .9em; } }
 @keyframes rkUp { from { opacity: 0; transform: translateY(14px); } }
 @keyframes rkTier { from { opacity: 0; transform: scale(1.6); letter-spacing: .3em; } }
+@keyframes rkGlint { from { background-position: 130% 0, 0 0; } to { background-position: -30% 0, 0 0; } }
 .cslot { padding: 14px 0; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
 .cslot-h { display: flex; align-items: center; gap: 12px; }
 .cslot-h > div { flex: 1; display: grid; gap: 1px; min-width: 0; }
@@ -1680,6 +1710,7 @@ body.kp-open #toast { bottom: calc(300px + env(safe-area-inset-bottom, 0px)) !im
 <script src="visuals.js"></script>
 <script src="science.js"></script>
 <script src="ranks.js"></script>
+<script src="body.js"></script>
 <script src="ar.js"></script>
 <script src="ar-names.js"></script>
 <script src="app.js"></script>

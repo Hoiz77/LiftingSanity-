@@ -181,8 +181,8 @@
 [data-style="y2k"] :is(.thumb.art, .exc-hero.art, .exd-art, .strip) { background: linear-gradient(180deg, color-mix(in srgb, var(--cobalt) 86%, #fff), var(--cobalt) 60%, color-mix(in srgb, var(--cobalt) 78%, #000)) !important; }
 [data-style="y2k"] :is(.thumb.art, .exc-hero.art, .exd-art, .strip) img { filter: grayscale(1) contrast(1.35) brightness(1.2); mix-blend-mode: multiply; }
 [data-style="y2k"] :is(.thumb.art.ek, .exc-hero.ek, .exd-art.ek) img { filter: invert(1) grayscale(1) contrast(1.4); mix-blend-mode: screen; }
-[data-style="y2k"] .thumb:not(.art) { background: var(--track); --fig: var(--y-fig); --fig-m: var(--y-fig-m); --hit: var(--magenta); --hit-2: color-mix(in srgb, var(--magenta) 60%, #000); }
-[data-style="y2k"] .exc-hero.maps, [data-style="y2k"] .exd-map { background: var(--track); --fig: var(--y-fig); --fig-m: var(--y-fig-m); --hit: var(--magenta); --hit-2: color-mix(in srgb, var(--magenta) 60%, #000); }
+[data-style="y2k"] .thumb:not(.art), [data-style="y2k"] .strip .thumb:not(.art):not(.photo) { background: radial-gradient(120% 100% at 50% 30%, color-mix(in srgb, var(--track) 70%, var(--cobalt)), var(--track) 70%); }
+[data-style="y2k"] .exc-hero.maps, [data-style="y2k"] .exd-map { background: radial-gradient(90% 110% at 50% 25%, color-mix(in srgb, var(--track) 70%, var(--cobalt)), var(--track) 70%); }
 [data-style="y2k"] .exc-hero::after { content: attr(data-callout); position: absolute; left: 10px; top: 12px; padding: 3px 7px; border: 1px solid var(--cyan); background: rgba(2, 4, 20, .85); color: var(--cyan); font: 400 15px/1 var(--lcd); letter-spacing: .04em; box-shadow: 18px 14px 0 -17px var(--cyan); }
 [data-style="y2k"] .exc-hero .hero-tag, [data-style="y2k"] .exc-hero .hero-note { background: var(--well); color: var(--cyan); border: 1px solid var(--cyan); font: 400 15px var(--lcd); }
 

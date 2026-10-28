@@ -255,64 +255,93 @@ const icon = (n, cls = '') => `<svg class="i i-${n} ${THICK.has(n) ? 'thick ' : 
 
 /* ============================== Exercise pictures ============================== */
 
-// A plain body, front and back, on a 100 × 200 grid. Every exercise gets its working muscles
-// painted on it (main muscle red, helpers light red). Shapes for one side are mirrored to the other.
-const FIG_BODY = `<ellipse cx="50" cy="15" rx="9" ry="11"/><rect x="45" y="23" width="10" height="10" rx="3"/>
-<path d="M33 33Q50 29 67 33L71 44Q68 72 64 100L63 112Q50 117 37 112L36 100Q32 72 29 44Z"/>`;
-const FIG_LIMBS = `<path d="M31 35Q22 37 20.5 50L18.5 78Q22 82 26 79L30 54Z"/><path d="M18.5 78L14.5 108Q18 112 21 109L26.5 80Z"/><ellipse cx="16.5" cy="115" rx="4" ry="6"/>
-<path d="M37 108Q33.5 130 36.5 152L47 152Q50 130 50 112Z"/><path d="M37.5 152Q35.5 172 38.5 188L45 188Q48 170 47 152Z"/><ellipse cx="42" cy="192" rx="6" ry="3"/>`;
-const MIRROR = 'matrix(-1 0 0 1 100 0)';
-const FIG_FRONT = [
-  ['traps', '<path d="M45 30L36 35L45 36Z"/>', 1],
-  ['neck', '<rect x="46.5" y="24" width="7" height="8" rx="2"/>', 0],
-  ['frontdelts', '<ellipse cx="32" cy="41" rx="5.5" ry="6.5"/>', 1],
-  ['sidedelts', '<ellipse cx="26.5" cy="43.5" rx="3.6" ry="6.5"/>', 1],
-  ['chest', '<path d="M49.5 38Q40 35.5 34.5 41.5Q33 52 38.5 57Q45 60.5 49.5 57.5Z"/>', 1],
-  ['biceps', '<ellipse cx="25.3" cy="61" rx="4" ry="10.5" transform="rotate(7 25.3 61)"/>', 1],
-  ['forearms', '<ellipse cx="20.8" cy="93" rx="3.7" ry="12" transform="rotate(8 20.8 93)"/>', 1],
-  ['abs', '<rect x="44" y="61" width="12" height="38" rx="4"/>', 0],
-  ['obliques', '<path d="M37.5 62Q35.5 80 39 98L43 98L43 63Z"/>', 1],
-  ['abductors', '<ellipse cx="37" cy="111" rx="2.6" ry="6"/>', 1],
-  ['quads', '<ellipse cx="42.5" cy="132" rx="5.5" ry="17"/>', 1],
-  ['adductors', '<ellipse cx="48" cy="124" rx="2.2" ry="9"/>', 1],
-  ['calves', '<ellipse cx="41.6" cy="168" rx="3.2" ry="12"/>', 1]
-];
-const FIG_BACK = [
-  ['neck', '<rect x="46.5" y="24" width="7" height="8" rx="2"/>', 0],
-  ['traps', '<path d="M50 27L36 36Q44 41 50 64Q56 41 64 36Z"/>', 0],
-  ['reardelts', '<ellipse cx="32" cy="41" rx="5.5" ry="6.5"/>', 1],
-  ['sidedelts', '<ellipse cx="26.5" cy="43.5" rx="3.6" ry="6.5"/>', 1],
-  ['upperback', '<ellipse cx="40.5" cy="49" rx="5" ry="5"/>', 1],
-  ['lats', '<path d="M34 52Q33 70 41 88Q46 80 47.5 70Q44 58 34 52Z"/>', 1],
-  ['lowerback', '<ellipse cx="46.5" cy="94" rx="2.8" ry="10"/>', 1],
-  ['triceps', '<ellipse cx="25.3" cy="61" rx="4" ry="10.5" transform="rotate(7 25.3 61)"/>', 1],
-  ['forearms', '<ellipse cx="20.8" cy="93" rx="3.7" ry="12" transform="rotate(8 20.8 93)"/>', 1],
-  ['abductors', '<ellipse cx="37.5" cy="108.5" rx="3.6" ry="4.6"/>', 1],
-  ['glutes', '<ellipse cx="43.5" cy="118" rx="7" ry="8"/>', 1],
-  ['hamstrings', '<ellipse cx="43" cy="138" rx="5.5" ry="13"/>', 1],
-  ['adductors', '<ellipse cx="48.2" cy="131" rx="1.8" ry="8"/>', 1],
-  ['calves', '<ellipse cx="42" cy="166" rx="4.6" ry="10"/>', 1]
-];
-const figGroup = list => list.map(([m, d, mir]) => `<g style="fill:var(--m-${m},var(--fig-m))">${d}${mir ? `<g transform="${MIRROR}">${d}</g>` : ''}</g>`).join('');
-// drawn once; every picture reuses it, coloured through CSS variables
-const FIG_SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
-<g id="fig-body" style="fill:var(--fig)">${FIG_BODY}${FIG_LIMBS}<g transform="${MIRROR}">${FIG_LIMBS}</g></g>
-<g id="fig-front"><use href="#fig-body"/>${figGroup(FIG_FRONT)}</g>
-<g id="fig-back"><use href="#fig-body"/>${figGroup(FIG_BACK)}</g></defs></svg>`;
+// The body in every muscle picture is a shaded anatomy render, front and back, with a man's or a woman's build (body.js
+// says where it's from). Each muscle has an outline on it. A muscle is painted by showing the render through its outline
+// with a colour filter, so its own shading, its fibres and the lines between muscles still show through the colour.
+const BD = window.LS_BODY;
+const BD_BOX = `0 0 ${BD.w} ${BD.h}`;
+const figSex = () => state.settings.figure || (state.body && state.body.sex === 'F' ? 'female' : 'male');
+const bodyImg = (view, src, sex = figSex()) => `art/body/${sex}-${view}-${src}.webp`;
+// each render's middle grey: the dark render is for dark backgrounds, the light one for light
+const BD_MID = { dark: 0.46, light: 0.62 };
+// a colour filter that lays colours over the render's dark to light: stops are [0…1, '#hex']
+const LUM = '0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0 0 0 1 0';
+function rampFilter(id, stops) {
+  const ch = [[], [], []], S = stops.map(([t, c]) => [t, hexRgb(c)]);
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    let k = 1;
+    while (k < S.length - 1 && t > S[k][0]) k++;
+    const [t0, a] = S[k - 1], [t1, b] = S[k], f = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+    for (let j = 0; j < 3; j++) ch[j].push(+((a[j] + (b[j] - a[j]) * f) / 255).toFixed(3));
+  }
+  return `<filter id="${id}" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feColorMatrix values="${LUM}"/><feComponentTransfer>${['R', 'G', 'B'].map((n, j) => `<feFunc${n} type="table" tableValues="${ch[j].join(' ')}"/>`).join('')}</feComponentTransfer></filter>`;
+}
+// a muscle in one colour: deep in the lines between muscles, the colour itself in the middle, near white where it catches the light
+const hitRamp = (c, src) => [[0, mixHex(c, '#000000', 0.86)], [BD_MID[src], c], [1, mixHex(c, '#FFFFFF', 0.72)]];
+// a muscle plated in a rank's metal (its light, middle and dark shades)
+const metalRamp = (t, src) => [[0, mixHex(t.c[2], '#000000', 0.6)], [BD_MID[src] * 0.55, t.c[2]], [BD_MID[src], t.c[1]], [Math.min(0.92, BD_MID[src] + 0.24), t.c[0]], [1, '#FFFFFF']];
+// a muscle's outline, softened: the colour fades out at its edges instead of stopping at a hard line
+const softFilter = (id, sd) => `<filter id="${id}" filterUnits="userSpaceOnUse" x="-40" y="-40" width="${BD.w + 80}" height="${BD.h + 80}"><feGaussianBlur stdDeviation="${sd}"/></filter>`;
+const softMask = (id, inner, f) => `<mask id="${id}" maskUnits="userSpaceOnUse" x="-40" y="-40" width="${BD.w + 80}" height="${BD.h + 80}"><g fill="#FFFFFF" filter="url(#${f})">${inner}</g></mask>`;
+// a soft glow in the painted muscles' own colour, for the bigger pictures
+const glowFilter = (id, sd = 9) => `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sd}" result="b"/><feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .7 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+// how the pictures look: Clean shows the light render on a light tile, the main muscle red and the helpers blue; Y2K the
+// dark one, tinted navy, on navy, with its two neons
+let figLookNow = null;
+function figLook() {
+  if (styleNow() !== 'y2k') return { src: 'light', base: null, hit: '#FF3B30', hit2: '#5B7CFA' };
+  const tk = tokens('y2k', userPal('y2k'), 'dark');
+  return { src: 'dark', base: [[0, tk['--well']], [BD_MID.dark, tk['--y-fig-m']], [1, mixHex(tk['--cobalt'], '#FFFFFF', 0.5)]], hit: tk['--magenta'], hit2: tk['--cyan'] };
+}
+// drawn once and shared by every picture: the two renders, every muscle's outline and the colour filters. Built again when
+// the colours, the style or the build change, and every picture on screen follows at once
+function bodySprite() {
+  const L = figLookNow = figLook(), sex = figSex();
+  let el = $('#bd-sprite');
+  if (!el) { document.body.insertAdjacentHTML('afterbegin', '<svg id="bd-sprite" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"></svg>'); el = $('#bd-sprite'); }
+  el.innerHTML = `<defs>${['front', 'back'].map(v => `<image id="bd-${v}" href="${bodyImg(v, L.src, sex)}" width="${BD.w}" height="${BD.h}"/>${Object.entries(BD[sex][v]).map(([k, d]) => `<path id="bm-${v}-${k}" d="${d}"/>`).join('')}`).join('')}
+    ${rampFilter('bd-base', L.base || [[0, '#000000'], [1, '#FFFFFF']])}${rampFilter('bd-hit', hitRamp(L.hit, L.src))}${rampFilter('bd-hit2', hitRamp(L.hit2, L.src))}${glowFilter('bd-glow')}${softFilter('bd-soft', 4)}
+    <path id="bd-heart" d="M282 268c-15-11-28-21-28-34 0-9 7-15 15-15 6 0 10 3 13 8 3-5 7-8 13-8 8 0 15 6 15 15 0 13-13 23-28 34z"/></defs>`;
+  // the key under an exercise's pictures uses the same two colours
+  document.documentElement.style.setProperty('--bd-hit', L.hit);
+  document.documentElement.style.setProperty('--bd-hit2', L.hit2);
+}
 const BACK_VIEW = new Set(['lats', 'upperback', 'traps', 'lowerback', 'reardelts', 'triceps', 'hamstrings', 'glutes', 'calves', 'abductors']);
 const LOWER_BODY = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'adductors', 'abductors']);
-const CROPS = { upper: '6 2 88 118', lower: '14 96 72 100', full: '0 0 100 200' };
-const HEART = '<path style="fill:var(--hit)" d="M50 50c-3-4-9-3-9 2 0 4 5 7 9 10 4-3 9-6 9-10 0-5-6-6-9-2z"/>';
-function figVars(ex) {
-  const v = [];
+// what a small square picture shows, for each build: the shoulders to the waist, the middle (core and lower back), the hips
+// (glutes), the legs, the shins and feet, or all of it
+const CROPS = {
+  male: { upper: '31 8 451 451', mid: '31 150 451 451', hips: '31 330 451 451', lower: '31 430 451 451', shins: '31 545 451 451', full: BD_BOX },
+  female: { upper: '61 36 391 391', mid: '61 170 391 391', hips: '61 340 391 391', lower: '61 440 391 391', shins: '61 590 391 391', full: BD_BOX }
+};
+// the main muscle, and the helpers (a full-body or cardio exercise lights up what it works most)
+function figMuscles(ex) {
   const helpers = ex.m === 'fullbody' ? ['chest', 'quads', 'abs', 'frontdelts', 'lats', 'glutes', 'hamstrings', 'upperback', ...ex.sec]
     : ex.m === 'cardio' ? ['quads', 'calves', 'hamstrings', 'glutes', ...ex.sec] : ex.sec;
-  for (const m of helpers) if (m !== ex.m) v.push(`--m-${m}:var(--hit-2)`);
-  v.push(`--m-${ex.m}:var(--hit)`);
-  return v.join(';');
+  return { main: [ex.m], help: [...new Set(helpers)].filter(m => m !== ex.m) };
 }
-function figure(view, ex, crop) {
-  return `<svg viewBox="${CROPS[crop]}" style="${figVars(ex)}" aria-hidden="true"><use href="#fig-${view}"/>${ex.m === 'cardio' && view === 'front' ? HEART : ''}</svg>`;
+let figN = 0;
+// the soft-edged masks the pictures paint through, one per view and set of muscles, made the first time they're needed and
+// shared by every picture (they draw whichever build is chosen, as they point at the outlines in the shared drawing)
+const bodyMasks = new Set();
+function bodyMask(view, keys) {
+  const id = `bdm-${view}-${keys.join('-')}`;
+  if (!bodyMasks.has(id)) {
+    let el = $('#bd-masks');
+    if (!el) { document.body.insertAdjacentHTML('afterbegin', '<svg id="bd-masks" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs></defs></svg>'); el = $('#bd-masks'); }
+    el.firstChild.insertAdjacentHTML('beforeend', softMask(id, keys.map(k => `<use href="#bm-${view}-${k}"/>`).join(''), 'bd-soft'));
+    bodyMasks.add(id);
+  }
+  return id;
+}
+// one view of the body with an exercise's muscles: the main one in full colour, the helpers in the second colour; big ones glow
+function figure(view, ex, crop, big) {
+  const { main, help } = figMuscles(ex), P = BD[figSex()][view];
+  const mk = main.filter(k => P[k]), hk = help.filter(k => P[k]);
+  const layer = (keys, two) => `<g mask="url(#${bodyMask(view, keys)})"${two ? ' opacity=".85"' : ''}><use href="#bd-${view}" filter="url(#${two ? 'bd-hit2' : 'bd-hit'})"/></g>`;
+  const heart = ex.m === 'cardio' && view === 'front' ? `<use href="#bd-heart" fill="${(figLookNow || figLook()).hit}"${big ? ' filter="url(#bd-glow)"' : ''}/>` : '';
+  return `<svg viewBox="${CROPS[figSex()][crop]}" aria-hidden="true"><use href="#bd-${view}"${styleNow() === 'y2k' ? ' filter="url(#bd-base)"' : ''}/>${hk.length ? layer(hk, true) : ''}${mk.length ? (big ? `<g filter="url(#bd-glow)">${layer(mk)}</g>` : layer(mk)) : ''}${heart}</svg>`;
 }
 /* ----- exercise illustrations: RepDB free tier (repdb.co), loaded from RepDB's own published copy ----- */
 const VIS = window.LS_VISUALS || { base: '', map: {} };
@@ -433,10 +462,11 @@ function thumb(exId, size = '') {
   if (art) return `<span class="thumb ${size} art${artKind(exId)}${mv ? ' moving' : ''}"${mv ? ' data-mv="pic"' : ''}>${mv ? artFrames(exId, art, '') : `<img src="${art[art.length - 1]}" alt="" loading="lazy" decoding="async" data-art="${esc(exId)}">`}</span>`;
   return mapThumb(exId, size);
 }
+const CROP_OF = { fullbody: 'full', cardio: 'full', mobility: 'full', abs: 'mid', obliques: 'mid', lowerback: 'mid', glutes: 'hips', abductors: 'hips', calves: 'shins' };
+const thumbCrop = ex => CROP_OF[ex.m] || (LOWER_BODY.has(ex.m) ? 'lower' : 'upper');
 function mapThumb(exId, size = '') {
   const ex = getEx(exId);
-  const crop = ex.m === 'fullbody' || ex.m === 'cardio' || ex.m === 'mobility' ? 'full' : LOWER_BODY.has(ex.m) ? 'lower' : 'upper';
-  return `<span class="thumb ${size}">${figure(BACK_VIEW.has(ex.m) ? 'back' : 'front', ex, crop)}</span>`;
+  return `<span class="thumb ${size}">${figure(BACK_VIEW.has(ex.m) ? 'back' : 'front', ex, thumbCrop(ex))}</span>`;
 }
 
 /* ----- your own photos live in IndexedDB so they don't crowd the main save ----- */
@@ -512,7 +542,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -544,6 +574,7 @@ function migrate(s) {
   s.settings = Object.assign(d.settings, typeof s.settings === 'object' ? s.settings : {});
   s.settings.colors = cleanPal(s.settings.colors);
   s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
+  if (s.settings.figure !== 'male' && s.settings.figure !== 'female') delete s.settings.figure;
   // your details for lift ranks (the guide's answers are in s.profile): kept only if they make sense
   const bd = s.body;
   s.body = bd && typeof bd === 'object' && +bd.bw >= 30 && +bd.bw <= 250 ? { sex: bd.sex === 'F' ? 'F' : 'M', bw: +bd.bw, age: +bd.age >= 10 && +bd.age <= 100 ? Math.round(+bd.age) : null, at: +bd.at || 0,
@@ -1501,6 +1532,7 @@ function applyColors() {
   }
   el.textContent = css.join('\n');
   if (styleNow() === 'y2k') numGrid();
+  bodySprite();
 }
 // the stylesheets' own colours for a style and mode (read from the stylesheets, so the preview always matches them)
 function sheetTokens(sel) {
@@ -3125,7 +3157,7 @@ function rankUpOf(w, x, s, mate) {
 let prTimer = null;
 function prParty(x, gains, up = null) {
   // a rank-up first fills the screen for a moment (not with Reduce Motion), then the banner says the rest
-  if (up && !calm() && !prParty.after) { rankTakeover(up, getEx(x.exId)); fanfare(true); hapticBurst(); prParty.after = true; setTimeout(() => { prParty(x, gains, up); prParty.after = false; }, 2250); return; }
+  if (up && !calm() && !prParty.after) { rankTakeover(up, getEx(x.exId)); fanfare(true); hapticBurst(); prParty.after = true; setTimeout(() => { prParty(x, gains, up); prParty.after = false; }, 2650); return; }
   let el = $('#prfx');
   if (!el) { el = document.createElement('div'); el.id = 'prfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
   const ex = getEx(x.exId), k = ex.k;
@@ -3245,9 +3277,11 @@ function cardCtx(k, label) {
   if (st === 'y2k') {
     const F = colorOf('frame'), A = colorOf('accent'), H = colorOf('hot'), B = dk['--bg'] || '#05060F', ink = dk['--ink'] || '#E8F0FF', tint = dk['--cobalt'] || dk['--bg'];
     c = { bg1: B, bg2: tint ? mixHex(B, F, 0.27) : '#101A57', line: F, ink, ink2: dk['--ink-2'] || '#A9B8F5', dim: dk['--muted'] || '#6C7BC7', accent: A, gold: ['#FFFFFF', A, H], good: colorOf('good'), flame: [ink, A, H], body: tint ? mixHex(B, F, 0.42) : '#2A3A8A', muscle: tint ? mixHex(B, F, 0.3) : '#1E2A6E', hot: [A, H], font: `'Courier New', ui-monospace, Menlo, monospace` };
+    c.bodyRamp = [[0, mixHex(B, '#000000', 0.5)], [BD_MID.dark, mixHex(B, F, 0.5)], [1, mixHex(F, '#FFFFFF', 0.55)]];
   } else {
     const bg = dk['--bg'];
     c = { bg1: bg || '#0A0A0E', bg2: dk['--panel'] ? mixHex(dk['--panel'], '#FFFFFF', 0.03) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: dk['--ink'] || '#F5F5F7', ink2: dk['--ink-2'] || '#A1A1AA', dim: dk['--muted'] || '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+    c.bodyRamp = [[0, '#040406'], [BD_MID.dark, '#5C5F6A'], [1, '#C8CBD3']];
   }
   return Object.assign(c, { k, label, rtl: RTL, id: `cd${++cardSeq}` });
 }
@@ -3286,41 +3320,39 @@ function cardFrame(c, inner, defs = '') {
 <defs>${grad(c.id + 'bg', [c.bg2, c.bg1])}<filter id="${c.id}blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter>${defs}</defs><rect width="${CARD_W}" height="${CARD_H}" rx="26" fill="url(#${c.id}bg)"/>${inner}
 <rect x=".75" y=".75" width="${CARD_W - 1.5}" height="${CARD_H - 1.5}" rx="25.5" fill="none" stroke="${c.line}" stroke-width="1.5"/>${ctext({ ...c, rtl: false }, 180, 432, 'LIFTING SANITY', { size: 10.5, weight: 800, fill: c.dim, ls: 3.2 })}</svg>`;
 }
-/* ----- the body on the cards: muscle shapes from react-body-highlighter (https://github.com/GV79/react-body-highlighter),
-   front and back, rounded to one decimal and keyed by region. Its licence:
-   MIT License. Copyright (c) 2020 GV79.
-   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
-   files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
-   modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice
-   shall be included in all copies or substantial portions of the Software.
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. ----- */
-const BODY = {"front":[["chest","51.8 41.6 51 55.1 58 58 67.8 55.5 70.6 47.3 62 41.6|29.8 46.5 31.4 55.5 40.8 58 48.2 55.1 47.8 42 37.6 42"],["obliques","68.6 63.3 67.3 57.1 58.8 59.6 60 64.1 60.4 83.3 65.7 78.8 66.5 69.8|33.9 78.4 33.1 71.8 31 63.3 32.2 57.1 40.8 59.2 39.2 63.3 39.2 83.7"],["abs","56.3 59.2 58 64.1 58.4 78 58.4 92.7 56.3 98.4 55.1 104.1 51.4 107.8 51 84.5 50.6 67.3 51 57.1|43.7 58.8 48.6 57.1 49 67.3 48.6 84.5 48.2 107.3 44.5 103.7 40.8 91.4 40.8 78.4 41.2 64.5"],["biceps","16.7 68.2 18 71.4 22.9 66.1 29 53.9 27.8 49.4 20.4 55.9|71.4 49.4 70.2 54.7 76.3 66.1 81.6 71.8 82.9 69 78.8 55.5"],["triceps","69.4 55.5 69.4 61.6 75.9 72.7 77.6 70.2 75.5 67.3|22.4 69.4 29.8 55.5 29.8 60.8 22.9 73.1"],["neck","55.5 23.7 50.6 33.5 50.6 39.2 61.6 40 70.6 44.9 69.4 36.7 63.3 35.1 58.4 30.6|29 44.9 30.2 37.1 36.3 35.1 41.2 30.2 44.5 24.5 49 33.9 48.6 39.2 38 39.6"],["fdelt","78.4 53.1 79.6 47.8 79.2 41.2 75.9 38 71 36.3 72.2 42.9 71.4 47.3|28.2 47.3 21.2 53.1 20 47.8 20.4 40.8 24.5 37.1 28.6 37.1 26.9 43.3"],["head","42.4 2.9 40 11.8 42 19.6 46.1 23.3 49.8 25.3 54.7 22.4 57.6 19.2 59.2 10.2 57.1 2.4 49.8 0"],["add","52.7 110.2 54.3 124.9 60 110.2 62 100 64.9 94.3 60 92.7 56.7 104.5|47.8 110.6 44.9 125.3 42 115.9 40.4 113.1 39.6 107.3 38 102.4 34.7 93.9 39.6 92.2 41.6 99.2 43.7 105.3"],["quads","34.7 98.8 37.1 108.2 37.1 127.8 34.3 137.1 31 132.7 29.4 120 28.2 111.4 29.4 100.8 32.2 94.7|63.3 105.7 64.5 100 66.9 94.7 70.2 101.2 71 111.8 68.2 133.1 65.3 137.6 62.4 128.6 62 111.4|38.8 129.4 38.4 112.2 41.2 118.4 44.5 129.4 42.9 135.1 40 146.1 36.3 146.5 35.5 140|59.6 145.7 55.5 129 60.8 113.9 61.2 130.2 64.1 139.6 62.9 146.5|32.7 138.4 26.5 145.7 25.7 136.7 25.7 127.3 26.9 114.3 29.4 133.5|71.8 113.1 73.9 124.1 73.9 140.4 72.7 145.7 66.5 138.4 70.2 133.5"],["knees","33.9 140 34.7 143.3 35.5 147.3 36.3 151 35.1 156.7 29.8 156.7 27.3 152.7 27.3 147.3 30.2 144.1|65.7 140 72.2 147.8 72.2 152.2 69.8 157.1 64.9 156.7 62.9 151"],["calves","71.4 160.4 73.5 153.5 76.7 161.2 79.6 167.8 78.4 187.8 79.6 195.5 74.7 195.5|24.9 194.7 27.8 164.9 28.2 160.4 26.1 154.3 24.9 157.6 22.4 161.6 20.8 167.8 22 188.2 20.8 195.5|72.7 195.1 69.8 159.2 65.3 158.4 64.1 162.4 64.1 165.3 65.7 177.1|35.5 158.4 35.9 162.4 35.9 166.9 35.1 172.2 35.1 176.7 32.2 182 30.6 187.3 26.9 194.7 27.3 187.8 28.2 180.4 28.6 175.5 29 169.8 29.8 164.1 30.2 158.8"],["forearms","6.1 88.6 10.2 75.1 14.7 70.2 16.3 74.3 19.2 73.5 4.5 97.6 0 100|84.5 69.8 83.3 73.5 80 73.1 95.1 98.4 100 100.4 93.5 89.4 89.8 76.3|77.6 72.2 77.6 77.6 80.4 84.1 85.3 89.8 92.2 101.2 94.7 99.6|6.9 101.2 13.5 90.6 18.8 84.1 21.6 77.1 21.2 71.8 4.9 98.8"]],"back":[["head","50.6 0 46 0.9 40.9 5.5 40.4 12.8 45.1 20 55.7 20 59.1 13.6 59.6 4.7 55.7 1.3"],["traps","44.7 21.7 47.7 21.7 47.2 38.3 47.7 64.7 38.3 53.2 35.3 40.9 31.1 36.6 39.1 33.2 43.8 27.2|52.3 21.7 55.7 21.7 56.6 27.2 60.9 32.8 68.9 36.6 64.7 40.4 61.7 53.2 52.3 64.7 53.2 38.3"],["rdelt","29.4 37 23 39.1 17.4 44.3 18.3 53.6 24.3 49.4 27.2 46.4|71.1 37 78.3 39.6 82.6 44.7 81.7 53.6 74.9 48.9 72.3 45.1"],["lats","31.1 38.7 28.1 48.9 28.5 55.3 34 75.3 47.2 71.1 47.2 66.4 36.6 54 33.6 41.3|68.9 38.7 71.9 49.4 71.5 56.2 66 75.3 52.8 71.1 52.8 66.4 63.4 54.5 66.4 41.7"],["triceps","26.8 49.8 17.9 55.7 14.5 72.3 16.6 81.7 21.7 63.8 26.8 55.7|73.6 50.2 82.1 55.7 86 73.2 83.4 82.1 77.9 63 73.2 55.7|26.8 58.3 26.8 68.5 23 75.3 19.1 77.4 22.6 65.5|72.8 58.3 77 64.7 80.4 77.4 76.6 75.3 72.8 68.9"],["lowerback","47.7 72.8 34.5 77 35.3 83.4 49.4 102.1 46.8 83|52.3 72.8 65.5 77 64.7 83.4 50.6 102.1 53.2 83.8"],["forearms","86.4 75.7 91.1 83.4 93.2 94 100 106.4 96.2 104.3 88.1 89.4 84.3 83.8|13.6 75.7 8.9 83.8 6.8 93.6 0 106.4 3.8 104.3 12.3 88.5 15.7 83|81.3 79.6 77.4 77.9 79.1 84.7 91.1 103.8 93.2 108.9 94.5 104.7|18.7 79.6 22.1 77.9 20.9 84.3 9.4 103 6.8 108.5 5.1 104.7"],["glutes","44.7 99.6 30.2 108.5 29.8 118.7 31.5 126 47.2 121.3 49.4 114.9|55.3 99.1 51.1 114.5 52.3 120.9 68.1 126 69.8 119.1 69.4 108.5"],["add","48.1 123 44.7 123 41.3 125.5 45.1 144.3 48.5 135.7 48.9 129.4|51.9 122.6 55.7 123.4 59.1 126 54.9 144.3 51.9 136.2 51.1 129.4"],["hams","28.9 122.1 31.1 129.4 36.6 126 35.3 135.3 34.5 150.2 29.4 158.3 28.9 146.8 27.7 141.3 27.2 131.5|71.5 121.7 69.4 128.9 63.8 126 65.5 136.6 66.4 150.2 71.1 158.3 71.5 147.7 72.8 142.1 73.6 131.9|38.7 125.5 44.3 146 40.4 166.8 36.2 152.8 37 135.3|61.7 125.5 63.4 136.2 64.3 153.2 60 166.8 56.2 146.4"],["knees","34.5 153.2 31.1 159.1 33.6 166.4 37.4 162.6|66.4 153.6 63 163 66.8 166.4 69.4 159.1"],["calves","29.4 160.4 28.5 167.2 24.7 179.6 23.8 192.8 25.5 197 28.5 193.2 29.8 180 31.9 171.1 31.9 166.8|37.4 165.1 35.3 167.7 33.2 171.9 31.1 180.4 30.2 191.9 34 200 38.7 190.6 39.1 168.9|63 165.1 61.3 168.5 61.7 190.6 66.4 199.6 70.6 191.9 68.9 179.6 66.8 170.2|70.6 160.4 72.3 168.5 75.7 179.1 76.6 192.8 74.5 196.6 72.3 193.6 70.6 179.6 68.1 168.1"],["soleus","28.5 195.7 30.2 195.7 33.6 201.7 30.6 220 28.5 213.6 26.8 198.3"],["soleus","69.8 195.7 71.9 195.7 73.6 198.3 71.9 213.2 70.2 219.6 67.2 202.1"]]};
-// how much each region of that body shows each muscle the app knows (side delts show from the front and the back)
-const BODY_OF = { chest: [['chest', 1]], frontdelts: [['fdelt', 1]], sidedelts: [['fdelt', 0.6], ['rdelt', 0.6]], reardelts: [['rdelt', 1]], biceps: [['biceps', 1]], triceps: [['triceps', 1]],
-  forearms: [['forearms', 1]], abs: [['abs', 1]], obliques: [['obliques', 1]], neck: [['neck', 1]], traps: [['traps', 1], ['neck', 0.6]], upperback: [['traps', 0.8], ['lats', 0.4]], lats: [['lats', 1]],
-  lowerback: [['lowerback', 1]], glutes: [['glutes', 1]], abductors: [['glutes', 0.6]], adductors: [['add', 1]], quads: [['quads', 1]], hamstrings: [['hams', 1]], calves: [['calves', 1], ['soleus', 1]] };
+/* ----- the body on the cards: the same render and outlines as the app's pictures (body.js). A card is shared as a
+   picture drawn from its SVG, which can't look outside itself, so each card carries its own filters and outlines ----- */
 const FULL_BODY = ['chest', 'quads', 'abs', 'frontdelts', 'lats', 'glutes', 'hamstrings', 'upperback'];
-// how worked each region is, 0 to 1, from sets per muscle (the most-trained muscle, or 4 sets, is the top)
+// how worked each muscle is, 0 to 1, from sets per muscle (the most-trained muscle, or 4 sets, is the top)
 function bodyHeat(muscles) {
   const top = muscles.length ? Math.max(4, muscles[0][1]) : 4, h = {};
   for (const [m, n] of muscles) {
     const t = 0.3 + 0.7 * Math.min(1, n / top);
-    for (const mm of m === 'fullbody' ? FULL_BODY : [m]) for (const [r, wt] of BODY_OF[mm] || []) h[r] = Math.max(h[r] || 0, t * wt);
+    for (const mm of m === 'fullbody' ? FULL_BODY : [m]) h[mm] = Math.max(h[mm] || 0, t);
   }
   return h;
 }
-// one view of the body, h tall: the muscles worked in warm colours with a glow, the rest in grey
-function cardBody(c, view, heat, x, y, h) {
-  const parts = [], glows = [];
-  for (const [r, pts] of BODY[view]) {
-    const t = Math.min(1, heat[r] || 0), fill = t ? mixHex(c.hot[0], c.hot[1], t) : r === 'head' || r === 'knees' ? c.body : c.muscle;
-    for (const p of pts.split('|')) { parts.push(`<polygon points="${p}" fill="${fill}"/>`); if (t > 0.45) glows.push(`<polygon points="${p}" fill="${fill}"/>`); }
-  }
-  return `<svg x="${x}" y="${y}" width="${+(h * 100 / 220).toFixed(1)}" height="${h}" viewBox="0 0 100 220" overflow="visible">${glows.length ? `<g filter="url(#${c.id}blur)" opacity=".6">${glows.join('')}</g>` : ''}${parts.join('')}</svg>`;
+// one view of the body, h tall (or the part of it in box): groups of muscles, each [colour ramp, muscles, glows, how strong]
+function bodyArt(c, view, groups, x, y, h, box = BD_BOX, src = 'dark') {
+  const id = `${c.id}b${++figN}`, sex = figSex(), P = BD[sex][view], [, , bw, bh] = box.split(' ').map(Number);
+  let defs = `<image id="${id}i" data-body="1" href="${bodyImg(view, src, sex)}" width="${BD.w}" height="${BD.h}"/>${rampFilter(id + 'f', c.bodyRamp)}${softFilter(id + 's', 4.5)}`;
+  let out = `<use href="#${id}i" filter="url(#${id}f)"/>`, lit = false;
+  groups.forEach(([ramp, keys, glow, op = 1], i) => {
+    const d = keys.map(k => P[k] || '').join('');
+    if (!d) return;
+    defs += rampFilter(`${id}h${i}`, ramp) + softMask(`${id}c${i}`, `<path d="${d}"/>`, id + 's');
+    const layer = `<g mask="url(#${id}c${i})"${op < 1 ? ` opacity="${op}"` : ''}><use href="#${id}i" filter="url(#${id}h${i})"/></g>`;
+    out += glow ? `<g filter="url(#${id}g)">${layer}</g>` : layer;
+    lit ||= glow;
+  });
+  if (lit) defs += glowFilter(id + 'g', 10);
+  return `<svg class="bd" x="${x}" y="${y}" width="${+(h * bw / bh).toFixed(1)}" height="${h}" viewBox="${box}" overflow="visible" aria-hidden="true"><defs>${defs}</defs>${out}</svg>`;
+}
+// the muscles worked in warm colours, deeper for more sets; the most-worked glow
+function cardBody(c, view, heat, x, y, h, box) {
+  const lv = [[], [], [], []];
+  for (const [k, t] of Object.entries(heat)) lv[t < 0.45 ? 0 : t < 0.65 ? 1 : t < 0.85 ? 2 : 3].push(k);
+  return bodyArt(c, view, lv.map((keys, i) => [hitRamp(mixHex(c.hot[0], c.hot[1], [0.2, 0.45, 0.75, 1][i]), 'dark'), keys, i >= 2, [0.45, 0.62, 0.82, 1][i]]), x, y, h, box);
 }
 function cardWorkout(st) {
   const c = cardCtx('workout', T('The workout')), { w } = st, unitTxt = ' ' + U();
@@ -3344,7 +3376,7 @@ function cardWorkout(st) {
   });
   // the muscles worked, front and back
   const heat = bodyHeat(st.muscles);
-  h += cardBody(c, 'front', heat, 100, 250, 154) + cardBody(c, 'back', heat, 190, 250, 154);
+  h += cardBody(c, 'front', heat, 96, 250, 154) + cardBody(c, 'back', heat, 184, 250, 154);
   if (st.muscles.length) h += ctext(c, 180, 414, st.muscles.slice(0, 3).map(([m, n]) => `${MUSCLES[m]} ${trimNum(n, 1)}`).join(' · '), { size: 11, weight: 600, fill: c.ink2, max: 312 });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h) };
 }
@@ -3448,7 +3480,7 @@ function cardExercises(st) {
     defs += `<clipPath id="${clip}"><rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="14"/></clipPath>`;
     h += `<g clip-path="url(#${clip})"><rect x="${tx}" y="${ty}" width="${tw}" height="${th}" fill="${c.bg2}"/><rect x="${tx}" y="${ty}" width="${tw}" height="${ph}" fill="${pic ? '#EEF1F6' : c.bg1}"/>`;
     // the drawing's stand-in (the body with this exercise's muscles), shown when there's no picture or it can't load
-    const fh = ph - 6, fb = cardBody(c, BACK_VIEW.has(ex.m) ? 'back' : 'front', bodyHeat([[ex.m, 4], ...ex.sec.map(m => [m, 2])]), tx + tw / 2 - fh * 50 / 220, ty + 3, fh);
+    const fh = ph - 6, fb = cardBody(c, BACK_VIEW.has(ex.m) ? 'back' : 'front', bodyHeat([[ex.m, 4], ...ex.sec.map(m => [m, 2])]), tx + tw / 2 - fh / 2, ty + 3, fh, CROPS[figSex()][thumbCrop(ex)]);
     h += pic ? `<g data-fb="${i}" display="none"><rect x="${tx}" y="${ty}" width="${tw}" height="${ph}" fill="${c.bg1}"/>${fb}</g><image data-i="${i}" href="${esc(pic)}" x="${tx + 4}" y="${ty + 3}" width="${tw - 8}" height="${ph - 6}" preserveAspectRatio="xMidYMid ${photos.get(x.exId) ? 'slice' : 'meet'}"/>` : fb;
     h += `</g>`;
     if (prIds.has(x.exId)) h += `<circle cx="${tx + (c.rtl ? 14 : tw - 14)}" cy="${ty + 14}" r="11" fill="${c.gold[1]}"/>${TROPHY('#1B1000', tx + (c.rtl ? 14 : tw - 14) - 7, ty + 7, 0.14)}`;
@@ -3465,7 +3497,7 @@ function cardMuscles(st) {
   let h = `<circle cx="180" cy="230" r="170" fill="url(#${c.id}r)"/>`;
   h += ctext(c, 180, 46, T('Muscles worked').toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
   h += ctext(c, 180, 70, TN(n, '{n} muscle group', '{n} muscle groups'), { size: 13, weight: 600, fill: c.ink2, max: 300 });
-  h += cardBody(c, 'front', heat, 40, 82, 284) + cardBody(c, 'back', heat, 191, 82, 284);
+  h += cardBody(c, 'front', heat, 34, 88, 276) + cardBody(c, 'back', heat, 182, 88, 276);
   h += `<rect x="${cx_(c, 110, 140)}" y="378" width="140" height="7" rx="3.5" fill="url(#${c.id}h)"/>`;
   h += ctext(c, 102, 385, T('fewer sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'end', max: 80 }) + ctext(c, 258, 385, T('more sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'start', max: 80 });
   if (n) h += ctext(c, 180, 410, st.muscles.slice(0, 4).map(([m, k]) => `${MUSCLES[m]} ${trimNum(k, 1)}`).join(' · '), { size: 11.5, weight: 700, max: 312 });
@@ -3510,20 +3542,30 @@ function cardProgress(st, rows) {
 // a rank card: the emblem in its light, the rank, the lift and the set, and how far the next rank is
 function rankCard(o, tier, kick, setText, sub, more, k) {
   const t = RK.TIERS[tier], c = cardCtx(k, kick), ex = getEx(o.id), g = `url(#${c.id}t)`;
-  let h = `<circle cx="180" cy="150" r="190" fill="url(#${c.id}r)"/>${rays(180, 150, 220, t.glow, 0.09)}`;
-  h += RK.emblem(tier, c.id + 'em', tierName(tier)).replace('<svg class="rank-emb"', '<svg x="104" y="38" width="152" height="168"');
-  h += ctext({ ...c, rtl: false }, 180, 230, kick.toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: t.c[1], ls: 3, max: 300 });
-  h += `<text x="180" y="276" font-size="${fitText(tierName(tier).toLocaleUpperCase(LOC), 312, 44, 900, c.font, 26)[1]}" font-weight="900" fill="${g}" text-anchor="middle" letter-spacing="1">${esc(tierName(tier).toLocaleUpperCase(LOC))}</text>`;
-  h += ctext(c, 180, 306, ex.name, { size: 18, weight: 800, max: 312 });
-  if (setText) h += ctext(c, 180, 332, setText, { size: 14.5, weight: 700, fill: c.ink2, max: 312 });
-  if (sub) h += ctext(c, 180, 354, sub, { size: 12, weight: 600, fill: c.dim, max: 312 });
+  // light behind the emblem: a glow, rays, rings and a few glints
+  let h = `<circle cx="180" cy="114" r="190" fill="url(#${c.id}r)"/>${rays(180, 114, 220, t.glow, 0.09)}`;
+  h += `<g fill="none" stroke="${t.c[1]}"><circle cx="180" cy="114" r="92" stroke-opacity=".22" stroke-width="1.2"/><circle cx="180" cy="114" r="104" stroke-opacity=".35" stroke-width="1.4" stroke-dasharray="1.5 7" stroke-linecap="round"/><circle cx="180" cy="114" r="120" stroke-opacity=".12" stroke-width="1"/></g>`;
+  const glint = (x, y, r, op) => `<path d="M${x} ${y - r}Q${x + r * 0.16} ${y - r * 0.16} ${x + r} ${y}Q${x + r * 0.16} ${y + r * 0.16} ${x} ${y + r}Q${x - r * 0.16} ${y + r * 0.16} ${x - r} ${y}Q${x - r * 0.16} ${y - r * 0.16} ${x} ${y - r}Z" fill="#FFFFFF" opacity="${op}"/>`;
+  h += glint(70, 64, 6, 0.85) + glint(296, 52, 5, 0.75) + glint(300, 170, 7, 0.9) + glint(58, 176, 4, 0.6) + glint(250, 28, 3.5, 0.6);
+  h += RK.emblem(tier, c.id + 'em', tierName(tier)).replace('<svg class="rank-emb"', '<svg x="104" y="30" width="152" height="168"');
+  h += ctext({ ...c, rtl: false }, 180, 222, kick.toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: t.c[1], ls: 3, max: 300 });
+  h += `<text x="180" y="264" font-size="${fitText(tierName(tier).toLocaleUpperCase(LOC), 312, 44, 900, c.font, 26)[1]}" font-weight="900" fill="${g}" text-anchor="middle" letter-spacing="1">${esc(tierName(tier).toLocaleUpperCase(LOC))}</text>`;
+  h += ctext(c, 180, 292, ex.name, { size: 18, weight: 800, max: 312 });
+  if (setText) h += ctext(c, 180, 314, setText, { size: 14.5, weight: 700, fill: c.ink2, max: 312 });
+  // below: the muscle that earned it, plated in the rank's metal, and how far it is to the next rank
+  h += `<rect x="20" y="330" width="320" height="82" rx="16" fill="${c.bg2}" stroke="${c.line}"/>`;
+  const box = CROPS[figSex()][thumbCrop(ex)], tx = cx_(c, 28, 66);
+  h += `<g clip-path="url(#${c.id}m)"><rect x="${tx}" y="338" width="66" height="66" fill="${c.bg1}"/>${bodyArt(c, BACK_VIEW.has(ex.m) ? 'back' : 'front', [[metalRamp(t, 'dark'), ex.m === 'fullbody' ? FULL_BODY : [ex.m], tier >= 3]], tx, 338, 66, box)}</g>`;
+  let y = 354;
+  if (sub) { h += ctext(c, 106, y, sub, { size: 11.5, weight: 700, fill: c.ink2, anchor: 'start', max: 222 }); y += 10; }
   if (tier < 8 && o.now.tier === tier) {
-    const f = o.now.frac;
-    h += `<rect x="70" y="374" width="220" height="7" rx="3.5" fill="${c.muscle}"/><rect x="${c.rtl ? 70 + 220 * (1 - f) : 70}" y="374" width="${Math.max(7, 220 * f)}" height="7" rx="3.5" fill="${RK.TIERS[tier + 1].c[1]}"/>`;
-    h += ctext(c, 180, 398, rankNext(o), { size: 11, weight: 700, fill: c.ink2, max: 300 });
+    const f = o.now.frac, nx = RK.TIERS[tier + 1];
+    h += `<rect x="${cx_(c, 106, 222)}" y="${y}" width="222" height="7" rx="3.5" fill="${c.muscle}"/><rect x="${c.rtl ? CARD_W - 106 - 222 * f : 106}" y="${y}" width="${Math.max(7, 222 * f)}" height="7" rx="3.5" fill="${nx.c[1]}"/>`;
+    h += ctext(c, 106, y + 22, rankNext(o), { size: 11, weight: 700, fill: c.ink2, anchor: 'start', max: 222 });
+    y += 22;
   }
-  if (more) h += ctext(c, 180, 414, more, { size: 10.5, weight: 800, fill: t.c[1], max: 300 });
-  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 't', [t.c[0], t.c[1], t.c[2]]) + glow(c.id + 'r', t.glow, 0.38)) };
+  if (more) h += ctext(c, 106, Math.min(402, y + 16), more, { size: 10.5, weight: 800, fill: t.c[1], anchor: 'start', max: 222 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 't', [t.c[0], t.c[1], t.c[2]]) + glow(c.id + 'r', t.glow, 0.38) + `<clipPath id="${c.id}m"><rect x="${tx}" y="338" width="66" height="66" rx="12"/></clipPath>`) };
 }
 // a rank-up, big: the new emblem, the rank, the lift and the set that did it
 function cardRankUp(st) {
@@ -3540,9 +3582,9 @@ function cardRanks(st) {
   h += ctext(c, 108, 88, tierName(all.tier).toLocaleUpperCase(LOC), { size: 30, weight: 900, fill: t.c[1], anchor: 'start', max: 230 });
   h += ctext(c, 108, 108, TN(rows.length, 'from {n} lift', 'from {n} lifts'), { size: 11.5, weight: 600, fill: c.ink2, anchor: 'start', max: 220 });
   // start and now, front and back
-  const fig = (view, mr, x) => `<svg x="${x}" y="128" width="72" height="158" viewBox="0 0 100 220">${rankFigure(view, mr, [c.body, c.muscle])}</svg>`;
-  const mw = muscleRanks(rows, 'was'), mn = muscleRanks(rows), [L, R] = c.rtl ? [196, 22] : [22, 196];
-  h += fig('front', mw, L) + fig('back', mw, L + 70) + fig('front', mn, R) + fig('back', mn, R + 70);
+  const fig = (view, mr, x) => bodyArt(c, view, tierGroups(mr, 'dark'), x, 130, 146);
+  const mw = muscleRanks(rows, 'was'), mn = muscleRanks(rows), [L, R] = c.rtl ? [186, 22] : [22, 186];
+  h += fig('front', mw, L) + fig('back', mw, L + 76) + fig('front', mn, R) + fig('back', mn, R + 76);
   h += `<path d="M${c.rtl ? 186 : 174} 207 l${c.rtl ? -12 : 12} 0 m${c.rtl ? 5 : -5} -5 l${c.rtl ? -5 : 5} 5 l${c.rtl ? 5 : -5} 5" stroke="${c.ink2}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
   h += ctext(c, 93, 304, `${TC('Start', 'rank')} · ${was ? tierName(was.tier) : '—'}`, { size: 12, weight: 700, fill: c.ink2, max: 150 });
   h += ctext(c, 267, 304, `${T('Now')} · ${tierName(all.tier)}`, { size: 12, weight: 800, fill: t.c[1], max: 150 });
@@ -3574,6 +3616,10 @@ function finCards(st) {
 const artData = new Map();
 const dataURL = u => artData.get(u) || artData.set(u, fetch(u).then(r => r.ok ? r.blob() : Promise.reject(new Error(r.status))).then(b => new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); })).catch(() => null)).get(u);
 async function inlineArt(svg) {
+  for (const u of new Set([...svg.matchAll(/data-body="1" href="([^"]+)"/g)].map(m => m[1]).filter(u => !u.startsWith('data:')))) {
+    const d = await dataURL(u);
+    if (d) svg = svg.split(`data-body="1" href="${u}"`).join(`data-body="1" href="${d}"`);
+  }
   const urls = [...new Set([...svg.matchAll(/<image data-i="\d+" href="([^"]+)"/g)].map(m => m[1]).filter(u => !u.startsWith('data:')))];
   const got = new Map(await Promise.all(urls.map(async u => [u, await dataURL(u.replace(/&amp;/g, '&'))])));
   const failed = [];
@@ -4056,7 +4102,8 @@ function exHero(exId, i) {
   const note = !photo && art ? artNote(exId) : '';
   return `<button class="exc-hero ${photo ? 'photo' : art ? 'art' + artKind(exId) : 'maps'}${note ? ' noted' : ''}"${mv ? ' data-mv="pic"' : ''} data-a="exInfo" data-e="${i}" data-callout="TGT:${esc(MUSCLES[ex.m].toUpperCase())} // ${esc(EQUIP[ex.eq].toUpperCase())}" aria-label="${T('How to do {name}', { name: esc(ex.name) })}">${inner}${note ? `<span class="hero-note">${T('Similar picture: {note}', { note: esc(note.charAt(0).toLowerCase() + note.slice(1)) })}</span>` : ''}${scoreOf(exId) != null ? `<span class="hero-tag">${icon('flask', 'inline')} ${T('Est. {score}/10 · how it works', { score: scoreOf(exId) })}</span>` : art && !photo ? `<span class="hero-tag">${T('How to')}</span>` : ''}</button>`;
 }
-const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, 'full')}${figure('back', ex, 'full')}</span>`;
+// the part of the body the exercise works, front and back, big
+const heroMaps = ex => `<span class="hero-maps">${figure('front', ex, thumbCrop(ex), true)}${figure('back', ex, thumbCrop(ex), true)}</span>`;
 function setRowHTML(i, x, j, k, ctx, effOn, two) {
   const s = x.sets[j], ph = placeholder(x, j, ctx), prev = ctx.prevSets[j], prs = ctx.prs[j] || [];
   const pad = useKeypad();
@@ -5300,7 +5347,7 @@ function exerciseSheet(exId) {
       <div class="sheet-body pad exd">${ex.en ? `<p class="exd-en" lang="en" dir="ltr">${esc(ex.en)}</p>` : ''}
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="${T('Your photo of {name}', { name: esc(ex.name) })}">` : ''}
           ${art ? `<figure class="exd-art ${art.length > 1 ? motionOn() ? 'moving' : 'still' : ''}${artKind(exId)}"${art.length > 1 && motionOn() ? ' data-mv="pic"' : ''}>${artFrames(exId, art, ex.name)}${art.length > 1 && motionOn() ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} ${T('Similar picture. {note}.', { note: esc(artNote(exId)) })}</b>` : ''}<span>${T('Illustration: {credit}', { credit: artCredit(exId) })}</span></figcaption></figure>` : ''}
-          <div class="exd-map"><figure>${figure('front', ex, 'full')}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full')}<figcaption>${T('Back')}</figcaption></figure></div></div>
+          <div class="exd-map"><figure>${figure('front', ex, 'full', true)}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full', true)}<figcaption>${T('Back')}</figcaption></figure></div></div>
         <div class="exd-legend"><span><i class="dot hit"></i>${T('Main: {muscle}', { muscle: esc(MUSCLES[ex.m]) })}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>${T('Also: {muscles}', { muscles: esc(ex.sec.map(m => MUSCLES[m]).join(T(', '))) })}</span>` : ''}
           <button class="btn sm" data-a="photo">${icon('camera')}${photo ? T('Change photo') : T('Add your own photo')}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">${T('Remove photo')}</button>` : ''}</div>
         ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}${T('How to do it')}<span class="muted">${TN(steps.length, '{n} steps', '{n} steps')}</span>${icon('down', 'chev')}</summary>
@@ -5364,7 +5411,8 @@ const rankOn = () => !!(RK && state.settings.ranks && state.body && state.body.b
 const tierName = i => T(RK.TIERS[i].name);
 const tierColor = i => RK.TIERS[i].c[1];
 let embSeq = 0;
-const emblem = (i, cls = '') => `<span class="rank-e ${cls}">${RK.emblem(i, 'e' + (++embSeq), tierName(i))}</span>`;
+// at list sizes (xs) the emblem leaves out its glow, rays and sparkles
+const emblem = (i, cls = '') => `<span class="rank-e ${cls}">${RK.emblem(i, 'e' + (++embSeq), tierName(i), /\bxs\b/.test(cls))}</span>`;
 const basisMemo = new Map();
 function rankBasis(id) {
   const ex = getEx(id), key = `${id}|${ex.name}|${ex.eq}|${ex.k}|${ex.uni}`;
@@ -5475,18 +5523,19 @@ function overallRank(rows, when = 'now') {
   const score = sum(v, x => x.sc * x.w) / sum(v, x => x.w), tier = Math.min(8, Math.floor(score));
   return { score, tier, frac: tier === 8 ? 1 : score - tier };
 }
-// one view of the body with each muscle in its rank's colour (muscles with no rank in grey)
-function rankFigure(view, mr, grey = ['#3A3A42', '#2C2C33']) {
-  const reg = {};
-  for (const [m, sc] of Object.entries(mr)) for (const mm of m === 'fullbody' ? FULL_BODY : [m]) for (const [r, wt] of BODY_OF[mm] || []) if (wt >= 0.6 && (reg[r] == null || sc > reg[r])) reg[r] = sc;
-  const parts = [];
-  for (const [r, pts] of BODY[view]) {
-    const sc = reg[r], fill = sc != null ? tierColor(Math.min(8, Math.floor(sc))) : r === 'head' || r === 'knees' ? grey[0] : grey[1];
-    for (const p of pts.split('|')) parts.push(`<polygon points="${p}" fill="${fill}"/>`);
-  }
-  return parts.join('');
+// each muscle with a rank, plated in its rank's metal; the higher ranks glow
+function tierGroups(mr, src) {
+  const by = {};
+  for (const [m, sc] of Object.entries(mr)) for (const mm of m === 'fullbody' ? FULL_BODY : [m]) { const t = Math.min(8, Math.floor(sc)); if (by[mm] == null || t > by[mm]) by[mm] = t; }
+  const g = [];
+  for (let t = 0; t <= 8; t++) { const keys = Object.keys(by).filter(k => by[k] === t); if (keys.length) g.push([metalRamp(RK.TIERS[t], src), keys, t >= 5]); }
+  return g;
 }
-const rankBody = (mr, cls = '') => `<span class="rank-body ${cls}">${['front', 'back'].map(v => `<svg viewBox="0 0 100 220" aria-hidden="true">${rankFigure(v, mr)}</svg>`).join('')}</span>`;
+// the two views of your ranks, for the page: the light render in light mode
+function rankBody(mr, cls = '') {
+  const src = darkNow() ? 'dark' : 'light', c = { id: 'rk', bodyRamp: src === 'dark' ? [[0, '#050507'], [BD_MID.dark, '#686B75'], [1, '#D2D5DC']] : [[0, '#000000'], [1, '#FFFFFF']] };
+  return `<span class="rank-body ${cls}">${['front', 'back'].map(v => bodyArt(c, v, tierGroups(mr, src), 0, 0, 119, BD_BOX, src)).join('')}</span>`;
+}
 const perText = b => b.per === 'hand' ? T('per dumbbell') : b.per === 'side' ? T('per side') : b.per === 'total' ? T('with your bodyweight') : '';
 // how far along: the share of the way to the next tier, and how much more that takes
 function rankNext(o) {
@@ -5585,15 +5634,20 @@ function rankTakeover(up, ex) {
   let el = $('#rankfx');
   if (!el) { el = document.createElement('div'); el.id = 'rankfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
   const t = RK.TIERS[up[1]];
-  el.style.cssText = `--tc:${t.c[1]}; --tg:${t.glow}; --t0:${t.c[0]}`;
-  el.innerHTML = `<button class="rkfx" data-a="rankfxHide" aria-label="${esc(T('Rank up: {tier}!', { tier: tierName(up[1]) }))}"><span class="rkfx-rays"></span><span class="rkfx-glow"></span>
-    ${emblem(up[1], 'rkfx-emb')}<b class="rkfx-kick">${T('Rank up')}</b><b class="rkfx-tier">${tierName(up[1])}</b><span class="rkfx-ex">${esc(ex.name)}</span>
+  el.style.cssText = `--tc:${t.c[1]}; --tg:${t.glow}; --t0:${t.c[0]}; --t2:${t.c[2]}`;
+  // sparks that fly out from the emblem and drift up
+  const sparks = Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2 + Math.random() * 0.4, d = 90 + Math.random() * 90;
+    return `<i style="--x:${Math.round(Math.cos(a) * d)}px; --y:${Math.round(Math.sin(a) * d * 0.8 - 40)}px; --d:${(0.45 + Math.random() * 0.5).toFixed(2)}s; --s:${(0.6 + Math.random() * 0.8).toFixed(2)}"></i>`; }).join('');
+  // the old rank breaks apart and the new one lands with a shockwave, a sweep of light and sparks
+  el.innerHTML = `<button class="rkfx" data-a="rankfxHide" aria-label="${esc(T('Rank up: {tier}!', { tier: tierName(up[1]) }))}"><span class="rkfx-rays"></span><span class="rkfx-rays r2"></span><span class="rkfx-glow"></span>
+    <span class="rkfx-stage"><span class="rkfx-old">${emblem(up[0])}</span><span class="rkfx-ring"></span><span class="rkfx-ring r2"></span><span class="rkfx-new"><span class="rank-e">${RK.emblem(up[1], 'fx' + (++embSeq), tierName(up[1]), false, true)}</span></span><span class="rkfx-sparks">${sparks}</span></span>
+    <b class="rkfx-kick">${T('Rank up')}</b><b class="rkfx-tier">${tierName(up[1])}</b><span class="rkfx-ex">${esc(ex.name)}</span>
     <span class="rkfx-from">${emblem(up[0], 'xs')}<span>${tierName(up[0])}</span>${icon(RTL ? 'left' : 'right')}${emblem(up[1], 'xs')}<span>${tierName(up[1])}</span></span></button>`;
   el.hidden = false;
   el.classList.remove('in', 'out'); void el.offsetWidth; el.classList.add('in');
-  setTimeout(() => { if (!el.hidden) confetti(innerWidth / 2, innerHeight * 0.4, { n: 180, colors: [...t.c, t.glow, '#FFFFFF'], power: 1.25 }); }, 260);
+  setTimeout(() => { if (!el.hidden) confetti(innerWidth / 2, innerHeight * 0.38, { n: 200, colors: [...t.c, t.glow, '#FFFFFF'], power: 1.3 }); }, 520);
   clearTimeout(rankfxTimer);
-  rankfxTimer = setTimeout(rankfxHide, 2100);
+  rankfxTimer = setTimeout(rankfxHide, 2500);
 }
 let rankfxTimer = null;
 function rankfxHide() {
@@ -5654,7 +5708,7 @@ function rankSetup() {
         if (!log.length || Math.abs(log[log.length - 1].bw - bwKg) > 0.05) log.push({ at: Date.now(), bw: bwKg });
         state.body = { sex: p.sex, bw: bwKg, age: age == null ? null : Math.round(age), at: Date.now(), log: log.slice(-200) };
         state.settings.ranks = true;
-        save(); closeSheet(d); render();
+        save(); closeSheet(d); bodySprite(); render(); renderWorkout();
         toast(T('Ranks are on.'));
       },
       off: (b, d) => { state.settings.ranks = false; save(); closeSheet(d); render(); }
@@ -5807,6 +5861,7 @@ VIEWS.settings = function () {
     ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
+    ${row(T('Body in pictures'), T('The build of the body in the muscle pictures, the end-of-workout cards and your ranks.'), seg('setFigure', figSex(), [['male', T('Man')], ['female', T('Woman')]]))}
     ${row(T('Colours'), s.style === 'y2k' ? T('Every colour of the Y2K style: frame, neons, background, cards, text, set types and more, with a preview before you save.') : T('Every colour: accent, background, cards, text, greys, set types and more, with ready-made looks and a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${(s.style === 'y2k' ? ['frame', 'accent', 'hot', 'bg'] : ['accent', 'good', 'gold', 'bg']).map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
   </div>
@@ -5822,13 +5877,19 @@ VIEWS.settings = function () {
     <p class="muted small">${T('Your workouts are stored on this device only, and nobody else can see them: sharing the link shares the app, not your data. Browsers can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.')}</p>
   </div>
   <p class="muted small center">Lifting Sanity 1.3 · ${TN(LIB.length, '{n} exercise', '{n} exercises')} · ${storageOK ? T('saving to this device') : T('storage blocked')}</p>
-  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })} · ${T('Muscle map on the end-of-workout cards: {lib} (MIT)', { lib: '<a href="https://github.com/GV79/react-body-highlighter" target="_blank" rel="noopener">react-body-highlighter</a>' })}</p>
+  <p class="muted small center credits">${T('Illustrations: {repdb} and {everkinetic} (Greg Priday, CC BY-SA 4.0)', { repdb: `<a href="https://repdb.co" target="_blank" rel="noopener">${T('Exercise data by RepDB (repdb.co)')}</a>`, everkinetic: '<a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a>' })} · ${T('Instructions: {dataset} (MIT)', { dataset: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })} · ${T('Body drawings: {lib} (MIT)', { lib: '<a href="https://github.com/crmapache/js-rich-body-highlighter" target="_blank" rel="noopener">js-rich-body-highlighter</a>' })}</p>
   <p class="muted small center fit-info" id="fitInfo" lang="en" dir="ltr">${(screenGap(), fitLine())}</p>`;
 };
 /* ----- What's new: a short note once after each update (not on a first launch), and again from Settings ----- */
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 41, items: [
+    ['dumbbell', 'A new body in every muscle picture', 'A detailed anatomy drawing, front and back, with every muscle you train: erectors, rotator cuff, serratus, adductors, the outer hip and more. Worked muscles glow and fade softly at their edges.'],
+    ['layout', 'Bigger and clearer', 'An exercise without a picture now shows the part of the body it works, big, front and back. The end-of-workout cards and your ranks use the same body.'],
+    ['sliders', 'A man’s or a woman’s build', 'Pick the body in the pictures in Settings, under Look. Lift ranks with women’s standards pick it for you.'],
+    ['trophy', 'Ranks, refined', 'Each rank has its own emblem shape in its own metal, with gems from Gold up. A rank-up breaks the old emblem and lands the new one with a burst of light, and its card shows the muscle that earned it.']
+  ] },
   { v: 40, items: [
     ['check', 'The RIR step logs the set', 'On the number pad, picking the RIR (or pressing Next on it) now logs the set and starts the rest timer.'],
     ['sliders', 'Colours for each theme', 'Dark mode and light mode keep their own colours, as do Clean and Y2K: a change to one never touches another. Copy colours across in one tap.'],
@@ -6342,6 +6403,7 @@ const ACT = {
   rankPromoOff: () => { state.flags.rankPromoOff = 1; save(); render(); },
   rankToggle: () => { if (rankOn()) { state.settings.ranks = false; save(); render(); } else if (state.body && state.body.bw > 0) { state.settings.ranks = true; save(); render(); } else rankSetup(); },
   setStyle: b => { state.settings.style = b.dataset.v; applyTheme(); save(); render(); renderWorkout(); },
+  setFigure: b => { state.settings.figure = b.dataset.v; bodySprite(); save(); render(); renderWorkout(); },
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
   exportFile: () => exportFile(),
@@ -6690,7 +6752,6 @@ setInterval(() => { if (state.rest && !document.hidden) tickRest(); }, 250);
 
 // the display font loads without holding up the first screen (system font until it arrives)
 for (const l of $$('link[data-font]')) l.media = 'all';
-document.body.insertAdjacentHTML('afterbegin', FIG_SPRITE);
 load();
 rebuildCustom();
 // once: older saves get their record flags worked out the current way

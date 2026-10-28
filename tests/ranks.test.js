@@ -75,7 +75,7 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   const take = await p.evaluate(() => { const f = document.querySelector('#rankfx:not([hidden])'); return f && f.textContent.replace(/\s+/g, ' '); });
   r.ok(take && /Rank up/.test(take) && /Platinum/.test(take) && /Barbell Bench Press/.test(take) && /Gold/.test(take), 'beating your rank fills the screen for a moment: the new emblem, “Platinum”, the lift, from Gold', take);
   r.ok(/Platinum/.test(await t.text('#workout .exc[data-e="0"] .rank-hint')), 'and the card’s rank moves up with it');
-  await p.waitForTimeout(2600);
+  await p.waitForTimeout(3000);
   const banner = await p.evaluate(() => { const b = document.querySelector('#prfx:not([hidden]) .prfx-card'); return b && { rank: b.classList.contains('prfx-rank'), text: b.textContent, emb: !!b.querySelector('.rank-emb') }; });
   r.ok(banner && banner.rank && banner.emb && /Rank up: Platinum!/.test(banner.text) && /from Gold/.test(banner.text) && await p.evaluate(() => document.querySelector('#rankfx').hidden), 'then it gives way to the banner: “Rank up: Platinum!”, from Gold, with the new emblem', banner);
   await t.ev('prHide()'); await p.waitForTimeout(400);

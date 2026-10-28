@@ -222,58 +222,110 @@ window.LS_RANKS = (() => {
     return { tier: t, frac, score: t + (t === 8 ? 0 : frac), next: t < 8 ? lad[t + 1] : null };
   }
 
-  // ---------- the emblems: a crest in the tier's metal and its symbol; wings and a laurel at the top ----------
-  function emblem(i, uid, label) {
-    const t = TIERS[i], [hi, mid, lo] = t.c, u = 're' + uid;
-    const shield = 'M60 8 L100 22 L100 62 C100 92 83 113 60 128 C37 113 20 92 20 62 L20 22 Z';
-    const inner = 'M60 17 L92 28 L92 62 C92 87 78 105 60 118 C42 105 28 87 28 62 L28 28 Z';
-    const chev = y => `<path d="M38 ${y} L60 ${y + 11} L82 ${y} L82 ${y + 9} L60 ${y + 20} L38 ${y + 9} Z"/>`;
-    const star = (cx, cy, r, k = 0.45) => { let d = ''; for (let n = 0; n < 10; n++) { const a = -Math.PI / 2 + n * Math.PI / 5, rr = n % 2 ? r * k : r; d += `${n ? 'L' : 'M'}${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)} `; } return `<path d="${d}Z"/>`; };
-    const sym = [
-      `<circle cx="60" cy="64" r="21" fill="none" stroke-width="3.2"/><circle cx="60" cy="64" r="13" fill="none" stroke-width="2.6"/><circle cx="60" cy="64" r="5.5"/><path d="M60 43 L57 52 L62 56" fill="none" stroke-width="2.6"/>`,
-      chev(54),
-      chev(46) + chev(64),
-      chev(64) + chev(80) + star(60, 48, 13),
-      `<circle cx="60" cy="64" r="22" fill="none" stroke-width="3.5"/>${star(60, 64, 16)}`,
-      `<path d="M42 54 L50 44 L70 44 L78 54 L60 86 Z"/><path d="M42 54 L78 54 M50 44 L56 54 L60 86 M70 44 L64 54 L60 86 M56 54 L60 44 L64 54" fill="none" stroke="${lo}" stroke-opacity=".55" stroke-width="1.6"/>`,
-      `<path d="M38 80 L35 50 L48 62 L60 44 L72 62 L85 50 L82 80 Z"/><rect x="38" y="83" width="44" height="7" rx="2"/><circle cx="35" cy="47" r="3.5"/><circle cx="60" cy="41" r="3.5"/><circle cx="85" cy="47" r="3.5"/>`,
-      `<path d="M40 86 C38 66 46 52 60 52 C74 52 82 66 80 86 L68 86 L68 74 L52 74 L52 86 Z"/><path d="M44 58 C34 54 30 44 32 34 C37 42 43 46 50 50 Z"/><path d="M76 58 C86 54 90 44 88 34 C83 42 77 46 70 50 Z"/><rect x="58" y="56" width="4" height="16" fill="${lo}" opacity=".5"/>`,
-      `<path d="M60 36 C70 46 72 54 66 62 C68 54 64 50 60 46 C58 52 52 54 54 62 C48 56 50 46 60 36 Z"/><path d="M50 64 L70 64 L65 74 L55 74 Z"/><path d="M55 76 L65 76 L62 98 L58 98 Z"/>`
-    ][i];
-    const leaf = (x, y, a, s) => `<ellipse cx="${x}" cy="${y}" rx="${2.6 * s}" ry="${6 * s}" transform="rotate(${a} ${x} ${y})"/>`;
-    const laurel = n => {
-      let l = '<path d="M38 128 C12 112 0 84 6 50 M82 128 C108 112 120 84 114 50" fill="none" stroke-width="2.6"/>';
-      for (let k = 0; k < n; k++) {
-        const deg = 112 + k * 17, a = deg * Math.PI / 180, x = 60 + 60 * Math.cos(a), y = 72 + 60 * Math.sin(a), r = deg - 90 + 35;
-        l += leaf(x.toFixed(1), y.toFixed(1), r, 1.6) + leaf((120 - x).toFixed(1), y.toFixed(1), -r, 1.6);
-      }
-      return l;
-    };
-    const wings = i === 6 || i === 7 ? `<g fill="url(#${u}m)" stroke="${lo}" stroke-width="1.2" ${i === 7 ? 'transform="translate(60 44) scale(1.22) translate(-60 -44)"' : ''}>
-        <path d="M22 40 C8 38 2 30 0 20 C8 26 14 27 22 26 Z"/><path d="M21 54 C6 54 -1 46 -3 37 C6 42 13 43 21 41 Z"/><path d="M22 68 C9 70 2 64 -1 56 C7 59 14 59 22 56 Z"/>
-        <path d="M98 40 C112 38 118 30 120 20 C112 26 106 27 98 26 Z"/><path d="M99 54 C114 54 121 46 123 37 C114 42 107 43 99 41 Z"/><path d="M98 68 C111 70 118 64 121 56 C113 59 106 59 98 56 Z"/></g>` : '';
-    const rays = i === 8 ? `<g>${Array.from({ length: 18 }, (_, k) => { const a = k * Math.PI / 9, w = k % 2 ? 0.05 : 0.09, r = k % 2 ? 70 : 86; return `<path d="M60 68 L${(60 + r * Math.cos(a - w)).toFixed(1)} ${(68 + r * Math.sin(a - w)).toFixed(1)} L${(60 + r * Math.cos(a + w)).toFixed(1)} ${(68 + r * Math.sin(a + w)).toFixed(1)} Z" fill="url(#${u}r)"/>`; }).join('')}</g>` : '';
-    const sparks = i >= 5 ? [[24, 18, 4], [99, 16, 3], [104, 96, 3.4], [16, 92, 2.6]].map(([x, y, r]) => star(x, y, r, 0.28)).join('') : '';
-    const wreath = i === 8 ? `<g fill="url(#${u}m)" stroke="${lo}" stroke-width="1">${laurel(7)}</g>` : '';
-    return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible">
-      <defs>
-        <linearGradient id="${u}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".45" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient>
-        <linearGradient id="${u}e" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${lo}"/><stop offset="1" stop-color="${mid}"/></linearGradient>
-        <radialGradient id="${u}i" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></radialGradient>
-        <radialGradient id="${u}g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${t.glow}" stop-opacity=".75"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
-        <radialGradient id="${u}r" cx="60" cy="68" r="86" gradientUnits="userSpaceOnUse"><stop offset=".35" stop-color="#FFF6CC" stop-opacity="1"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
-        <linearGradient id="${u}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-        <filter id="${u}d" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity=".35"/></filter>
-      </defs>
-      ${i >= 3 ? `<circle cx="60" cy="68" r="${58 + i * 2}" fill="url(#${u}g)"/>` : ''}${rays}${wings}${wreath}
-      <path d="${shield}" fill="url(#${u}e)" stroke="${lo}" stroke-width="1.5"/>
-      <path d="${inner}" fill="url(#${u}i)"/>
-      ${i === 0 ? `<g fill="none" stroke="${lo}" stroke-opacity=".45" stroke-width="1.3"><path d="M34 34 C44 40 40 60 36 80 C34 92 40 102 46 108"/><path d="M84 34 C76 44 82 62 84 78 C86 92 80 102 74 108"/><path d="M48 22 C52 30 50 38 52 46"/></g>` : ''}
-      <path d="${inner}" fill="none" stroke="${hi}" stroke-opacity=".55" stroke-width="1.4"/>
-      <g fill="${t.ink}" stroke="${t.ink}" stroke-linejoin="round" filter="url(#${u}d)">${sym}</g>
-      <path d="M28 28 L60 17 L92 28 L92 50 C78 58 44 58 28 50 Z" fill="url(#${u}s)" opacity=".55"/>
-      ${sparks ? `<g fill="#FFFFFF">${sparks}</g>` : ''}
-    </svg>`;
+  // ---------- the emblems: each rank has its own shape, a bevelled metal rim, a brushed face, an embossed symbol, and from
+  // Gold up a gem and a glow; the top ranks get wings, crystals, a laurel and rays. `small` leaves out what turns to noise
+  // at list sizes ----------
+  const f1 = v => +v.toFixed(1);
+  function star(cx, cy, r, k = 0.45, n = 5) {
+    let d = '';
+    for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? r * k : r; d += `${i ? 'L' : 'M'}${f1(cx + rr * Math.cos(a))} ${f1(cy + rr * Math.sin(a))}`; }
+    return d + 'Z';
   }
+  // a four-point glint
+  const glint = (x, y, r) => `M${x} ${y - r}Q${x + r * 0.16} ${y - r * 0.16} ${x + r} ${y}Q${x + r * 0.16} ${y + r * 0.16} ${x} ${y + r}Q${x - r * 0.16} ${y + r * 0.16} ${x - r} ${y}Q${x - r * 0.16} ${y - r * 0.16} ${x} ${y - r}Z`;
+  // the silhouettes, one per tier, on a 120 × 134 face centred at x = 60
+  const FRAME = [
+    'M60 9Q84 10 99 21L99 61C99 90 83 111 60 126C37 111 21 90 21 61L21 21Q36 10 60 9Z', // wood: a rounded board
+    'M60 7L100 20L100 61C100 92 83 113 60 128C37 113 20 92 20 61L20 20Z', // bronze: the heater shield
+    'M60 6L90 15L101 26L101 61C101 92 84 113 60 128C36 113 19 92 19 61L19 26L30 15Z', // silver: notched shoulders
+    'M60 0L69 10L101 20L101 61C101 92 84 114 60 129C36 114 19 92 19 61L19 20L51 10Z', // gold: a crest at the top
+    'M60 4L98 16L108 10L103 28L102 61C102 93 84 114 60 129C36 114 18 93 18 61L17 28L12 10L22 16Z', // platinum: flared shoulders
+    'M60 2L99 18L106 56L60 132L14 56L21 18Z', // diamond: a cut gem
+    'M60 7L100 20L100 61C100 92 83 113 60 128C37 113 20 92 20 61L20 20Z', // champion: the shield, crowned
+    'M60 4L84 10L104 6L100 26L102 62C101 92 84 114 60 130C36 114 19 92 18 62L20 26L16 6L36 10Z', // titan: spiked
+    'M60 10A56 56 0 1 1 59.9 10Z' // olympian: a medallion
+  ];
+  const CENTRE = [[60, 66], [60, 66], [60, 66], [60, 66], [60, 66], [60, 62], [60, 66], [60, 66], [60, 66]];
+  // the symbols, as before but redrawn a little finer
+  function chev(y, w = 22, h = 11, t = 9) { return `M${60 - w} ${y}L60 ${y + h}L${60 + w} ${y}L${60 + w} ${y + t}L60 ${y + h + t}L${60 - w} ${y + t}Z`; }
+  const SYM = [
+    `<circle cx="60" cy="66" r="20" fill="none" stroke-width="3.4"/><circle cx="60" cy="66" r="12" fill="none" stroke-width="2.8"/><circle cx="60" cy="66" r="5"/>`,
+    `<path d="${chev(55, 25, 14, 11)}"/>`,
+    `<path d="${chev(48)}"/><path d="${chev(66)}"/>`,
+    `<path d="${star(60, 47, 13)}"/><path d="${chev(64, 21, 10, 8)}"/><path d="${chev(79, 21, 10, 8)}"/>`,
+    `<circle cx="60" cy="66" r="22" fill="none" stroke-width="3.6"/><path d="${star(60, 66, 15.5)}"/>`,
+    `<path d="M39 55L48 42L72 42L81 55L60 90Z"/><path d="M39 55L81 55M48 42L55 55L60 90M72 42L65 55L60 90M55 55L60 42L65 55" fill="none" stroke="#1A44B8" stroke-opacity=".45" stroke-width="1.4"/>`,
+    `<path d="M44 46L76 46L75 60C74 72 68 78 60 79C52 78 46 72 45 60Z"/><path d="M44 50C34 50 33 64 46 67M76 50C86 50 87 64 74 67" fill="none" stroke-width="3.4"/><path d="M56 79L64 79L65 87L55 87Z"/><rect x="47" y="87" width="26" height="7" rx="2"/>`,
+    `<path d="M40 88C38 67 46 53 60 53C74 53 82 67 80 88L68 88L68 75L52 75L52 88Z"/><path d="M44 59C33 55 29 44 31 33C36 42 43 46 50 51Z"/><path d="M76 59C87 55 91 44 89 33C84 42 77 46 70 51Z"/>`,
+    `<path d="M60 36C71 46 73 55 66 63C68 55 64 51 60 47C58 53 51 55 54 63C47 57 49 46 60 36Z"/><path d="M49 65L71 65L66 75L54 75Z"/><path d="M55 77L65 77L62 100L58 100Z"/>`
+  ];
+  // facet lines on the diamond's face and its symbol
+  const FACETS = `<path d="M21 18L60 34L99 18M14 56L60 34L106 56M60 34L60 132" fill="none" stroke-width="1"/>`;
+  // gems: [x, y, r, colour]
+  const GEM = { 3: [60, 9, 5.2, '#E8204F'], 4: [60, 12, 5, '#F2FFFC'], 5: [60, 20, 5.5, '#7FD0FF'], 6: [60, 23, 5.5, '#FF2459'], 7: [60, 18, 6, '#B076FF'], 8: [60, 22, 6.5, '#FFF3B0'] };
+  function gem(u, x, y, r, c) {
+    return `<g><path d="M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z" fill="url(#${u}gm)" stroke="#00000066" stroke-width=".8"/>
+      <path d="M${x} ${y - r}L${x + r} ${y}L${x} ${y}Z" fill="#FFFFFF" opacity=".45"/><path d="M${x - r} ${y}L${x} ${y + r}L${x} ${y}Z" fill="#000000" opacity=".22"/>
+      <circle cx="${f1(x - r * 0.3)}" cy="${f1(y - r * 0.35)}" r="${f1(r * 0.22)}" fill="#FFFFFF"/></g>`;
+  }
+  // fx: a sweep of light across it, for the rank-up screen
+  function emblem(i, uid, label, small, fx) {
+    const t = TIERS[i], [hi, mid, lo] = t.c, u = 're' + uid, F = FRAME[i], [cx, cy] = CENTRE[i];
+    const inset = (s) => `translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`;
+    const defs = `<defs>
+      <linearGradient id="${u}rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".28" stop-color="${mid}"/><stop offset=".5" stop-color="${lo}"/><stop offset=".72" stop-color="${mid}"/><stop offset="1" stop-color="${hi}"/></linearGradient>
+      <linearGradient id="${u}bev" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".85"/><stop offset=".45" stop-color="#FFFFFF" stop-opacity=".08"/><stop offset="1" stop-color="#000000" stop-opacity=".35"/></linearGradient>
+      <radialGradient id="${u}face" cx=".5" cy=".28" r=".85"><stop offset="0" stop-color="${mid}"/><stop offset=".55" stop-color="${mixc(mid, lo, 0.55)}"/><stop offset="1" stop-color="${mixc(lo, '#000000', 0.35)}"/></radialGradient>
+      <linearGradient id="${u}sym" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".5" stop-color="${t.ink}"/><stop offset="1" stop-color="${mixc(hi, mid, 0.35)}"/></linearGradient>
+      <linearGradient id="${u}gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".6"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+      <radialGradient id="${u}aura" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${t.glow}" stop-opacity=".8"/><stop offset=".6" stop-color="${t.glow}" stop-opacity=".22"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${u}ray" cx="60" cy="66" r="92" gradientUnits="userSpaceOnUse"><stop offset=".3" stop-color="#FFF8D6"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${u}wing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient>
+      <radialGradient id="${u}gm" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="${(GEM[i] || [])[3] || hi}"/><stop offset="1" stop-color="${mixc((GEM[i] || [])[3] || lo, '#000000', 0.5)}"/></radialGradient>
+      <clipPath id="${u}cl"><path d="${F}" transform="${inset(0.84)}"/></clipPath>${fx ? `<clipPath id="${u}fr"><path d="${F}"/></clipPath><linearGradient id="${u}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".9"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>` : ''}
+      <filter id="${u}emb" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.1" flood-color="#000" flood-opacity=".55"/></filter>
+    </defs>`;
+    let back = '';
+    if (!small && i >= 3) back += `<circle cx="60" cy="66" r="${62 + i * 3}" fill="url(#${u}aura)"/>`;
+    if (!small && i === 8) back += `<g>${Array.from({ length: 20 }, (_, k) => { const a = k * Math.PI / 10, w = k % 2 ? 0.045 : 0.085, r = k % 2 ? 78 : 94; return `<path d="M60 66L${f1(60 + r * Math.cos(a - w))} ${f1(66 + r * Math.sin(a - w))}L${f1(60 + r * Math.cos(a + w))} ${f1(66 + r * Math.sin(a + w))}Z" fill="url(#${u}ray)"/>`; }).join('')}</g>`;
+    // wings for Champion, Titan (bigger) and Olympian (spread behind the medallion)
+    if (i === 6 || i === 7 || (i === 8 && !small)) {
+      const s = i === 7 ? 1.18 : i === 8 ? 1.1 : 1, wy = i === 8 ? 66 : 50;
+      const feather = (k, side) => { const y = wy - 22 + k * 12, len = 30 - k * 4.5, x0 = side < 0 ? 26 : 94; return `<path d="M${x0} ${y + 8}C${x0 + side * len * 0.5} ${y + 6} ${x0 + side * len} ${y - 2} ${x0 + side * (len + 4)} ${y - 10}C${x0 + side * (len - 6)} ${y - 4} ${x0 + side * len * 0.4} ${y} ${x0} ${y}Z"/>`; };
+      let w = '';
+      for (let k = 0; k < 4; k++) w += feather(k, -1) + feather(k, 1);
+      back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width="1" stroke-linejoin="round" transform="translate(60 ${wy}) scale(${s}) translate(-60 ${-wy})">${w}</g>`;
+    }
+    // crystal shards behind Platinum and Diamond
+    if (!small && (i === 4 || i === 5)) back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width=".8" opacity=".9"><path d="M22 40L6 20L18 46Z"/><path d="M98 40L114 20L102 46Z"/><path d="M24 74L4 70L22 82Z"/><path d="M96 74L116 70L98 82Z"/></g>`;
+    // the laurel around the Olympian medallion
+    if (i === 8) {
+      const leaf = (x, y, a) => `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="3.2" ry="7.4" transform="rotate(${f1(a)} ${f1(x)} ${f1(y)})"/>`;
+      let l = '';
+      for (let k = 0; k < 8; k++) { const deg = 100 + k * 18, a = deg * Math.PI / 180, x = 60 + 63 * Math.cos(a), y = 70 + 63 * Math.sin(a), r = deg - 90 + 32; l += leaf(x, y, r) + leaf(120 - x, y, -r); }
+      back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width=".9">${l}</g>`;
+    }
+    // the crown on Champion's shield
+    const crown = i === 6 ? `<g fill="url(#${u}rim)" stroke="${lo}" stroke-width="1"><path d="M38 20L36 4L48 13L60 0L72 13L84 4L82 20Z"/></g>` : '';
+    // the rim, its bevel, the face, its brushed lines, a shadow inside the rim
+    let body = `<path d="${F}" fill="url(#${u}rim)" stroke="${mixc(lo, '#000000', 0.4)}" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="${F}" fill="none" stroke="url(#${u}bev)" stroke-width="2.4" transform="${inset(0.955)}" stroke-linejoin="round"/>
+      <path d="${F}" fill="url(#${u}face)" transform="${inset(0.84)}"/>`;
+    if (!small) body += `<g clip-path="url(#${u}cl)" stroke="#FFFFFF" stroke-opacity=".07" stroke-width="1">${Array.from({ length: 16 }, (_, k) => `<path d="M${-20 + k * 10} 0L${20 + k * 10} 140"/>`).join('')}</g>`;
+    body += `<path d="${F}" fill="none" stroke="#000000" stroke-opacity=".35" stroke-width="3" transform="${inset(0.84)}" clip-path="url(#${u}cl)"/>
+      <path d="${F}" fill="none" stroke="${hi}" stroke-opacity=".7" stroke-width="1" transform="${inset(0.84)}"/>`;
+    if (i === 5) body += `<g stroke="${hi}" stroke-opacity=".35" clip-path="url(#${u}cl)">${FACETS}</g>`;
+    if (i === 0) body += `<g fill="none" stroke="${lo}" stroke-opacity=".5" stroke-width="1.2" clip-path="url(#${u}cl)"><path d="M36 30C44 40 40 60 37 80C35 92 40 102 46 110"/><path d="M84 30C76 44 82 62 84 78C86 92 80 104 74 110"/><path d="M50 18C53 28 51 38 53 46"/></g>`;
+    // rivets on the lower tiers
+    if (i <= 2) body += `<g fill="url(#${u}rim)" stroke="${mixc(lo, '#000000', 0.4)}" stroke-width=".6">${[[29, 27], [91, 27], [60, 117]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6"/><circle cx="${f1(x - 0.8)}" cy="${f1(y - 0.8)}" r=".9" fill="#FFFFFF" stroke="none" opacity=".8"/>`).join('')}</g>`;
+    // the symbol, embossed
+    const sym = `<g fill="url(#${u}sym)" stroke="url(#${u}sym)" stroke-linejoin="round" filter="url(#${u}emb)">${SYM[i]}</g>`;
+    const gloss = `<path d="M28 26L60 15L92 26L92 46C76 55 44 55 28 46Z" fill="url(#${u}gloss)" opacity=".45" clip-path="url(#${u}cl)"/>`;
+    const g = GEM[i] ? gem(u, ...GEM[i]) : '';
+    const sparks = !small && i >= 5 ? `<g fill="#FFFFFF">${[[18, 14, 5], [103, 12, 4], [108, 100, 4.4], [12, 96, 3.4]].map(([x, y, r]) => `<path d="${glint(x, y, r)}"/>`).join('')}</g>` : '';
+    const shine = fx ? `<g clip-path="url(#${u}fr)"><rect class="emb-shine" x="-40" y="-10" width="34" height="160" fill="url(#${u}sh)"/></g>` : '';
+    return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible">${defs}${back}${crown}${body}${sym}${gloss}${shine}${g}${sparks}</svg>`;
+  }
+  function mixc(a, b, t) { const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, k) => Math.round(v * (1 - t) + B[k] * t).toString(16).padStart(2, '0')).join(''); }
   return { TIERS, FITS, basis, ladder, place, ageFactor, emblem };
 })();
