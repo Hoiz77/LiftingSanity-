@@ -18,7 +18,8 @@ const CONTRAST = sel => {
   const r = report('Contrast: text stays readable in both styles and modes');
   for (const style of ['clean', 'y2k']) for (const theme of ['dark', 'light']) {
     const t = await open({ settings: { style, theme, keypad: 'app' } }), p = t.p, at = `${style} ${theme}`;
-    const ratio = sel => p.evaluate(CONTRAST, sel);
+    // (wait for it first: a busy machine can take a moment to open a sheet or the pad)
+    const ratio = async sel => { await p.waitForSelector(sel, { state: 'attached', timeout: 4000 }).catch(() => {}); return p.evaluate(CONTRAST, sel); };
     await t.click('[data-a="demoOn"]', 300).catch(async () => { await t.tab('settings'); await t.click('[data-a="demoOn"]', 300); });
     await t.tab('progress');
     const term = await ratio('.term');
