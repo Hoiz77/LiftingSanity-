@@ -63,12 +63,14 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   await t.ev('prParty(A().ex[0], setGains(A(), A().ex[0], 2))'); await p.waitForTimeout(400);
   const upBefore = await banner();
   await t.ev('fxBits = []; finishWorkout()');
-  await p.waitForTimeout(500);
-  r.ok(/New PRs?!/i.test(upBefore || '') && await banner() === null, 'a record banner still showing when Finish is tapped goes away for the celebration', upBefore);
-  // the medal starts in the middle of the screen, with its light ready to go off as it lands
-  const stage = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'), m = w && w.querySelector('.fin-medal'), r = m && m.getBoundingClientRect();
-    return w && { mid: Math.round(r.top + r.height / 2), h: innerHeight, beams: w.querySelectorAll('.fin-beams i').length, waves: w.querySelectorAll('.fin-wave').length, streaks: w.querySelectorAll('.fin-streaks i').length, words: [...w.querySelectorAll('.fin-title .w')].map(e => e.textContent) }; });
-  r.ok(stage && stage.mid > stage.h * 0.3 && stage.beams === 2 && stage.waves === 2 && stage.streaks > 10 && stage.words.join(' ') === 'New records!', 'a workout just finished: the medal lands big in the middle, with spotlights, rings and streaks of light, and the title comes in word by word', stage);
+  // a busy machine (or phone) can take a moment to draw all this: wait for each thing rather than a fixed time
+  const waitFor = async (fn, ms = 4000) => { for (let i = 0; i < ms / 100; i++) { const v = await fn(); if (v) return v; await p.waitForTimeout(100); } return null; };
+  const gone = await waitFor(async () => await banner() === null);
+  r.ok(/New PRs?!/i.test(upBefore || '') && gone, 'a record banner still showing when Finish is tapped goes away for the celebration', upBefore);
+  // the medal starts in the middle of the screen (its offset from its place up top), with its light ready to go off as it lands
+  const stage = await waitFor(() => p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'), m = w && w.querySelector('.fin-medal');
+    return m && { stage: m.getAnimations().some(a => a.animationName === 'medalStage'), my: parseFloat(m.style.getPropertyValue('--my')), h: innerHeight, beams: w.querySelectorAll('.fin-beams i').length, waves: w.querySelectorAll('.fin-wave').length, streaks: w.querySelectorAll('.fin-streaks i').length, words: [...w.querySelectorAll('.fin-title .w')].map(e => e.textContent) }; }));
+  r.ok(stage && stage.stage && stage.my > stage.h * 0.15 && stage.beams === 2 && stage.waves === 2 && stage.streaks > 10 && stage.words.join(' ') === 'New records!', 'a workout just finished: the medal lands big in the middle, with spotlights, rings and streaks of light, and the title comes in word by word', stage);
   let landed = 0;
   for (let i = 0; i < 30 && landed <= 100; i++) { await p.waitForTimeout(100); landed = await t.ev('fxBits.length'); }
   const fin = await p.evaluate(() => {
@@ -81,8 +83,9 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   r.ok(landed > 100, 'it opens with confetti as the medal lands', landed);
   let fw = 0;
   for (let i = 0; i < 40 && !fw; i++) { await p.waitForTimeout(100); fw = await t.ev(`fxBits.filter(b => b.k).length`); }
-  const home = await p.evaluate(() => { const m = document.querySelector('.fin-medal').getBoundingClientRect(), t = document.querySelector('.fin-title').getBoundingClientRect(); return { medal: Math.round(m.bottom), title: Math.round(t.top) }; });
-  r.ok(fw > 0 && home.medal <= home.title + 2, 'then fireworks, and the medal has risen to its place above the title', { fw, home });
+  const home = await waitFor(() => p.evaluate(() => { const md = document.querySelector('.fin-medal'); if (md.getAnimations().some(a => a.animationName === 'medalStage' && a.playState === 'running')) return null;
+    const m = md.getBoundingClientRect(), t = document.querySelector('.fin-title').getBoundingClientRect(); return { medal: Math.round(m.bottom), title: Math.round(t.top) }; }));
+  r.ok(fw > 0 && home && home.medal <= home.title + 2, 'then fireworks, and the medal has risen to its place above the title', { fw, home });
   await p.waitForTimeout(1700);
   const cardText = i => p.evaluate(i => document.querySelectorAll('.fin-card')[i].textContent.replace(/\s+/g, ' ').trim(), typeof i === 'number' ? i : CARDS.indexOf(i));
   const vol = 82.5 * 8 * 3 + 62.5 * 10 * 3, prevVol = 80 * 8 * 3 + 60 * 10 * 3;
