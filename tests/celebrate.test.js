@@ -59,8 +59,18 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
 
   // the end of a workout: Upper A for the fourth time, with records
   await load({ ex: [ex('x0', 'barbell-bench-press', logged('n', 82.5, 8, 3)), ex('x1', 'seated-cable-row', logged('m', 62.5, 10, 3))] });
+  // a record's banner still up as the workout ends goes away rather than sit over the celebration
+  await t.ev('prParty(A().ex[0], setGains(A(), A().ex[0], 2))'); await p.waitForTimeout(400);
+  const upBefore = await banner();
   await t.ev('fxBits = []; finishWorkout()');
-  await p.waitForTimeout(1100);
+  await p.waitForTimeout(500);
+  r.ok(/New PRs?!/i.test(upBefore || '') && await banner() === null, 'a record banner still showing when Finish is tapped goes away for the celebration', upBefore);
+  // the medal starts in the middle of the screen, with its light ready to go off as it lands
+  const stage = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'), m = w && w.querySelector('.fin-medal'), r = m && m.getBoundingClientRect();
+    return w && { mid: Math.round(r.top + r.height / 2), h: innerHeight, beams: w.querySelectorAll('.fin-beams i').length, waves: w.querySelectorAll('.fin-wave').length, streaks: w.querySelectorAll('.fin-streaks i').length, words: [...w.querySelectorAll('.fin-title .w')].map(e => e.textContent) }; });
+  r.ok(stage && stage.mid > stage.h * 0.3 && stage.beams === 2 && stage.waves === 2 && stage.streaks > 10 && stage.words.join(' ') === 'New records!', 'a workout just finished: the medal lands big in the middle, with spotlights, rings and streaks of light, and the title comes in word by word', stage);
+  let landed = 0;
+  for (let i = 0; i < 30 && landed <= 100; i++) { await p.waitForTimeout(100); landed = await t.ev('fxBits.length'); }
   const fin = await p.evaluate(() => {
     const w = document.querySelector('.sheet-wrap.finish.in');
     return w && { title: w.querySelector('.fin-title').textContent, sub: w.querySelector('.fin-sub').textContent, cards: [...w.querySelectorAll('.fin-card')].map(c => c.querySelector('svg').getAttribute('aria-label')), dots: w.querySelectorAll('.fin-dots button').length, medal: !!w.querySelector('.fin-face') };
@@ -68,8 +78,12 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   r.ok(fin && fin.title === 'New records!' && fin.sub === 'Your workout number 4 · Upper A' && fin.medal, 'Finish opens the full-screen celebration: a medal, “New records!” and the workout’s number', fin);
   const CARDS = ['The workout', 'New records', 'The exercises', 'Muscles worked', 'Getting stronger', 'Week streak', 'Against last time'];
   r.ok(fin && JSON.stringify(fin.cards) === JSON.stringify(CARDS) && fin.dots === 7, 'the cards: the workout, its records, the exercises, the muscles worked, getting stronger, the week streak and against last time, with a dot for each', fin && fin.cards);
-  r.ok(await t.ev('fxBits.length') > 100, 'it opens with confetti');
-  await p.waitForTimeout(1800);
+  r.ok(landed > 100, 'it opens with confetti as the medal lands', landed);
+  let fw = 0;
+  for (let i = 0; i < 40 && !fw; i++) { await p.waitForTimeout(100); fw = await t.ev(`fxBits.filter(b => b.k).length`); }
+  const home = await p.evaluate(() => { const m = document.querySelector('.fin-medal').getBoundingClientRect(), t = document.querySelector('.fin-title').getBoundingClientRect(); return { medal: Math.round(m.bottom), title: Math.round(t.top) }; });
+  r.ok(fw > 0 && home.medal <= home.title + 2, 'then fireworks, and the medal has risen to its place above the title', { fw, home });
+  await p.waitForTimeout(1700);
   const cardText = i => p.evaluate(i => document.querySelectorAll('.fin-card')[i].textContent.replace(/\s+/g, ' ').trim(), typeof i === 'number' ? i : CARDS.indexOf(i));
   const vol = 82.5 * 8 * 3 + 62.5 * 10 * 3, prevVol = 80 * 8 * 3 + 60 * 10 * 3;
   const c0 = await cardText(0);
@@ -89,8 +103,10 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   const cm = await cardText('Muscles worked'), cg = await cardText('Getting stronger');
   r.ok(/MUSCLES WORKED/.test(cm) && /muscle groups/.test(cm) && /fewer sets/.test(cm) && /Chest/.test(cm) && await p.evaluate(() => { const c = [...document.querySelectorAll('.fin-card')][3]; return c.querySelectorAll('svg.bd').length === 2 && c.querySelectorAll('svg.bd mask path').length >= 2 && [...c.querySelectorAll('svg.bd image')].every(i => /art\/body\/male-(front|back)-dark\.webp$/.test(i.getAttribute('href'))); }), 'the muscles card: the body front and back, with the muscles worked and how many sets', cm);
   r.ok(/GETTING STRONGER/.test(cg) && /Barbell Bench Press/.test(cg) && /\+3\.2 kg since/.test(cg) && /Seated Cable Row/.test(cg), 'getting stronger: a chart of each lift’s best set over the last sessions, with the gain', cg);
-  const more = await p.evaluate(() => ({ prs: [...document.querySelectorAll('.fin-prs li')].map(l => l.innerText.replace(/\s+/g, ' ')), bars: document.querySelectorAll('.fin-ms div').length }));
-  r.ok(more.prs.length === 4 && more.prs.every(l => /\+[\d.]+ (kg|reps)/.test(l)) && more.bars >= 2, 'below the cards: every record with its gain, and sets per muscle as bars', more);
+  await p.evaluate(() => document.querySelector('.fin-ms').scrollIntoView({ block: 'center' })); await p.waitForTimeout(500);
+  const more = await p.evaluate(() => ({ prs: [...document.querySelectorAll('.fin-prs li')].map(l => l.innerText.replace(/\s+/g, ' ')), bars: document.querySelectorAll('.fin-ms div').length, go: document.querySelectorAll('.fin-prs.go, .fin-ms.go').length }));
+  r.ok(more.prs.length === 4 && more.prs.every(l => /\+[\d.]+ (kg|reps)/.test(l)) && more.bars >= 2 && more.go === 2, 'below the cards: every record with its gain, and sets per muscle as bars, brought in as they’re scrolled to', more);
+  await p.evaluate(() => document.querySelector('.fin-body').scrollTo(0, 0)); await p.waitForTimeout(300);
   // sharing a card: here there's no share sheet, so the picture is saved
   const shot = async () => {
     const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }), t.inSheet('.fin-foot [data-a="finShare"]', 200)]);
@@ -122,14 +138,18 @@ const pngSize = f => { const b = fs.readFileSync(f); return [b.readUInt32BE(16),
   await t.ev(`workoutSheet(state.workouts[state.workouts.length - 1].id)`); await p.waitForTimeout(500);
   await t.ev('fxBits = []');
   await t.inSheet('[data-a="cards"]', 900);
-  const hist = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'); return w && { title: w.querySelector('.fin-title').textContent, note: !!w.querySelector('.fin-more'), cards: w.querySelectorAll('.fin-card').length }; });
-  r.ok(hist && hist.title === 'Upper A' && !hist.note && hist.cards === 7 && await t.ev('fxBits.length') === 0, 'History → a workout → Share opens its cards, with no confetti', hist);
+  const hist = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'); return w && { title: w.querySelector('.fin-title').textContent, note: !!w.querySelector('.fin-more'), cards: w.querySelectorAll('.fin-card').length, stage: w.querySelectorAll('.fin-beams, .fin-wave').length }; });
+  r.ok(hist && hist.title === 'Upper A' && !hist.note && hist.cards === 7 && !hist.stage && await t.ev('fxBits.length') === 0, 'History → a workout → Share opens its cards, with no confetti or show', hist);
   await p.keyboard.press('Escape'); await p.waitForTimeout(500);
   await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
 
   // milestones: the first workout ever, and the tenth
   await load({ name: 'Day 1', tplId: null, ex: [ex('x0', 'leg-press', logged('a', 100, 10, 3))] }, []);
-  await t.ev('finishWorkout()'); await p.waitForTimeout(1200);
+  await t.ev('finishWorkout()'); await p.waitForTimeout(700);
+  await p.mouse.click(195, 300); await p.waitForTimeout(150);
+  const skipped = await p.evaluate(() => { const f = document.querySelector('.sheet-wrap.finish.in .fin'), t = f.querySelector('.fin-title .w'), c = f.querySelector('.fin-card');
+    return { word: +getComputedStyle(t).opacity, card: +getComputedStyle(c).opacity, playing: f.getAnimations({ subtree: true }).filter(a => a.playState === 'running' && isFinite(a.effect.getComputedTiming().endTime)).length }; });
+  r.ok(skipped.word === 1 && skipped.card === 1 && skipped.playing === 0, 'a tap while it plays skips to the end: the words and cards are there at once', skipped);
   const first = await p.evaluate(() => { const w = document.querySelector('.sheet-wrap.finish.in'); return w && { title: w.querySelector('.fin-title').textContent, card: w.querySelector('.fin-card svg').getAttribute('aria-label'), text: w.querySelector('.fin-card').textContent.replace(/\s+/g, ' ') }; });
   r.ok(first && first.title === 'First workout done!' && first.card === 'Milestone' && /The first of many/.test(first.text) && /And 1,000 kg lifted in total!/.test(first.text), 'the first workout ever: “First workout done!”, a milestone card first (and the first 1,000 kg lifted)', first);
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);

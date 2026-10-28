@@ -1,5 +1,6 @@
-# Every push and pull request runs the test suite: all of it in Chromium, and the first-launch-to-restore journey
-# and your own colours in WebKit (Safari's engine, with an iPhone's user agent). Same commands as on a computer: see tests/README.md.
+# Every push and pull request runs the test suite: all of it in Chromium, and the first-launch-to-restore journey,
+# your own colours, the celebrations and contrast in WebKit (Safari's engine, with an iPhone's user agent). Same
+# commands as on a computer: see tests/README.md.
 name: Tests
 
 on:
@@ -29,9 +30,9 @@ jobs:
       - run: npm test
 
   webkit:
-    name: First launch to restored backup, and colours (WebKit, iPhone)
+    name: First launch to restored backup, colours, celebrations and contrast (WebKit, iPhone)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -43,5 +44,11 @@ jobs:
         env:
           LS_BROWSER: webkit
       - run: node tests/colors.test.js
+        env:
+          LS_BROWSER: webkit
+      - run: node tests/celebrate.test.js
+        env:
+          LS_BROWSER: webkit
+      - run: node tests/contrast.test.js
         env:
           LS_BROWSER: webkit

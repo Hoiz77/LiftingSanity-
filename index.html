@@ -52,7 +52,7 @@
     --warn: #c79a00; --bad: #e0352b; --bad-soft: rgba(255, 59, 48, .1);
     --side-l: #1e9e45; --side-r: #9f45d8; --gold: #b88600; --gold-2: #e08600;
     --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
-    --term-bg: #ffffff; --term-ink: #2f9e44;
+    --term-bg: #ffffff; --term-ink: #1f7a33;
     --bar-bg: rgb(249, 249, 251); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
     --status-band: #f2f2f7;
     --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
@@ -68,7 +68,7 @@
   --warn: #c79a00; --bad: #e0352b; --bad-soft: rgba(255, 59, 48, .1);
   --side-l: #1e9e45; --side-r: #9f45d8; --gold: #b88600; --gold-2: #e08600;
   --p-m: #12a39b; --p-c: #6a9a1f; --p-e: #0a9fd0; --p-a: #e08600;
-  --term-bg: #ffffff; --term-ink: #2f9e44;
+  --term-bg: #ffffff; --term-ink: #1f7a33;
   --bar-bg: rgb(249, 249, 251); --scrim: rgba(0, 0, 0, .32); --shadow: 0 18px 44px rgba(0, 0, 0, .14);
   --status-band: #f2f2f7;
   --hi: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px -10px rgba(0, 0, 0, .12); --glow: 0 12px 26px -12px rgba(0, 122, 255, .7);
@@ -1195,6 +1195,9 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .term .cur { animation: blink 1s steps(1) infinite; }
 .term-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px currentColor; color: inherit; font: 600 13px var(--ui); }
 .term-btn .i { width: 16px; height: 16px; }
+/* a terminal reads left to right in any language (its button follows the language) */
+.term-h, .term pre { direction: ltr; text-align: left; }
+[dir="rtl"] .term-btn { direction: rtl; }
 
 /* ---------- the end of a workout: a dark stage, a medal, confetti and cards to share ---------- */
 #fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 96; pointer-events: none; }
@@ -1227,15 +1230,18 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .fin-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
 .fin-ring circle { fill: none; stroke: rgba(255, 255, 255, .12); stroke-width: 6; }
 .fin-ring .arc { stroke: var(--fin-c2); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; filter: drop-shadow(0 0 5px var(--fin-c)); }
-.fin-face { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 34% 28%, var(--fin-c2), var(--fin-c) 70%); box-shadow: 0 12px 34px -8px var(--fin-c), inset 0 2px 0 rgba(255, 255, 255, .4), inset 0 -4px 10px rgba(0, 0, 0, .18); }
+.fin-face { position: relative; overflow: hidden; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 34% 28%, var(--fin-c2), var(--fin-c) 70%); box-shadow: 0 12px 34px -8px var(--fin-c), inset 0 2px 0 rgba(255, 255, 255, .4), inset 0 -4px 10px rgba(0, 0, 0, .18); }
 .fin-face .i { width: 38px; height: 38px; stroke-width: 3; }
 .fin-face b { font: 900 30px/1 var(--display); font-stretch: 110%; color: #1b1000; }
 .fin[data-mood="pr"] .fin-face, .fin[data-mood="milestone"] .fin-face { color: #2a1800; }
-.fin-title { margin: 0; font: 900 34px/1.08 var(--display); font-stretch: 112%; letter-spacing: -.01em; background: linear-gradient(100deg, var(--ink) 20%, var(--fin-c2) 40%, var(--ink) 60%); background-size: 250% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fin-title { margin: 0; font: 900 34px/1.08 var(--display); font-stretch: 112%; letter-spacing: -.01em; }
+/* each word in light that sweeps across it (padding so the light reaches the tails of letters) */
+.fin-title .w { display: inline-block; padding: .08em .03em .16em; margin: -.08em -.03em -.16em; background: linear-gradient(100deg, var(--ink) 20%, var(--fin-c2) 40%, var(--ink) 60%); background-size: 250% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; color: transparent; }
 .fin-sub { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; font-weight: 500; }
 .fin-cards { --cw: min(80vw, 340px, max(220px, calc((100dvh - 360px) * .8))); display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px calc((100% - var(--cw)) / 2) 12px; scrollbar-width: none; overscroll-behavior-x: contain; outline: none; }
 .fin-cards::-webkit-scrollbar { display: none; }
-.fin-card { flex: 0 0 var(--cw); margin: 0; aspect-ratio: 4 / 5; scroll-snap-align: center; border-radius: calc(var(--cw) * .072); overflow: hidden; box-shadow: 0 26px 60px -24px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .03); }
+.fin-card { position: relative; flex: 0 0 var(--cw); margin: 0; aspect-ratio: 4 / 5; scroll-snap-align: center; border-radius: calc(var(--cw) * .072); overflow: hidden; box-shadow: 0 26px 60px -24px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .03); }
+.fin-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .16) 50%, transparent 62%); transform: translateX(-110%); opacity: 0; }
 .fin-card > svg { display: block; width: 100%; height: 100%; }
 .fin-cards:focus-visible .fin-card { outline: 2px solid var(--accent); outline-offset: 3px; }
 .fin-dots { display: flex; justify-content: center; gap: 4px; padding: 0 0 4px; }
@@ -1257,21 +1263,91 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .fin-ms i { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .08); position: relative; overflow: hidden; }
 .fin-ms i::after { content: ""; position: absolute; inset: 0; border-radius: 4px; transform-origin: 0 50%; transform: scaleX(var(--p)); background: linear-gradient(90deg, #ffb340, #ff375f); }
 [dir="rtl"] .fin-ms i::after { transform-origin: 100% 50%; }
+[dir="rtl"] .fin-prs.go li { animation-name: prRowR; }
+@keyframes prRowR { from { opacity: 0; transform: translateX(28px); } }
 .fin-ms b { text-align: end; font-variant-numeric: tabular-nums; }
 .fin-more .wnote { margin-top: 6px; }
 .fin-foot { display: flex; gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
 .fin-foot .btn { flex: 1; height: 52px; border-radius: 999px; font-size: 17px; font-weight: 700; }
 .fin-share { background: #ffffff; color: #000000; }
 .fin-share .i { width: 20px; height: 20px; }
+/* the medal's light for a workout just finished: a halo that breathes, rings that run out as it lands, a flash,
+   streaks and sparks; spotlights that sweep the stage */
+.fin-halo, .fin-wave, .fin-flash { position: absolute; border-radius: 50%; pointer-events: none; opacity: 0; }
+.fin-halo { inset: -38%; background: radial-gradient(closest-side, color-mix(in srgb, var(--fin-c2) 55%, transparent), color-mix(in srgb, var(--fin-c) 22%, transparent) 55%, transparent); }
+.fin-wave { inset: 0; border: 3px solid var(--fin-c2); box-shadow: 0 0 16px var(--fin-c), inset 0 0 16px var(--fin-c); }
+.fin-wave.w2 { border-width: 2px; border-color: #fff; }
+.fin-flash { inset: -70%; background: radial-gradient(closest-side, rgba(255, 255, 255, .95), color-mix(in srgb, var(--fin-c2) 45%, transparent) 40%, transparent 72%); }
+.fin-streaks, .fin-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.fin-streaks i { position: absolute; left: -1.5px; top: -10px; width: 3px; height: 20px; border-radius: 2px; background: linear-gradient(#fff, var(--fin-c2)); box-shadow: 0 0 8px var(--fin-c); opacity: 0; }
+.fin-sparks i { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px 2px var(--fin-c2), 0 0 2px #fff; opacity: 0; }
+/* sweeps of light are only there while they sweep (Safari doesn't always clip to a round corner mid-turn) */
+.fin-face::after { content: ""; position: absolute; inset: -10%; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .75) 50%, transparent 65%); transform: translateX(-120%); opacity: 0; }
+.fin-beams { position: absolute; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; }
+.fin-beams i { position: absolute; top: -12%; left: -40%; width: 120%; height: 120%; transform-origin: 50% 0; opacity: 0;
+  background: conic-gradient(from 180deg at 50% 0%, color-mix(in srgb, var(--fin-c2) 34%, transparent) 0deg, transparent 11deg 349deg, color-mix(in srgb, var(--fin-c2) 34%, transparent) 360deg);
+  -webkit-mask: linear-gradient(#000 8%, transparent 80%); mask: linear-gradient(#000 8%, transparent 80%); rotate: -32deg; }
+.fin-beams i + i { left: 20%; rotate: 32deg; }
 /* in order as it opens: the medal, the words, then the cards */
 .sheet-wrap.finish.in .fin-rays { animation: raysIn 1s .35s ease-out forwards, spin 30s .35s linear infinite; }
 .sheet-wrap.finish.in .fin-ring .arc { animation: ringDraw 1s .1s cubic-bezier(.6, 0, .2, 1) both; }
 .sheet-wrap.finish.in .fin-face { animation: medalPop .75s .45s cubic-bezier(.3, 1.7, .45, 1) both; }
 .sheet-wrap.finish.in .fin[data-mood="done"] .fin-face .i path { stroke-dasharray: 22; animation: draw .45s .95s ease-out both; }
-.sheet-wrap.finish.in .fin-title { animation: finRise .6s .6s cubic-bezier(.2, .9, .25, 1) both, shine 2.4s 1.2s ease-in-out both; }
+.sheet-wrap.finish.in .fin-title { animation: finRise .6s .6s cubic-bezier(.2, .9, .25, 1) both; }
+.sheet-wrap.finish.in .fin-title .w { animation: shine 2.4s calc(1.2s + var(--i) * .1s) ease-in-out both; }
 .sheet-wrap.finish.in .fin-sub { animation: finRise .6s .7s cubic-bezier(.2, .9, .25, 1) both; }
 .sheet-wrap.finish.in .fin-card { animation: cardUp .8s calc(.75s + var(--d, 0s)) cubic-bezier(.2, .9, .25, 1) both; }
 .sheet-wrap.finish.in .fin-dots, .sheet-wrap.finish.in .fin-more, .sheet-wrap.finish.in .fin-foot { animation: finRise .6s 1s ease-out both; }
+/* a workout just finished, bigger: the stage lights up, the medal spins in large in the middle and lands with a flash,
+   rings and streaks of light, then rises to its place; the title comes in word by word and the cards are dealt */
+.sheet-wrap.finish.in .fin[data-fresh] .fin-glow { animation: finBloom 1.6s ease-out both, glowDrift 14s 1.6s ease-in-out infinite alternate; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-beams i { animation: beamIn 4.6s .5s ease-out both, beamL 4.6s .5s cubic-bezier(.45, 0, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-beams i + i { animation: beamIn 4.6s .62s ease-out both, beamR 4.6s .62s cubic-bezier(.45, 0, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-medal { animation: medalStage 1.95s both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-ring .arc { animation: ringDraw .7s .12s cubic-bezier(.6, 0, .2, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-face { animation: medalFlip .8s .35s cubic-bezier(.2, .7, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-face::after { animation: faceShine .9s 1.15s ease-in-out; }
+.sheet-wrap.finish.in .fin[data-mood="done"][data-fresh] .fin-face .i path { animation: draw .45s .8s ease-out both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-rays { animation: raysIn 1s .78s ease-out forwards, spin 30s .78s linear infinite; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-halo { animation: haloIn .9s .76s ease-out both, haloBreathe 2.8s 1.7s ease-in-out infinite; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-wave { animation: finWave 1s .76s cubic-bezier(.1, .7, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-wave.w2 { animation: finWave2 1.15s .88s cubic-bezier(.1, .7, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-flash { animation: finFlash .6s .74s ease-out both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-streaks i { animation: finStreak .8s calc(.76s + var(--d)) cubic-bezier(.15, .7, .3, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-sparks i { animation: rkSpark 1.4s calc(.8s + var(--d)) cubic-bezier(.15, .6, .35, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-title { animation: none; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-title .w { animation: wordIn .7s calc(1.62s + var(--i) * .09s) cubic-bezier(.2, .9, .25, 1) both, shine 2.2s calc(2.15s + var(--i) * .12s) ease-in-out both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-sub { animation: finRise .6s 1.9s cubic-bezier(.2, .9, .25, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-cards { perspective: 1100px; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-card { animation: cardDeal .95s calc(1.95s + var(--d, 0s)) cubic-bezier(.2, .85, .25, 1) both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-card::after { animation: cardSheen 1.2s calc(2.65s + var(--d, 0s)) ease-in-out; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-foot { animation: finRise .6s 1.75s ease-out both; }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-dots, .sheet-wrap.finish.in .fin[data-fresh] .fin-more { animation: finRise .6s 2.2s ease-out both; }
+/* the records slide in with a glint, and each muscle's bar grows, as they're scrolled to */
+.fin-prs li { position: relative; overflow: hidden; }
+.fin-prs li::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--gold) 30%, transparent) 50%, transparent 65%); transform: translateX(-110%); opacity: 0; }
+.fin-prs.go li { animation: prRow .55s calc(var(--i) * .08s) cubic-bezier(.2, .9, .25, 1) both; }
+.fin-prs.go li::after { animation: cardSheen 1s calc(.3s + var(--i) * .08s) ease-in-out; }
+.fin-ms.go i::after { animation: barGrow .9s calc(var(--i) * .06s) cubic-bezier(.2, .9, .25, 1) both; }
+.fin-ms.go b { animation: finRise .5s calc(.2s + var(--i) * .06s) ease-out both; }
+@keyframes medalStage { 0%, 67% { transform: translate(var(--mx, 0px), var(--my, 0px)) scale(1.75); animation-timing-function: cubic-bezier(.6, 0, .2, 1); } 100% { transform: none; } }
+@keyframes medalFlip { 0% { opacity: 0; transform: perspective(500px) rotateY(-540deg) scale(.3); } 55% { opacity: 1; transform: perspective(500px) rotateY(20deg) scale(1.16); } 78% { transform: perspective(500px) rotateY(-6deg) scale(.97); } 100% { transform: perspective(500px) rotateY(0) scale(1); } }
+@keyframes faceShine { 0% { opacity: 1; transform: translateX(-120%); } 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(120%); } }
+@keyframes haloIn { 0% { opacity: 0; transform: scale(.3); } 45% { opacity: 1; transform: scale(1.25); } 100% { opacity: .8; transform: none; } }
+@keyframes haloBreathe { 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes finWave { 0% { opacity: .95; transform: scale(.55); } 100% { opacity: 0; transform: scale(3.4); } }
+@keyframes finWave2 { 0% { opacity: .8; transform: scale(.5); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes finFlash { 0% { opacity: 0; transform: scale(.4); } 18% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes finStreak { 0% { opacity: 0; transform: rotate(var(--a)) translateY(-40px) scaleY(.3); } 18% { opacity: 1; transform: rotate(var(--a)) translateY(-56px) scaleY(1.5); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-56px - var(--r))) scaleY(.2); } }
+@keyframes finBloom { 0% { opacity: 0; transform: scale(.55); } 45% { opacity: 1; transform: scale(1.12); } 100% { transform: none; } }
+@keyframes beamIn { 0% { opacity: 0; } 18% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: .5; } }
+@keyframes beamL { 0% { rotate: 12deg; } 40% { rotate: -30deg; } 72% { rotate: -6deg; } 100% { rotate: -18deg; } }
+@keyframes beamR { 0% { rotate: -12deg; } 40% { rotate: 30deg; } 72% { rotate: 6deg; } 100% { rotate: 18deg; } }
+@keyframes wordIn { from { opacity: 0; transform: translateY(28px) scale(.82); } }
+@keyframes cardDeal { 0% { opacity: 0; transform: translateY(150px) rotateX(40deg) scale(.84); } 55% { opacity: 1; } 100% { transform: none; } }
+@keyframes cardSheen { 0% { opacity: 1; transform: translateX(-110%); } 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(110%); } }
+@keyframes prRow { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes barGrow { from { transform: scaleX(0); } }
 @keyframes glowDrift { to { transform: translate3d(5%, 7%, 0) scale(1.1) rotate(8deg); } }
 @keyframes ringDraw { from { stroke-dashoffset: 100; } }
 @keyframes medalPop { from { transform: scale(0) rotate(-25deg); } }

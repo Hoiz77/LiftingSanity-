@@ -107,6 +107,8 @@
 [data-style="y2k"] .prog { --win: "PROGRAM.INI"; }
 [data-style="y2k"] .sci { --win: "BIOMECH_ANALYSIS.EXE ─ 解析"; }
 [data-style="y2k"] .term { --win: "WEEKLY_STATS.LOG"; }
+/* the terminal keeps its own dark screen, in light mode too (above the windows' panel colour) */
+:root[data-style="y2k"] .term { background-color: var(--term-bg); }
 [data-style="y2k"] .chart-card { --win: "GRAPH.EXE"; }
 [data-style="y2k"] .cal { --win: "CALENDAR.APP ─ 暦"; }
 [data-style="y2k"] .block-card { --win: "BLOCK_MANAGER.EXE"; }
@@ -139,8 +141,18 @@
 [data-style="y2k"] :is(.cell, .search, .field input, .field textarea, .field select, .select-wrap select, .note-f textarea, .note-f input) {
   background: var(--well) !important; color: var(--cyan); border: 2px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo) !important; box-shadow: inset 0 0 12px color-mix(in srgb, var(--cobalt) 35%, transparent); }
 [data-style="y2k"] .cell { font: 400 24px/1 var(--lcd); text-shadow: 0 0 7px color-mix(in srgb, var(--cyan) 75%, transparent); }
-[data-style="y2k"] .cell::placeholder, [data-style="y2k"] .cell .ph { color: color-mix(in srgb, var(--cobalt) 50%, var(--well)); text-shadow: none; }
+/* what a set will log if you tap ✓: dimmer than a logged value, but easy to read */
+[data-style="y2k"] .cell::placeholder, [data-style="y2k"] .cell .ph { color: color-mix(in srgb, var(--cyan) 58%, var(--well)); text-shadow: none; }
 [data-style="y2k"] .set-row.done .cell { color: #fff; background: color-mix(in srgb, var(--cobalt) 25%, transparent) !important; }
+/* in light mode the wells stay dark, so what's written in them takes dark mode's text colours; a logged set's boxes light up */
+:root[data-style="y2k"][data-theme="light"] :is(.score, .seg, .wd b, .sci-diag, .sci-rates, .sci-sure, .sci-ev, .sci-curve, .wo-nav, #restbar, #keypad) { --ink: #E8F0FF; --ink-2: #A9B8F5; --muted: #8C9AD8; --panel-2: #0F1747; --panel-3: #1A2670; }
+:root[data-style="y2k"][data-theme="light"] :is(.sci-diag, .sci-rates, .sci-sure, .sci-ev, .sci-curve, .wo-nav, #restbar, #keypad) { color: var(--ink); }
+:root[data-style="y2k"][data-theme="light"] .set-row.done .cell { background: color-mix(in srgb, var(--cobalt) 78%, #05060F) !important; }
+@media (prefers-color-scheme: light) {
+  :root[data-style="y2k"]:not([data-theme="dark"]) :is(.score, .seg, .wd b, .sci-diag, .sci-rates, .sci-sure, .sci-ev, .sci-curve, .wo-nav, #restbar, #keypad) { --ink: #E8F0FF; --ink-2: #A9B8F5; --muted: #8C9AD8; --panel-2: #0F1747; --panel-3: #1A2670; }
+  :root[data-style="y2k"]:not([data-theme="dark"]) :is(.sci-diag, .sci-rates, .sci-sure, .sci-ev, .sci-curve, .wo-nav, #restbar, #keypad) { color: var(--ink); }
+  :root[data-style="y2k"]:not([data-theme="dark"]) .set-row.done .cell { background: color-mix(in srgb, var(--cobalt) 78%, #05060F) !important; }
+}
 [data-style="y2k"] .search input { color: var(--cyan); font-family: var(--lcd); font-size: 20px; }
 [data-style="y2k"] .check { background: var(--chrome); color: #05060F; border: 2px solid; border-color: #fff #3a4370 #3a4370 #fff; }
 [data-style="y2k"] .set-row.done .check { background: var(--cyan); color: var(--on-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 90%, transparent); border-color: color-mix(in srgb, var(--cyan) 20%, #fff) color-mix(in srgb, var(--cyan) 50%, #000) color-mix(in srgb, var(--cyan) 50%, #000) color-mix(in srgb, var(--cyan) 20%, #fff); }
@@ -305,6 +317,7 @@
 [data-style="y2k"] .fin-face b { color: #05060F; font-family: var(--lcd); font-size: 40px; }
 [data-style="y2k"] .fin-title { font-family: var(--display); text-transform: uppercase; letter-spacing: .04em; text-shadow: none; }
 [data-style="y2k"] .fin-sub { font-family: var(--ui); }
+[data-style="y2k"] .fin-wave { border-radius: 0; }
 [data-style="y2k"] .fin-btn { border-radius: 0; background: color-mix(in srgb, var(--cobalt) 25%, transparent); border: 1px solid var(--cobalt); }
 [data-style="y2k"] .fin-card { border-radius: 26px; }
 [data-style="y2k"] .fin-dots button.on::after { background: var(--cyan); }

@@ -119,9 +119,11 @@ const pad2 = n => String(n).padStart(2, '0');
 const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 
 function trimNum(v, d = 2) { const f = 10 ** d; return String(Math.round(v * f) / f); }
+// a phone keyboard in Arabic (or Persian) can type ٨٢٫٥: the same number as 82.5
+const latinDigits = str => String(str).replace(/[\u0660-\u0669]/g, d => d.charCodeAt(0) - 0x660).replace(/[\u06F0-\u06F9]/g, d => d.charCodeAt(0) - 0x6F0).replace(/\u066B/g, '.').replace(/\u066C/g, '');
 function parseNum(str) {
   if (str == null || String(str).trim() === '') return null;
-  const v = parseFloat(String(str).replace(',', '.'));
+  const v = parseFloat(latinDigits(str).replace(',', '.'));
   return isFinite(v) ? v : null;
 }
 // units, effort scales and side letters as shown: in Arabic when Arabic terms are chosen; what's saved never changes
@@ -158,7 +160,7 @@ function fmtClock(sec) {
 // "45" is 45 s, "130" is 1:30, "1:30" is 1:30, like a microwave keypad
 function parseTime(str) {
   if (str == null) return null;
-  str = String(str).trim();
+  str = latinDigits(str).trim();
   if (!str) return null;
   if (str.includes(':')) {
     const parts = str.split(':').map(p => parseInt(p, 10) || 0);
@@ -258,7 +260,8 @@ const icon = (n, cls = '') => `<svg class="i i-${n} ${THICK.has(n) ? 'thick ' : 
 // The body in every muscle picture is a shaded anatomy render, front and back, with a man's or a woman's build (body.js
 // says where it's from). Each muscle has an outline on it. A muscle is painted by showing the render through its outline
 // with a colour filter, so its own shading, its fibres and the lines between muscles still show through the colour.
-const BD = window.LS_BODY;
+// (with body.js missing, the pictures are blank instead of the app not starting)
+const BD = window.LS_BODY || { w: 513, h: 986, male: { front: {}, back: {} }, female: { front: {}, back: {} } };
 const BD_BOX = `0 0 ${BD.w} ${BD.h}`;
 const figSex = () => state.settings.figure || (state.body && state.body.sex === 'F' ? 'female' : 'male');
 const bodyImg = (view, src, sex = figSex()) => `art/body/${sex}-${view}-${src}.webp`;
@@ -542,7 +545,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -3017,6 +3020,7 @@ function finishWorkout() {
   resetWoUI();
   save(true);
   wake(false);
+  prAllHide();
   render();
   renderWorkout();
   renderRest();
@@ -3026,6 +3030,7 @@ function finishWorkout() {
 function discardActive() {
   state.active = null;
   state.rest = null;
+  prAllHide();
   resetWoUI();
   ui.woHidden = false;
   save(true);
@@ -3047,28 +3052,65 @@ const fxColors = kind => {
     : [colorOf('accent'), colorOf('good'), g, '#FF375F', colorOf('right'), '#64D2FF', '#FFFFFF'];
 };
 let fxCv = null, fxBits = [], fxRaf = 0, fxLast = 0, fxEnd = 0, fxFrames = 0;
+function fxGo() {
+  if (!fxCv) { fxCv = document.createElement('canvas'); fxCv.id = 'fx'; fxCv.setAttribute('aria-hidden', 'true'); document.body.append(fxCv); }
+  fxEnd = Math.max(fxEnd, performance.now() + 4000); fxFrames = 0;
+  if (!fxRaf) { fxLast = performance.now(); fxRaf = requestAnimationFrame(fxTick); }
+}
 function confetti(x, y, { n = 120, colors = fxColors('party'), angle = -Math.PI / 2, spread = Math.PI * 2, power = 1 } = {}) {
   if (calm() || !window.requestAnimationFrame) return;
-  if (!fxCv) { fxCv = document.createElement('canvas'); fxCv.id = 'fx'; fxCv.setAttribute('aria-hidden', 'true'); document.body.append(fxCv); }
   for (let i = 0; i < n; i++) {
     const a = angle + (Math.random() - 0.5) * spread, v = (4 + Math.random() * 9) * power;
     fxBits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.35, w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[i % colors.length], s: i % 4, t: 0, life: 90 + Math.random() * 70, f: Math.random() * 6.3 });
   }
-  fxEnd = performance.now() + 4000; fxFrames = 0;
-  if (!fxRaf) { fxLast = performance.now(); fxRaf = requestAnimationFrame(fxTick); }
+  fxGo();
+}
+// a firework over `box` (a rectangle on the screen): a rocket from its bottom edge that bursts near the top, to one
+// side (-1 left, 1 right) or anywhere across it
+function firework(box, colors = fxColors('party'), side = 0) {
+  if (calm() || !window.requestAnimationFrame) return;
+  const fx = side ? 0.5 + side * (0.24 + Math.random() * 0.16) : 0.16 + Math.random() * 0.68;
+  const x = box.left + box.width * fx, y0 = box.top + box.height, top = box.top + box.height * (0.08 + Math.random() * 0.16);
+  // just fast enough to reach `top` under the rocket's own gravity
+  fxBits.push({ k: 'r', x, y: y0, vx: (Math.random() - 0.5) * 1.4, vy: -Math.sqrt(2 * 0.3 * (y0 - top)), t: 0, life: 240, c: '#FFFFFF', cols: colors });
+  fxGo();
+}
+// a rocket at the top of its climb: two shells of glowing sparks in one or two of its colours, a few of them white
+function fwBurst(b, out) {
+  const pick = () => b.cols[Math.floor(Math.random() * b.cols.length)], c1 = pick(), c2 = pick(), n = 72;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.12, v = (i % 2 ? 4.4 : 3.2) + Math.random() * 0.5;
+    out.push({ k: 's', x: b.x, y: b.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 60 + Math.random() * 35, c: i % 7 === 0 ? '#FFFFFF' : i % 2 ? c1 : c2 });
+  }
 }
 // one frame: each piece slows in the air, falls, sways and flips; the canvas is cleared once the last one is gone,
-// after 4 seconds (or 400 frames, whatever the clock says) at most, or straight away when the page was put away mid-burst
+// after 4 seconds (or 400 frames, whatever the clock says) at most, or straight away when the page was put away mid-burst.
+// Rockets climb and burst; sparks glow (their light adds up where they cross), trail a little and twinkle as they fade
 function fxTick(now) {
   if (now > fxEnd || now - fxLast > 1000 || ++fxFrames > 400) fxBits = [];
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight;
   if (fxCv.width !== Math.round(W * dpr) || fxCv.height !== Math.round(H * dpr)) { fxCv.width = Math.round(W * dpr); fxCv.height = Math.round(H * dpr); }
-  const g = fxCv.getContext('2d'), k = Math.min(3, Math.max(0.2, (now - fxLast) / 16.7));
+  const g = fxCv.getContext('2d'), k = Math.min(3, Math.max(0.2, (now - fxLast) / 16.7)), born = [];
   fxLast = now;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
   fxBits = fxBits.filter(b => b.t < b.life && b.y < H + 30);
   for (const b of fxBits) {
+    if (b.k) {
+      const rocket = b.k === 'r', drag = rocket ? 1 : Math.pow(0.955, k);
+      b.t += k; b.vx *= drag; b.vy = b.vy * drag + (rocket ? 0.3 : 0.05) * k;
+      b.x += b.vx * k; b.y += b.vy * k;
+      if (rocket && b.vy >= 0) { fwBurst(b, born); b.t = b.life; continue; }
+      // a climbing rocket sheds embers that drift and die quickly
+      if (rocket && Math.random() < 0.8 * k) born.push({ k: 's', x: b.x, y: b.y, vx: (Math.random() - 0.5) * 1.2, vy: Math.random() * 1.2, t: 0, life: 14 + Math.random() * 14, c: Math.random() < 0.5 ? '#FFFFFF' : b.cols[0] });
+      const fade = rocket ? 1 : Math.pow(Math.max(0, 1 - b.t / b.life), 0.7), tw = !rocket && b.t > b.life * 0.5 && Math.random() < 0.3 ? 0.25 : 1;
+      g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = g.fillStyle = b.c; g.lineCap = 'round';
+      g.globalAlpha = fade * tw; g.lineWidth = rocket ? 2.2 : 2;
+      g.beginPath(); g.moveTo(b.x - b.vx * (rocket ? 0.9 : 2.6), b.y - b.vy * (rocket ? 0.9 : 2.6)); g.lineTo(b.x, b.y); g.stroke();
+      g.globalAlpha = fade * tw * (rocket ? 0.4 : 0.22); g.beginPath(); g.arc(b.x, b.y, rocket ? 6 : 4.5, 0, 6.283); g.fill();
+      g.restore();
+      continue;
+    }
     const drag = Math.pow(0.97, k);
     b.t += k; b.vx *= drag; b.vy = b.vy * drag + 0.28 * k; b.f += 0.12 * k;
     b.x += (b.vx + Math.sin(b.f) * 0.8) * k; b.y += b.vy * k; b.r += b.vr * k;
@@ -3080,6 +3122,7 @@ function fxTick(now) {
     else g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
     g.restore();
   }
+  if (born.length) fxBits.push(...born);
   fxRaf = fxBits.length ? requestAnimationFrame(fxTick) : 0;
   if (!fxRaf) g.clearRect(0, 0, W, H);
 }
@@ -3157,7 +3200,7 @@ function rankUpOf(w, x, s, mate) {
 let prTimer = null;
 function prParty(x, gains, up = null) {
   // a rank-up first fills the screen for a moment (not with Reduce Motion), then the banner says the rest
-  if (up && !calm() && !prParty.after) { rankTakeover(up, getEx(x.exId)); fanfare(true); hapticBurst(); prParty.after = true; setTimeout(() => { prParty(x, gains, up); prParty.after = false; }, 2650); return; }
+  if (up && !calm() && !prParty.after) { rankTakeover(up, getEx(x.exId)); fanfare(true); hapticBurst(); prParty.after = true; prParty.later = setTimeout(() => { prParty(x, gains, up); prParty.after = false; }, 2650); return; }
   let el = $('#prfx');
   if (!el) { el = document.createElement('div'); el.id = 'prfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
   const ex = getEx(x.exId), k = ex.k;
@@ -3176,6 +3219,11 @@ function prParty(x, gains, up = null) {
   if (!prParty.after) { fanfare(!!up); hapticBurst(); }
   clearTimeout(prTimer);
   prTimer = setTimeout(prHide, 3800);
+}
+// the end of a workout (or throwing it away) puts any record banner or rank-up away, and one still to come with it
+function prAllHide() {
+  clearTimeout(prParty.later); prParty.after = false;
+  prHide(); rankfxHide();
 }
 function prHide() {
   const el = $('#prfx');
@@ -3679,25 +3727,29 @@ function finishScreen(id, mode = 'new') {
   const face = st.count ? `<b>${st.n}</b>` : mood === 'done' ? icon('check') : icon('trophy');
   const maxM = st.muscles.length ? st.muscles[0][1] : 1;
   let cur = 0, timer = null;
+  // light that runs out from the medal as it lands: streaks, and sparks that drift up
+  const streaks = Array.from({ length: 14 }, (_, i) => `<i style="--a:${Math.round(i * 360 / 14 + Math.random() * 12)}deg; --r:${Math.round(60 + Math.random() * 60)}px; --d:${(Math.random() * 0.12).toFixed(2)}s"></i>`).join('');
+  const sparks = Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2 + Math.random() * 0.5, d = 55 + Math.random() * 60;
+    return `<i style="--x:${Math.round(Math.cos(a) * d)}px; --y:${Math.round(Math.sin(a) * d * 0.85 - 10)}px; --d:${(Math.random() * 0.3).toFixed(2)}s; --s:${(0.5 + Math.random() * 0.7).toFixed(2)}"></i>`; }).join('');
   const pics = new Map();
   const prep = i => { if (cards[i] && !pics.has(i)) pics.set(i, cardPNG(cards[i]).catch(() => null)); return pics.get(i); };
   const def = openSheet({
     cls: 'finish',
     label: title,
     render: () => `<div class="fin" data-mood="${mood}"${fresh ? ' data-fresh' : ''}>
-      <div class="fin-glow" aria-hidden="true"></div>
+      <div class="fin-glow" aria-hidden="true"></div>${fresh ? '<div class="fin-beams" aria-hidden="true"><i></i><i></i></div>' : ''}
       <header class="fin-top"><button class="fin-btn" data-a="sheetClose" aria-label="${T('Close')}">${icon('x')}</button><button class="fin-btn" data-a="finShare" aria-label="${T('Share')}">${icon('share')}</button></header>
       <div class="sheet-body fin-body">
         <section class="fin-hero">
-          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span><svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${face}</span></div>
-          <h1 class="fin-title">${esc(title)}</h1>
+          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span>${fresh ? `<span class="fin-halo"></span><span class="fin-wave"></span><span class="fin-wave w2"></span><span class="fin-flash"></span><span class="fin-streaks">${streaks}</span><span class="fin-sparks">${sparks}</span>` : ''}<svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${face}</span></div>
+          <h1 class="fin-title">${title.split(' ').map((wd, i) => `<span class="w" style="--i:${i}">${esc(wd)}</span>`).join(' ')}</h1>
           <p class="fin-sub">${esc(sub)}</p>
         </section>
         <div class="fin-cards" role="region" aria-label="${T('Cards to share')}" tabindex="0">${cards.map((cd, i) => `<figure class="fin-card" data-i="${i}" style="--d:${i * 0.08}s" aria-label="${esc(T('{i} of {n}: {name}', { i: i + 1, n: cards.length, name: cd.label }))}">${cd.svg}</figure>`).join('')}</div>
         ${cards.length > 1 ? `<div class="fin-dots">${cards.map((cd, i) => `<button class="${i ? '' : 'on'}" data-a="finDot" data-i="${i}" aria-label="${esc(cd.label)}" aria-current="${!i}"></button>`).join('')}</div>` : ''}
         ${past ? '' : `<section class="fin-more">
-          ${st.prs.length ? `<h3 class="fin-h">${icon('trophy')}${TN(st.prs.length, '{n} new record', '{n} new records')}</h3><ul class="fin-prs">${st.prs.map(p => { const k = getEx(p.exId).k, plus = gainPlus(p, k); return `<li><span><b>${esc(getEx(p.exId).name)}</b><small>${esc(recKind(p.kind))} · ${esc(gainNow(p, k))}</small></span>${plus ? `<em>${esc(plus)}</em>` : ''}</li>`; }).join('')}</ul>` : ''}
-          ${st.muscles.length ? `<h3 class="fin-h">${T('Sets per muscle')}</h3><div class="fin-ms">${st.muscles.slice(0, 8).map(([m, n]) => `<div><span>${esc(MUSCLES[m])}</span><i style="--p:${Math.max(0.06, n / maxM)}"></i><b>${trimNum(n, 1)}</b></div>`).join('')}</div>` : ''}
+          ${st.prs.length ? `<h3 class="fin-h">${icon('trophy')}${TN(st.prs.length, '{n} new record', '{n} new records')}</h3><ul class="fin-prs">${st.prs.map((p, i) => { const k = getEx(p.exId).k, plus = gainPlus(p, k); return `<li style="--i:${i}"><span><b>${esc(getEx(p.exId).name)}</b><small>${esc(recKind(p.kind))} · ${esc(gainNow(p, k))}</small></span>${plus ? `<em>${esc(plus)}</em>` : ''}</li>`; }).join('')}</ul>` : ''}
+          ${st.muscles.length ? `<h3 class="fin-h">${T('Sets per muscle')}</h3><div class="fin-ms">${st.muscles.slice(0, 8).map(([m, n], i) => `<div style="--i:${i}"><span>${esc(MUSCLES[m])}</span><i style="--p:${Math.max(0.06, n / maxM)}"></i><b>${trimNum(n, 1)}</b></div>`).join('')}</div>` : ''}
           <label class="field wnote"><span>${icon('note')} ${T('How did it go?')}</span><textarea data-f="wnote" rows="2" placeholder="${T('Energy, sleep, anything to remember')}">${esc(w.note || '')}</textarea></label>
           <div class="chips wrap note-chips wnote-chips">${WNOTE_CHIPS.map(([en, c]) => `<button class="chip ${noteHas(w.note, en, c) ? 'on' : ''}" data-a="wnoteChip" data-v="${esc(c)}" aria-pressed="${noteHas(w.note, en, c)}">${esc(c)}</button>`).join('')}</div>
           <div class="row-btns left">
@@ -3745,20 +3797,46 @@ function finishScreen(id, mode = 'new') {
     clearTimeout(timer); timer = setTimeout(() => prep(cur), 250);
   }, { passive: true });
   setTimeout(() => prep(0), 1200);
+  const still = calm(), fin = $('.fin', el), medal = $('.fin-medal', el);
   if (fresh) {
-    countUp($('.fin-card[data-i="' + (cards[0].k === 'milestone' ? 1 : 0) + '"]', el), 900);
-    setTimeout(() => {
-      if (!el.isConnected) return;
-      const m = $('.fin-medal', el).getBoundingClientRect(), x = m.left + m.width / 2, y = m.top + m.height / 2, cols = fxColors(mood === 'done' ? 'party' : 'gold');
-      confetti(x, y, { n: 150, colors: cols, power: 1.1 });
-      setTimeout(() => {
-        confetti(0, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI / 3, spread: 0.7, power: 1.6 });
-        confetti(innerWidth, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI * 2 / 3, spread: 0.7, power: 1.6 });
-      }, 240);
+    // the medal lands in the middle of the screen, then rises to its place above the words and the cards
+    if (!still) {
+      const r = medal.getBoundingClientRect(), f = fin.getBoundingClientRect();
+      medal.style.setProperty('--mx', `${Math.round(f.left + f.width / 2 - r.left - r.width / 2)}px`);
+      medal.style.setProperty('--my', `${Math.round(f.top + f.height * 0.4 - r.top - r.height / 2)}px`);
+    }
+    const cols = fxColors(mood === 'done' ? 'party' : 'gold'), shells = mood === 'milestone' ? 5 : mood === 'pr' ? 3 : 2;
+    const at = (ms, fn) => setTimeout(() => { if (el.isConnected && !el.classList.contains('out')) fn(); }, still ? 0 : ms);
+    // as it lands: confetti from the medal, the fanfare and a stronger tap; as the cards come in, two cannons
+    // from the bottom corners; then fireworks, more of them for a record or a milestone
+    at(780, () => {
+      const m = medal.getBoundingClientRect();
+      confetti(m.left + m.width / 2, m.top + m.height / 2, { n: 160, colors: cols, power: 1.15 });
       fanfare(true);
       hapticBurst();
-    }, calm() ? 0 : 650);
+    });
+    at(1950, () => {
+      confetti(0, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI / 3, spread: 0.7, power: 1.6 });
+      confetti(innerWidth, innerHeight * 0.8, { n: 70, colors: cols, angle: -Math.PI * 2 / 3, spread: 0.7, power: 1.6 });
+    });
+    for (let i = 0; i < shells; i++) at(2400 + i * 560, () => firework(fin.getBoundingClientRect(), cols, i % 2 ? 1 : -1));
+    countUp($('.fin-card[data-i="' + (cards[0].k === 'milestone' ? 1 : 0) + '"]', el), 2250);
+    // a tap while it plays (not on a button) skips to the end of it
+    const until = performance.now() + 2600;
+    if (!still) fin.addEventListener('pointerdown', e => {
+      if (performance.now() > until || e.target.closest('button, textarea')) return;
+      for (const a of fin.getAnimations({ subtree: true })) if (isFinite(a.effect.getComputedTiming().endTime)) a.finish();
+    });
   }
+  // the records and the bars for each muscle come in as they're scrolled to
+  const seen = () => {
+    if (!el.isConnected) return;
+    const parts = $$('.fin-prs, .fin-ms', el);
+    if (still || !window.IntersectionObserver) { parts.forEach(p => p.classList.add('go')); return; }
+    const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('go'); io.unobserve(e.target); } }, { root: $('.fin-body', el), threshold: 0.25 });
+    parts.forEach(p => io.observe(p));
+  };
+  if (fresh && !still) setTimeout(seen, 2300); else seen();
   return def;
 }
 function tplExFromWorkout(w, oldTpl) {
@@ -4494,7 +4572,7 @@ function woSetField(i, j, f, v) {
   if (f === 'w') s.w = toKg(pos(parseNum(v)));
   else if (f === 'sec') s.sec = pos(parseTime(v));
   else if (f === 'dist') s.dist = toMeters(pos(parseNum(v)), k);
-  else { const n = parseInt(v, 10); s[f] = pos(isFinite(n) ? n : null); }
+  else { const n = parseInt(latinDigits(v), 10); s[f] = pos(isFinite(n) ? n : null); }
   if (s[f] == null) delete s[f];
   const m = f === 'w' && isCompact(x) ? partnerOf(x, s) : null;
   if (m) { if (s.w == null) delete m.w; else m.w = s.w; }
@@ -5104,7 +5182,7 @@ function templateEditor(tplId, opts = {}) {
       if (!x) return;
       if (f === 'rest') { x.rest = +el.value; return; }
       const s = x.sets[+el.dataset.j];
-      if (f === 'tr') s.tr = el.value.trim();
+      if (f === 'tr') s.tr = latinDigits(el.value).trim();
       if (f === 'tw') { const v = parseNum(el.value); if (v == null) delete s.tw; else s.tw = toKg(v); }
       if (f === 'trir') {
         const v = parseNum(el.value.replace('+', ''));
@@ -5769,7 +5847,7 @@ function weekLines() {
 }
 function weekCard() {
   const rule = '-'.repeat(28);
-  return `<section class="term" aria-label="This week"><div class="term-h"><span>LIFTING-SANITY v1.3</span><button class="term-btn" data-a="shareWeek">${icon('share')}Share</button></div>
+  return `<section class="term" aria-label="${T('This week')}"><div class="term-h"><span>LIFTING-SANITY v1.3</span><button class="term-btn" data-a="shareWeek">${icon('share')}${T('Share')}</button></div>
     <pre>${rule}\n$ cat weekly_stats.log\n${rule}\n${weekLines().map(l => '> ' + esc(l)).join('\n')}\n${rule}\n$ <span class="cur">_</span></pre></section>`;
 }
 function liftsSection(from, to, title) {
@@ -5884,6 +5962,11 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 42, items: [
+    ['flame', 'A bigger finish', 'Finishing a workout is a show now: spotlights sweep the stage, the medal spins in and lands with a flash, rings of light and confetti, the cards are dealt in and fireworks go off. Tap to skip ahead.'],
+    ['sliders', 'Y2K, easier to read', 'The numbers a set will log are clear now, and in light mode the scores, notes, number pad and terminal read properly again.'],
+    ['check', 'Fixes', 'A record banner no longer covers the end of a workout, numbers typed on an Arabic keyboard (٨٢٫٥) count, and the weekly stats terminal reads left to right in Arabic.']
+  ] },
   { v: 41, items: [
     ['dumbbell', 'A new body in every muscle picture', 'A detailed anatomy drawing, front and back, with every muscle you train: erectors, rotator cuff, serratus, adductors, the outer hip and more. Worked muscles glow and fade softly at their edges.'],
     ['layout', 'Bigger and clearer', 'An exercise without a picture now shows the part of the body it works, big, front and back. The end-of-workout cards and your ranks use the same body.'],
@@ -6836,6 +6919,10 @@ function selfCheck() {
       let x = 100; for (let n = 0; n < 100; n++) { state.settings.unit = n % 2 ? 'kg' : 'lb'; dispW(x); }
       return lb === '220.5' && kg === '100' && back === '225' && x === 100 || [lb, kg, back].join(' / ');
     } finally { state.settings.unit = was; }
+  });
+  check('Numbers typed on an Arabic or Persian keyboard read the same as 0–9', () => {
+    const got = [parseNum('٨٢٫٥'), parseNum('۸۲,۵'), parseNum('82,5'), parseTime('١:٣٠'), parseTime('٩٠'), parseNum('١٬٢٠٠')];
+    return JSON.stringify(got) === JSON.stringify([82.5, 82.5, 82.5, 90, 90, 1200]) || JSON.stringify(got);
   });
   check('A damaged backup is refused before anything changes', () => {
     const bad = backupProblem({ workouts: [{ start: 1, ex: 'oops' }] }), good = backupProblem(clone({ ...state, active: null }));
