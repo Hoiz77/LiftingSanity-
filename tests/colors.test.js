@@ -31,19 +31,21 @@ const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16
   await p.fill('.cslot[data-k="left"] .chex', '0f0'); await p.waitForTimeout(150);
   r.ok(await pv('--side-l') === '#00FF00' && await p.evaluate(() => !document.querySelector('.cslot[data-k="left"] .cslot-reset').hidden), 'a hex code works too (short ones like 0f0 included), and the colour gets a Default button');
   await t.inSheet('[data-a="mode"][data-v="light"]', 300);
+  r.ok(await pv('--bg') === '#F2F2F7' && await pv('--accent') === '#007AFF' && await pv('--good') === '#1F9D47', 'light mode is edited on its own: what was picked for dark mode isn’t in it', { accent: await pv('--accent'), good: await pv('--good') });
+  await wheel('good', '#ffcc00'); await p.waitForTimeout(150);
   const lg = await pv('--good');
-  r.ok(await pv('--bg') === '#F2F2F7' && lg !== '#FFCC00' && contrast(lg, '#FFFFFF') >= 2.6 && /In light mode/.test(await note('good')), 'the light preview: the page is light, and the yellow is darkened just enough to read on white (and says so)', { lg });
+  r.ok(lg !== '#FFCC00' && contrast(lg, '#FFFFFF') >= 2.6 && /light background/.test(await note('good')), 'a yellow picked for light mode is darkened just enough to read on the light page (and says so)', { lg });
   r.ok(await p.evaluate(() => document.querySelector('details[data-sec="sides"]').open), 'groups opened stay open when the preview changes');
   r.ok(/Light mode/.test(await t.text('#sheets .sheet-wrap.in details[data-sec="surf"] summary')), 'background and text are for the mode shown in the preview');
-  await t.inSheet('.cslot[data-k="s.bg"] [data-a="pick"][data-v="#F3EBDD"]', 200);
+  await t.inSheet('.cslot[data-k="bg"] [data-a="pick"][data-v="#F3EBDD"]', 200);
   r.ok(await pv('--bg') === '#F3EBDD' && lum(await pv('--panel')) > lum('#F3EBDD'), 'a light background for light mode, with the cards lighter than it');
   await t.inSheet('[data-a="mode"][data-v="dark"]', 300);
-  await t.inSheet('.cslot[data-k="s.bg"] [data-a="pick"][data-v="#15202B"]', 200);
+  await t.inSheet('.cslot[data-k="bg"] [data-a="pick"][data-v="#15202B"]', 200);
   r.ok(await pv('--bg') === '#15202B' && await pv('--panel') !== '#121214' && await pv('--panel') !== '#15202B', 'dark mode has its own: a grey-blue page, with the cards a shade lighter');
-  await p.fill('.cslot[data-k="s.bg"] .chex', '#8090A0'); await p.waitForTimeout(150);
-  r.ok(lum(await pv('--bg')) <= 0.06 && /darker/.test(await note('s.bg')), 'a background too light for dark mode is kept dark, and it says so', await pv('--bg'));
-  await p.fill('.cslot[data-k="s.ink2"] .chex', '#303030'); await p.waitForTimeout(150);
-  r.ok(contrast(await pv('--ink-2'), await pv('--panel')) >= 4.5 && /easy to read/.test(await note('s.ink2')), 'text too dark to read on the cards is lightened until it reads, and it says so', await pv('--ink-2'));
+  await p.fill('.cslot[data-k="bg"] .chex', '#8090A0'); await p.waitForTimeout(150);
+  r.ok(lum(await pv('--bg')) <= 0.06 && /darker/.test(await note('bg')), 'a background too light for dark mode is kept dark, and it says so', await pv('--bg'));
+  await p.fill('.cslot[data-k="ink2"] .chex', '#303030'); await p.waitForTimeout(150);
+  r.ok(contrast(await pv('--ink-2'), await pv('--panel')) >= 4.5 && /easy to read/.test(await note('ink2')), 'text too dark to read on the cards is lightened until it reads, and it says so', await pv('--ink-2'));
   await section('types');
   await t.inSheet('.cslot[data-k="types.D"] [data-a="pick"][data-v="#FFD60A"]', 500);
   const dTag = await p.evaluate(() => { const b = document.querySelector('#sheets .sheet-wrap.in .cpv .cpv-types .badge.t-D'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, ink: cs.color }; });
@@ -56,11 +58,14 @@ const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16
   await t.inSheet('[data-a="preset"][data-i="1"]', 300);
   r.ok(await pv('--accent') === '#1D9BF0' && await pv('--bg') === '#15202B' && await pv('--panel') === '#192734' && await pv('--ink-2') === '#8B98A5', 'a ready-made look (X Dim) changes the page, cards, text and accent at once');
   await t.inSheet('.cslot[data-k="accent"] [data-a="pick"][data-v="#FFD60A"]', 200);
+  await t.inSheet('[data-a="mode"][data-v="light"]', 300);
+  r.ok(await pv('--accent') !== '#FFD60A', 'picking in dark mode leaves light mode alone', await pv('--accent'));
+  await t.inSheet('[data-a="mode"][data-v="dark"]', 300);
   await section('types');
   await t.inSheet('.cslot[data-k="types.W"] [data-a="pick"][data-v="#BF5AF2"]', 200);
   await t.inSheet('[data-a="save"]', 700);
   const saved = (await t.state()).settings.colors;
-  r.ok(saved.accent === '#FFD60A' && saved.good === '#00BA7C' && saved.dark.bg === '#15202B' && saved.light.bg === '#F7F9F9' && saved.types.W === '#BF5AF2' && /saved/.test(await t.text('#toast')), 'Save keeps them', saved);
+  r.ok(saved.dark.accent === '#FFD60A' && saved.dark.good === '#00BA7C' && saved.dark.bg === '#15202B' && saved.dark.types.W === '#BF5AF2' && saved.light.accent === '#1D9BF0' && saved.light.bg === '#F7F9F9' && !(saved.light.types || {}).W && /saved/.test(await t.text('#toast')), 'Save keeps them: the look in both modes, and the changes made in dark mode in dark mode only', saved);
   r.ok(await rootVar('--accent') === '#FFD60A' && await rootVar('--bg') === '#15202B' && await rootVar('--panel') === '#192734', 'and the app takes them');
   await t.start();
   const look = await p.evaluate(() => { const f = getComputedStyle(document.querySelector('#workout [data-a="woFinish"]')), w = document.querySelector('#workout .badge.t-W'); return { btn: f.backgroundColor, text: f.color, page: getComputedStyle(document.querySelector('#workout')).backgroundColor, warm: w && getComputedStyle(w).borderTopColor }; });
@@ -68,7 +73,7 @@ const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16
   r.ok(!look.warm || hex(look.warm) === '#BF5AF2', 'and a warm-up plate in its new colour', look.warm);
   await t.ev(`state.settings.theme = 'light'; applyTheme(); renderWorkout()`); await p.waitForTimeout(200);
   const la = await rootVar('--accent'), lb = await rootVar('--bg');
-  r.ok(la !== '#FFD60A' && contrast(la, '#FFFFFF') >= 3 && lb === '#F7F9F9', 'in light mode: the light background of the look, and the accent darkened to read on it', { la, lb });
+  r.ok(la !== '#FFD60A' && contrast(la, '#F7F9F9') >= 3 && lb === '#F7F9F9', 'in light mode: the look’s light background and its own accent, not the yellow picked for dark mode', { la, lb });
   // the end of a workout: always dark, in the dark-mode colours, and so are its cards
   await t.ev(`(() => { for (const x of A().ex) for (const s of x.sets) { s.done = true; s.w = s.w || 20; s.r = s.r || 8; } finishWorkout(); })()`);
   await p.waitForTimeout(1300);
@@ -87,7 +92,7 @@ const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16
   await t.inSheet('[data-a="preset"][data-i="1"]', 300);
   await t.inSheet('[data-a="save"]', 700);
   const st = await t.state();
-  r.ok(st.settings.colorsY2k.frame === '#B967FF' && st.settings.colorsY2k.accent === '#05FFA1' && st.settings.colors.accent === '#FFD60A', 'saved as the Y2K colours; the Clean ones are kept', { y2k: st.settings.colorsY2k });
+  r.ok(st.settings.colorsY2k.dark.frame === '#B967FF' && st.settings.colorsY2k.light.accent === '#05FFA1' && st.settings.colors.dark.accent === '#FFD60A', 'saved as the Y2K colours; the Clean ones are kept', { y2k: st.settings.colorsY2k });
   const y = { cobalt: await rootVar('--cobalt'), cyan: await rootVar('--cyan'), accent: await rootVar('--accent'), good: await rootVar('--good'), right: await rootVar('--side-r'), bg: await rootVar('--bg') };
   r.ok(y.cobalt === '#B967FF' && y.cyan === '#05FFA1' && y.accent === '#05FFA1' && y.good === '#05FFA1' && y.right === '#FF71CE' && y.bg === '#120A1F', 'and Y2K takes them: the frame, the accent (done follows it), the highlight on the right side, the page', y);
   await t.ev(`state.settings.theme = 'light'; applyTheme()`); await p.waitForTimeout(200);
@@ -102,6 +107,8 @@ const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => (+n).toString(16
   r.ok(!Object.keys((await t.state()).settings.colors || {}).length && await rootVar('--accent') === '#0A84FF' && await rootVar('--bg') === '#000000', '“All back to default” puts every colour back');
   // colours saved by an earlier version: the background moves to dark mode's, anything that isn't a colour is dropped
   const old = await t.ev(`migrate({ settings: { colors: { accent: '#ff0000', bg: '#101010', good: 'red', types: { D: '#00ff00', Q: '#000000' } } } }).settings`);
-  r.ok(JSON.stringify(old.colors) === JSON.stringify({ accent: '#FF0000', dark: { bg: '#101010' }, types: { D: '#00FF00' } }) && JSON.stringify(old.colorsY2k) === '{}', 'colours from an earlier version are kept, in their new places', old.colors);
+  r.ok(JSON.stringify(old.colors) === JSON.stringify({ dark: { accent: '#FF0000', bg: '#101010', types: { D: '#00FF00' } }, light: { accent: '#FF0000', types: { D: '#00FF00' } } }) && JSON.stringify(old.colorsY2k) === '{}', 'colours from an earlier version are kept, in their new places (shared ones in both modes)', old.colors);
+  const v38 = await t.ev(`migrate({ settings: { colors: { accent: '#ff0000', dark: { bg: '#101010' }, light: { bg: '#eeeeee' } } } }).settings.colors`);
+  r.ok(v38.dark.accent === '#FF0000' && v38.light.accent === '#FF0000' && v38.dark.bg === '#101010' && v38.light.bg === '#EEEEEE', 'and from v38: the accent goes to both modes, each background to its own', v38);
   await r.done(t);
 })();

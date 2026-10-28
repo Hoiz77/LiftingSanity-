@@ -67,11 +67,17 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
 
   // a rank-up while you train
   await t.start();
-  await t.ev(`(() => { const w = A(); w.ex = [${JSON.stringify(ex('nx', 'barbell-bench-press', [set(105, 5, { done: false }), set(80, 5, { done: false })]))}, ${JSON.stringify(ex('ny', 'barbell-curl', [set(40, 8, { done: false })]))}]; w.cur = 0; renderWorkout(true); })()`);
+  await t.ev(`(() => { const w = A(); w.ex = [${JSON.stringify(ex('nx', 'barbell-bench-press', [set(105, 5, { done: false, tr: '4-6' }), set(80, 5, { done: false, tr: '4-6' })]))}, ${JSON.stringify(ex('ny', 'barbell-curl', [set(40, 8, { done: false })]))}]; w.cur = 0; renderWorkout(true); })()`);
   await p.waitForTimeout(400);
+  const hint = await t.text('#workout .exc[data-e="0"] .rank-hint');
+  r.ok(/Gold/.test(hint) && /next: Platinum at 95 kg × 6/.test(hint), 'in a workout, the exercise shows its rank and the next one as a set at the top of its rep range (95 kg × 6 for Platinum)', hint);
   await t.click('#workout [data-a="toggleSet"][data-e="0"][data-s="0"]', 700);
+  const take = await p.evaluate(() => { const f = document.querySelector('#rankfx:not([hidden])'); return f && f.textContent.replace(/\s+/g, ' '); });
+  r.ok(take && /Rank up/.test(take) && /Platinum/.test(take) && /Barbell Bench Press/.test(take) && /Gold/.test(take), 'beating your rank fills the screen for a moment: the new emblem, “Platinum”, the lift, from Gold', take);
+  r.ok(/Platinum/.test(await t.text('#workout .exc[data-e="0"] .rank-hint')), 'and the card’s rank moves up with it');
+  await p.waitForTimeout(2600);
   const banner = await p.evaluate(() => { const b = document.querySelector('#prfx:not([hidden]) .prfx-card'); return b && { rank: b.classList.contains('prfx-rank'), text: b.textContent, emb: !!b.querySelector('.rank-emb') }; });
-  r.ok(banner && banner.rank && banner.emb && /Rank up: Platinum!/.test(banner.text) && /from Gold/.test(banner.text), 'beating your rank: the banner says “Rank up: Platinum!”, from Gold, with the new emblem', banner);
+  r.ok(banner && banner.rank && banner.emb && /Rank up: Platinum!/.test(banner.text) && /from Gold/.test(banner.text) && await p.evaluate(() => document.querySelector('#rankfx').hidden), 'then it gives way to the banner: “Rank up: Platinum!”, from Gold, with the new emblem', banner);
   await t.ev('prHide()'); await p.waitForTimeout(400);
   await t.ev(`woGo(1)`); await p.waitForTimeout(400);
   await t.click('#workout [data-a="toggleSet"][data-e="1"][data-s="0"]', 700);
@@ -82,6 +88,17 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   r.ok(/Rank up/.test(cards[0] || '') && cards.some(c => /: Ranks$/.test(c)), 'the end screen opens with the rank-up card, and has your ranks', cards);
   const png = await t.ev(`(async () => { const st = workoutStory(state.workouts[state.workouts.length - 1]); const b = await cardPNG(finCards(st).find(c => c.k === 'rankup')); return b.size; })()`);
   r.ok(png > 20000, 'the rank-up card makes a picture to share', png);
+  // your rank in one exercise, to share; rank-ups through your history; your ranks in the exercise list
+  const own = await t.ev(`(async () => { const c = cardRankOf(rankTable().find(o => o.id === 'barbell-bench-press')); return { label: c.svg.match(/aria-label="([^"]+)"/)[1], has: /PLATINUM/.test(c.svg) && /105 × 5/.test(c.svg), size: (await cardPNG(c)).size }; })()`);
+  r.ok(own.has && own.size > 20000, 'an exercise’s rank as a card to share: the rank, the lift and the set', own);
+  const ups = await t.ev(`rankUpHistory().map(u => [u.id, RK.TIERS[u.from].id, RK.TIERS[u.to].id])`);
+  r.ok(ups.length && JSON.stringify(ups[0]) === JSON.stringify(['barbell-bench-press', 'gold', 'platinum']), 'rank-ups through your history, newest first', ups);
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
+  await t.tab('progress'); await t.click('.rank-card [data-a="rankAll"]', 600);
+  r.ok(await p.evaluate(() => document.querySelectorAll('#sheets .sheet-wrap.in .rank-up-row').length >= 2), 'All your ranks lists them');
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
+  await t.tab('library'); await p.fill('#view input[type="search"]', 'barbell bench press'); await p.waitForTimeout(500);
+  r.ok(await p.evaluate(() => { const row = [...document.querySelectorAll('#view .ex-row')].find(b => b.querySelector('b').textContent === 'Barbell Bench Press'); return !!(row && row.querySelector('.ex-rank .rank-emb[aria-label="Platinum"]')); }), 'the exercise list shows your rank in each exercise you’ve done');
   await t.ev('closeAllSheets()'); await p.waitForTimeout(500);
 
   // kept in backups; nonsense details are dropped
@@ -97,6 +114,7 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   await t.inSheet('[data-a="save"]', 600);
   st = await t.state();
   r.ok(Math.abs(st.body.bw - 90.72) < 0.01 && st.body.sex === 'F', 'and is kept in kg (200 lb = 90.7 kg), with women’s standards picked', st.body);
+  r.ok(st.body.log.length === 2 && st.body.log[0].bw === 80 && await t.ev(`bwAt(Date.now() - 30 * 864e5)`) === 80 && await t.ev(`bwAt(Date.now())`) > 90, 'each bodyweight is kept with its day, so older workouts are ranked at the bodyweight you had then', st.body.log);
   await t.ev(`state.settings.unit = 'kg'`);
   // off: no ranks anywhere
   await t.tab('settings');

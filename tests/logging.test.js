@@ -85,10 +85,11 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   let k = await kp();
   r.ok(k && k.s === 1 && k.f === 'rir' && JSON.stringify(await choices()) === '["0","1","2*","3","4","5+"]' && /Set 1 · RIR/.test(await t.text('#keypad .kp-title')), 'Next after the reps goes to the RIR: 0 to 5+ on the pad, the target ringed', { k, choices: await choices() });
   r.ok(await t.p.evaluate(() => document.querySelector('#workout .cell.eff[data-s="1"]').classList.contains('kp-on')), 'the RIR box is marked as the one being filled in');
-  await pick(1);
+  await t.ev('state.rest = null');
+  await pick(1, 450);
   a = await S(); k = await kp();
-  r.ok(a.ex[0].sets[1].rir === 1 && !a.ex[0].sets[1].done && k && k.s === 2 && k.f === 'w', 'one tap on a choice puts the RIR in and moves on to the next set’s weight', { set: a.ex[0].sets[1], k });
-  await pad('kpNext', 200); await key(8);
+  r.ok(a.ex[0].sets[1].rir === 1 && a.ex[0].sets[1].done && a.ex[0].sets[1].w === 30 && a.ex[0].sets[1].r === 9 && !k && await t.ev('!!state.rest'), 'one tap on a choice logs the set with that RIR, and the rest timer starts', { set: a.ex[0].sets[1], k });
+  await t.click('#workout .cell[data-e="0"][data-s="2"][data-f="r"]', 300); await key(8);
   await t.ev('state.rest = null');
   await pad('kpLog', 450);
   a = await S();
@@ -100,6 +101,7 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   r.ok(k && k.s === 1 && k.f === 'w', 'a warm-up has no RIR step: Next goes from its reps to the next set', k);
   await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpLog', 400);
   r.ok((await S()).ex[0].sets[0].done && !(await kp()), 'and Log logs a warm-up straight away');
+  await t.ev(`(() => { A().ex[0].sets[1].done = false; renderWorkout(); })()`); await t.p.waitForTimeout(150);
   await t.click('#workout .cell[data-e="0"][data-s="1"][data-f="r"]', 300); await pad('kpLog', 400);
   a = await S();
   r.ok(a.ex[0].sets[1].done && a.ex[0].sets[1].rir === 1 && !(await kp()), 'a set whose RIR is already in logs straight away', a.ex[0].sets[1]);
@@ -108,6 +110,10 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpNext'); await pad('kpLog', 400);
   a = await S();
   r.ok(a.ex[0].sets[0].done && a.ex[0].sets[0].rir === 2, 'Log on the RIR step logs the set with the target RIR shown, like ✓', a.ex[0].sets[0]);
+  await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { w: 30, r: 8, trir: 2 }), set('b', 'N', { w: 30, r: 8, trir: 2 })])] });
+  await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="r"]', 300); await pad('kpNext'); await pad('kpNext', 400);
+  a = await S();
+  r.ok(a.ex[0].sets[0].done && a.ex[0].sets[0].rir === 2 && !a.ex[0].sets[1].done, 'so does Next on the RIR step: the set is logged with the target, and only that set', a.ex[0].sets);
   await load({ ex: [ex('x0', 'barbell-curl', [set('a', 'N', { trir: 2 })])] });
   await t.click('#workout .cell[data-e="0"][data-s="0"][data-f="w"]', 300); await pad('kpLog');
   k = await kp();
@@ -140,9 +146,9 @@ const ex = (id, exId, sets, extra = {}) => ({ id, exId, rest: 90, uni: false, ss
   const k2 = await kp(), t2 = await t.text('#keypad .kp-title'), m2 = await t.p.evaluate(() => (document.querySelector('#workout .cell.eff.sides .kp-side') || {}).className);
   await pick(3);
   r.ok(k1 && k1.f === 'rir' && /Left side · RIR/.test(t1) && /side-L/.test(m1) && k2 && k2.f === 'rir' && /Right side · RIR/.test(t2) && /side-R/.test(m2), 'one-row left/right: Next goes from each side’s reps to the left side’s RIR, then the right’s, marking the side asked for', { k1, t1, m1, k2, t2, m2 });
-  await t.click('#workout .set-row.one .cell[data-f="r"]', 300); await pad('kpLog', 500);
+  await t.p.waitForTimeout(300);
   a = await S();
-  r.ok(a.ex[0].sets.every(s => s.done) && a.ex[0].sets[0].rir === 1 && a.ex[0].sets[1].rir === 3, 'then Log logs both sides, each with its own RIR', a.ex[0].sets);
+  r.ok(a.ex[0].sets.every(s => s.done) && a.ex[0].sets[0].rir === 1 && a.ex[0].sets[1].rir === 3, 'and the right side’s choice logs both sides, each with its own RIR', a.ex[0].sets);
   await t.ev(`delete state.exPrefs['single-arm-cable-fly']`);
   // separate left/right rows: the left side is logged, then on to the right side
   await load({ ex: [ex('x0', 'single-arm-cable-fly', [set('l', 'N', { side: 'L', pair: 'p', w: 15, r: 10 }), set('r', 'N', { side: 'R', pair: 'p', w: 15, r: 9 })], { uni: true })] });

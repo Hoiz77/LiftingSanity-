@@ -512,7 +512,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -546,7 +546,9 @@ function migrate(s) {
   s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
   // your details for lift ranks (the guide's answers are in s.profile): kept only if they make sense
   const bd = s.body;
-  s.body = bd && typeof bd === 'object' && +bd.bw >= 30 && +bd.bw <= 250 ? { sex: bd.sex === 'F' ? 'F' : 'M', bw: +bd.bw, age: +bd.age >= 10 && +bd.age <= 100 ? Math.round(+bd.age) : null, at: +bd.at || 0 } : null;
+  s.body = bd && typeof bd === 'object' && +bd.bw >= 30 && +bd.bw <= 250 ? { sex: bd.sex === 'F' ? 'F' : 'M', bw: +bd.bw, age: +bd.age >= 10 && +bd.age <= 100 ? Math.round(+bd.age) : null, at: +bd.at || 0,
+    log: (Array.isArray(bd.log) ? bd.log : []).filter(e => e && +e.at > 0 && +e.bw >= 30 && +e.bw <= 250).map(e => ({ at: +e.at, bw: +e.bw })).sort((a, b) => a.at - b.at) } : null;
+  if (s.body && !s.body.log.length) s.body.log = [{ at: s.body.at || 0, bw: s.body.bw }];
   if (!Array.isArray(s.blocks) || !s.blocks.length) s.blocks = d.blocks;
   // a record with something missing is mended rather than stopping the app from opening
   const mend = w => {
@@ -1326,21 +1328,22 @@ function applyTheme() {
 }
 /* ============================== Colours: every colour, for each style (Clean and Y2K) and each mode (dark and light) ============================== */
 
-// what each style starts from. "@accent" follows another colour of the same style; null is worked out from the
-// others (the cards from the background; Y2K's text and greys from its frame colour)
+// what each style starts from, in dark and in light mode: every colour is kept per style and per mode, so a change to
+// one never touches another. "@accent" follows another colour of the same mode; null is worked out from the others
+// (the cards from the background; Y2K's text and greys from its frame colour)
 const TYPE_KEYS = ['W', 'B', 'D', 'F', 'A', 'RP', 'M', 'C', 'P', 'E'];
+const BRAND_KEYS = ['accent', 'good', 'gold', 'bad', 'left', 'right', 'frame', 'hot'], SURF_KEYS = ['bg', 'panel', 'ink', 'ink2'];
+const Y2K_TYPES = { W: '#D9E2F5', B: '#8A9BE0', D: '#6F7DFF', F: '@bad', A: '@hot', RP: '@hot', M: '@accent', C: '#A9B8F5', P: '#8A9BE0', E: '@accent' };
 const PALETTES = {
   clean: {
-    accent: '#0A84FF', good: '#30D158', gold: '#FFD60A', bad: '#FF453A', left: '#32D74B', right: '#BF5AF2',
-    dark: { bg: '#000000', panel: null, ink: '#F5F5F7', ink2: '#ABABB3' },
-    light: { bg: '#F2F2F7', panel: null, ink: '#111114', ink2: '#4A4A52' },
-    types: { W: '#FFD60A', B: '#8E8E93', D: '#5E5CE6', F: '@bad', A: '#FF9F0A', RP: '#FF375F', M: '#66D4CF', C: '#A3D65C', P: '#AC8E68', E: '#64D2FF' }
+    dark: { accent: '#0A84FF', good: '#30D158', gold: '#FFD60A', bad: '#FF453A', left: '#32D74B', right: '#BF5AF2', bg: '#000000', panel: null, ink: '#F5F5F7', ink2: '#ABABB3',
+      types: { W: '#FFD60A', B: '#8E8E93', D: '#5E5CE6', F: '@bad', A: '#FF9F0A', RP: '#FF375F', M: '#66D4CF', C: '#A3D65C', P: '#AC8E68', E: '#64D2FF' } },
+    light: { accent: '#007AFF', good: '#1F9D47', gold: '#B88600', bad: '#E0352B', left: '#1E9E45', right: '#9F45D8', bg: '#F2F2F7', panel: null, ink: '#111114', ink2: '#4A4A52',
+      types: { W: '#C79A00', B: '#8E8E93', D: '#5E5CE6', F: '@bad', A: '#E08600', RP: '#FF375F', M: '#12A39B', C: '#6A9A1F', P: '#AC8E68', E: '#0A9FD0' } }
   },
   y2k: {
-    frame: '#1F3BFF', accent: '#19F0FF', hot: '#FF2D8F', good: '@accent', gold: '#FFD60A', bad: '@hot', left: '@accent', right: '@hot',
-    dark: { bg: '#05060F', panel: null, ink: null, ink2: null },
-    light: { bg: '#DCE2EE', panel: null, ink: '#05060F', ink2: null },
-    types: { W: '#D9E2F5', B: '#8A9BE0', D: '#6F7DFF', F: '@bad', A: '@hot', RP: '@hot', M: '@accent', C: '#A9B8F5', P: '#8A9BE0', E: '@accent' }
+    dark: { frame: '#1F3BFF', accent: '#19F0FF', hot: '#FF2D8F', good: '@accent', gold: '#FFD60A', bad: '@hot', left: '@accent', right: '@hot', bg: '#05060F', panel: null, ink: null, ink2: null, types: Y2K_TYPES },
+    light: { frame: '#1F3BFF', accent: '#19F0FF', hot: '#FF2D8F', good: '@accent', gold: '#B88600', bad: '@hot', left: '@accent', right: '@hot', bg: '#DCE2EE', panel: null, ink: '#05060F', ink2: null, types: Y2K_TYPES }
   }
 };
 // quick picks; any other colour comes from the colour wheel or a hex code
@@ -1403,41 +1406,46 @@ const normHex = v => { v = String(v || '').trim().replace(/^#?/, '#'); if (/^#[0
 const styleNow = () => state.settings.style === 'y2k' ? 'y2k' : 'clean';
 const palKey = st => st === 'y2k' ? 'colorsY2k' : 'colors';
 const userPal = (st = styleNow()) => state.settings[palKey(st)] || {};
-// one colour, by where it's kept ('accent', 'dark.bg', 'types.W'): yours, else the style's own, following another
-// colour where the style says so. Worked-out ones (null) are left to tokens()
-function palGet(st, pal, path) {
-  const [a, b] = path.split('.');
-  let v = b ? (pal[a] || {})[b] : pal[a];
-  if (!v) v = b ? PALETTES[st][a][b] : PALETTES[st][a];
-  return typeof v === 'string' && v[0] === '@' ? palGet(st, pal, v.slice(1)) : v || null;
+// one colour of a mode ('accent', 'bg', 'types.W'): yours, else the style's own, following another colour where the
+// style says so. Worked-out ones (null) are left to tokens()
+function palGet(st, pal, mode, key) {
+  const [a, b] = key.split('.'), mine = pal[mode] || {}, def = PALETTES[st][mode];
+  let v = b ? (mine[a] || {})[b] : mine[a];
+  if (!v) v = b ? def[a][b] : def[a];
+  return typeof v === 'string' && v[0] === '@' ? palGet(st, pal, mode, v.slice(1)) : v || null;
 }
-// the colour in use (as in dark mode): yours where you picked one, otherwise the default
-const colorOf = (k, st = styleNow()) => palGet(st, userPal(st), k);
-// saved colours, tidied: only real colours, in the places they belong. Before v38 the background sat at the top
+// the colour in use (as in dark mode, like the end screen and its cards): yours where you picked one, otherwise the default
+const colorOf = (k, st = styleNow()) => palGet(st, userPal(st), 'dark', k);
+// saved colours, tidied: only real colours, each mode on its own. Before v40 the main colours and set types were shared
+// by both modes (they go to both, so nothing changes), and before v38 the background sat at the top (dark mode's)
 function cleanPal(p) {
   if (!p || typeof p !== 'object' || Array.isArray(p)) return {};
-  const out = {}, sub = (o, keys) => { const r = {}; if (o && typeof o === 'object') for (const k of keys) if (normHex(o[k])) r[k] = normHex(o[k]); return Object.keys(r).length ? r : null; };
-  for (const k of ['accent', 'good', 'gold', 'bad', 'left', 'right', 'frame', 'hot']) if (normHex(p[k])) out[k] = normHex(p[k]);
-  for (const m of ['dark', 'light']) { const r = sub(p[m], ['bg', 'panel', 'ink', 'ink2']); if (r) out[m] = r; }
-  if (normHex(p.bg) && !(out.dark && out.dark.bg)) out.dark = { ...(out.dark || {}), bg: normHex(p.bg) };
-  const t = sub(p.types, TYPE_KEYS);
-  if (t) out.types = t;
+  const pick = (o, keys) => { const r = {}; if (o && typeof o === 'object') for (const k of keys) if (normHex(o[k])) r[k] = normHex(o[k]); return r; };
+  const out = {}, shared = pick(p, BRAND_KEYS), sharedT = pick(p.types, TYPE_KEYS);
+  for (const m of ['dark', 'light']) {
+    const o = p[m] && typeof p[m] === 'object' ? p[m] : {};
+    const r = { ...shared, ...pick(o, [...BRAND_KEYS, ...SURF_KEYS]) }, t = { ...sharedT, ...pick(o.types, TYPE_KEYS) };
+    if (m === 'dark' && !r.bg && normHex(p.bg)) r.bg = normHex(p.bg);
+    if (Object.keys(t).length) r.types = t;
+    if (Object.keys(r).length) out[m] = r;
+  }
   return out;
 }
 // every colour token of a style in one mode, worked out from a palette. Kept readable: the page and cards stay dark
 // (or light), text stands out from the cards, and in light mode each colour is darkened just enough to read on them
 function tokens(st, pal, mode) {
-  const g = p => palGet(st, pal, p), dark = mode === 'dark', y2k = st === 'y2k';
+  const g = k => palGet(st, pal, mode, k), dark = mode === 'dark', y2k = st === 'y2k';
   const on = c => contrastOf(c, '#FFFFFF') >= 3 ? '#FFFFFF' : mixHex(c, '#000000', 0.86);
   const up = (c, t) => mixHex(c, '#FFFFFF', t), down = (c, t) => mixHex(c, '#000000', t);
   const F = y2k ? g('frame') : null;
-  const B = dark ? darkBg(g(mode + '.bg')) : lightBg(g(mode + '.bg'));
-  let P = g(mode + '.panel') || (y2k ? (dark ? mixHex(B, F, 0.15) : up(B, 0.55)) : dark ? up(B, 0.07) : up(B, 0.85));
+  const B = dark ? darkBg(g('bg')) : lightBg(g('bg'));
+  let P = g('panel') || (y2k ? (dark ? mixHex(B, F, 0.15) : up(B, 0.55)) : dark ? up(B, 0.07) : up(B, 0.85));
   P = dark ? darkBg(P, 0.13) : lightBg(P, 0.6);
-  const I = readable(g(mode + '.ink') || up(F, 0.91), P, 7);
-  const I2 = readable(g(mode + '.ink2') || (dark ? up(F, 0.65) : mixHex(I, F, 0.3)), P, 4.5);
-  const lightest = luma(B) > luma(P) ? B : P;
-  const fit = (c, min) => dark ? c : readable(c, lightest, min);
+  const I = readable(g('ink') || up(F, 0.91), P, 7);
+  const I2 = readable(g('ink2') || (dark ? up(F, 0.65) : mixHex(I, F, 0.3)), P, 4.5);
+  // in light mode a colour has to read on the darker of the page and the cards (the harder of the two)
+  const under = luma(B) < luma(P) ? B : P;
+  const fit = (c, min) => dark ? c : readable(c, under, min);
   const A = fit(g('accent'), 3), G = fit(g('good'), 2.6), X = fit(g('bad'), 3), Au = fit(g('gold'), 2.2);
   const v = {
     '--accent': A, '--on-accent': on(A), '--accent-soft': rgba(A, y2k ? 0.12 : dark ? 0.17 : 0.1),
@@ -1463,7 +1471,7 @@ function tokens(st, pal, mode) {
       '--well': down(mixHex(B, F, 0.04), 0.5), '--deck': P, '--track': mixHex(B, F, 0.2), '--y-fig': mixHex(B, F, 0.4), '--y-fig-m': mixHex(B, F, 0.52), '--hud-dim': v['--muted']
     });
   } else {
-    const d = tokens(st, pal, 'dark'), C = readable(F, lightest, 3);
+    const d = tokens(st, pal, 'dark'), C = readable(F, under, 3);
     for (const k of ['--navy', '--well', '--deck', '--track', '--y-fig', '--y-fig-m', '--hud-dim', '--titlebar']) v[k] = d[k];
     Object.assign(v, {
       '--cobalt': C, '--panel-2': mixHex(P, B, 0.6), '--panel-3': mixHex(B, F, 0.1), '--line': down(mixHex(B, F, 0.3), 0.08), '--line-2': down(mixHex(B, F, 0.5), 0.15), '--grid': mixHex(B, F, 0.1), '--seg-on': C,
@@ -1521,7 +1529,7 @@ function colorPreview() {
     <div class="cpv-misc"><span class="badge side side-L t-N">L</span><span class="badge side side-R t-N">R</span><span class="switch on"><span></span></span><span class="seg"><button class="on">${T('On')}</button><button>${T('Off')}</button></span><span class="cpv-del">${icon('trash')}${T('Delete')}</span></div>
     <div class="kp-grid cpv-kp"><span class="kp-k">7</span><span class="kp-k">8</span><span class="kp-k fn">${T('Next')}</span><span class="kp-k log">${icon('check')}${T('Log')}</span></div>`;
 }
-// the colours in the editor, in groups. k is where a colour is kept: 'accent', 's.bg' (the mode being edited) or 'types.W'
+// the colours in the editor, in groups. k is where a colour is kept within the mode being edited: 'accent', 'bg' or 'types.W'
 function colorGroups(st) {
   const y = st === 'y2k';
   return [
@@ -1533,11 +1541,11 @@ function colorGroups(st) {
       { k: 'gold', name: T('Records'), desc: T('New records, the trophy count and the end of a workout.'), sw: 'any' },
       { k: 'bad', name: T('Delete and warnings'), desc: T('Delete buttons, failure sets and warnings.'), sw: y ? 'neon' : 'any' }
     ] },
-    { id: 'surf', h: T('Background and text'), surf: true, slots: [
-      { k: 's.bg', name: T('Background'), desc: T('Behind everything.'), sw: 'bg' },
-      { k: 's.panel', name: T('Cards'), desc: T('Exercise cards, set rows, sheets and bars; the lines and greys follow them.'), sw: 'panel' },
-      { k: 's.ink', name: T('Text'), desc: T('Names, numbers and headings.'), sw: 'ink' },
-      { k: 's.ink2', name: T('Secondary text'), desc: T('Hints, last time’s numbers and labels; the faintest grey follows it.'), sw: 'ink2' }
+    { id: 'surf', h: T('Background and text'), slots: [
+      { k: 'bg', name: T('Background'), desc: T('Behind everything.'), sw: 'bg', surf: true },
+      { k: 'panel', name: T('Cards'), desc: T('Exercise cards, set rows, sheets and bars; the lines and greys follow them.'), sw: 'panel', surf: true },
+      { k: 'ink', name: T('Text'), desc: T('Names, numbers and headings.'), sw: 'ink', surf: true },
+      { k: 'ink2', name: T('Secondary text'), desc: T('Hints, last time’s numbers and labels; the faintest grey follows it.'), sw: 'ink2', surf: true }
     ] },
     { id: 'sides', h: T('Left and right'), slots: [
       { k: 'left', name: T('Left side'), desc: T('The L plate and left-side rows.'), sw: y ? 'neon' : 'any' },
@@ -1548,32 +1556,34 @@ function colorGroups(st) {
 }
 // the token that shows each colour, to find how it's shown
 const SLOT_TOKEN = { accent: '--accent', good: '--good', gold: '--gold', bad: '--bad', left: '--side-l', right: '--side-r', frame: '--cobalt', hot: '--magenta', bg: '--bg', panel: '--panel', ink: '--ink', ink2: '--ink-2' };
+// your colours for the style in use, one mode at a time: what you change in dark mode stays in dark mode
 function colorsSheet() {
   const st = styleNow(), y = st === 'y2k';
   let draft = JSON.parse(JSON.stringify(userPal(st))), mode = darkNow() ? 'dark' : 'light';
   const shut = new Set(['sides', 'types']);
-  const path = k => k.startsWith('s.') ? mode + k.slice(1) : k;
-  const own = k => { const [a, b] = path(k).split('.'); return b ? (draft[a] || {})[b] : draft[a]; };
-  const tokenOf = k => { const p = path(k).split('.'); return p[0] === 'types' ? '--p-' + p[1].toLowerCase() : SLOT_TOKEN[p[p.length - 1]]; };
+  const other = () => mode === 'dark' ? 'light' : 'dark';
+  const own = k => { const [a, b] = k.split('.'), o = draft[mode] || {}; return b ? (o[a] || {})[b] : o[a]; };
+  const tokenOf = k => k.startsWith('types.') ? '--p-' + k.slice(6).toLowerCase() : SLOT_TOKEN[k];
+  const defOf = k => { const [a, b] = k.split('.'), d = PALETTES[st][mode]; return b ? d[a][b] : d[a]; };
   // the colour a slot shows in its dot: yours, or the default (worked out where the style works it out)
-  const cur = k => own(k) || palGet(st, draft, path(k)) || tokens(st, draft, k.startsWith('s.') ? mode : 'dark')[tokenOf(k)];
-  const follows = k => { const [a, b] = path(k).split('.'), d = b ? PALETTES[st][a][b] : PALETTES[st][a]; return typeof d === 'string' && d[0] === '@' ? d.slice(1) : null; };
+  const cur = k => own(k) || palGet(st, draft, mode, k) || tokens(st, draft, mode)[tokenOf(k)];
+  const follows = k => { const d = defOf(k); return typeof d === 'string' && d[0] === '@' ? d.slice(1) : null; };
   const nameOf = k => (colorGroups(st).flatMap(g => g.slots).find(s => s.k === k) || {}).name || k;
   const pvVars = () => cssVars({ ...baseTokens(st, mode), ...tokenDiff(st, draft, mode) });
   // a note when a colour is shown differently than picked, is hard to see, or follows another one
   const note = k => {
     const c = own(k);
     if (!c) { const f = follows(k); return f ? T('Same as {name} unless you pick one.', { name: nameOf(f) }) : ''; }
-    if (k.startsWith('s.')) {
-      const shown = tokens(st, draft, mode)[tokenOf(k)];
+    const shown = tokens(st, draft, mode)[tokenOf(k)];
+    if (SURF_KEYS.includes(k)) {
       if (shown === c) return '';
-      if (k === 's.bg' || k === 's.panel') return mode === 'dark' ? T('Shown a little darker, so text stays easy to read.') : T('Shown a little lighter, so text stays easy to read.');
+      if (k === 'bg' || k === 'panel') return mode === 'dark' ? T('Shown a little darker, so text stays easy to read.') : T('Shown a little lighter, so text stays easy to read.');
       return T('Adjusted a little so it stays easy to read.');
     }
-    if (contrastOf(c, tokens(st, draft, 'dark')['--panel']) < 2) return T('Hard to see on the dark background.');
-    return tokens(st, draft, 'light')[tokenOf(k)] !== c ? T('In light mode it’s shown a little darker, so it reads on white.') : '';
+    if (mode === 'dark') return contrastOf(c, tokens(st, draft, 'dark')['--panel']) < 2 ? T('Hard to see on the dark background.') : '';
+    return shown !== c ? T('Shown a little darker, so it reads on the light background.') : '';
   };
-  const swatchList = s => SWATCHES[s.sw === 'bg' || s.sw === 'panel' || s.sw === 'ink' || s.sw === 'ink2' ? s.sw + mode : s.sw];
+  const swatchList = s => SWATCHES[s.surf ? s.sw + mode : s.sw];
   const slotHTML = s => {
     const c = cur(s.k);
     return `<section class="cslot" data-k="${s.k}">
@@ -1583,9 +1593,9 @@ function colorsSheet() {
         <input class="chex" data-hex="${s.k}" value="${c}" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="characters" aria-label="${esc(T('{name}: hex code', { name: s.name }))}"></div>
       <p class="cnote">${note(s.k)}</p></section>`;
   };
-  // a whole look in a small picture: the page, a card, and its main colours
+  // a whole look (both modes) in a small picture of the mode being edited: the page, a card, and its main colours
   const presetHTML = ([n, p], i) => {
-    const tk = tokens(st, p, mode), dots = y ? ['--cyan', '--magenta', '--good'] : ['--accent', '--good', '--gold'];
+    const tk = tokens(st, cleanPal(p), mode), dots = y ? ['--cyan', '--magenta', '--good'] : ['--accent', '--good', '--gold'];
     return `<button class="cpreset" data-a="preset" data-i="${i}"><span class="cpreset-mock" style="background:${tk['--bg']}; border-color:${y ? tk['--cobalt'] : tk['--line-2']}"><i style="background:${tk['--panel']}"></i><span>${dots.map(d => `<b style="background:${tk[d]}"></b>`).join('')}</span></span>${esc(T(n))}</button>`;
   };
   const keepOpen = d => { for (const el of $$('details[data-sec]', d.el)) { if (el.open) shut.delete(el.dataset.sec); else shut.add(el.dataset.sec); } };
@@ -1605,26 +1615,29 @@ function colorsSheet() {
     // colours that follow this one: their dots and codes too
     for (const n of $$('.cslot', d.el)) if (n !== sec && !own(n.dataset.k)) { const cc = cur(n.dataset.k), dd = $('.cdot', n); if (dd) dd.style.background = cc; $('.chex', n).value = cc; $('input[type="color"]', n).value = cc.toLowerCase(); }
   };
+  // a colour for the mode being edited only; picking the default (one that follows another colour aside) drops it
   const set = (k, v) => {
-    const [a, b] = path(k).split('.');
-    const same = v && v === (b ? PALETTES[st][a][b] : PALETTES[st][a]); // a default that follows another colour is kept if picked
-    if (b) { const o = { ...(draft[a] || {}) }; if (!v || same) delete o[b]; else o[b] = v; if (Object.keys(o).length) draft[a] = o; else delete draft[a]; }
-    else if (!v || same) delete draft[a]; else draft[a] = v;
+    const [a, b] = k.split('.'), o = { ...(draft[mode] || {}) }, same = v && v === defOf(k);
+    if (b) { const t = { ...(o[a] || {}) }; if (!v || same) delete t[b]; else t[b] = v; if (Object.keys(t).length) o[a] = t; else delete o[a]; }
+    else if (!v || same) delete o[a]; else o[a] = v;
+    if (Object.keys(o).length) draft[mode] = o; else delete draft[mode];
   };
+  const modeName = m => m === 'dark' ? T('Dark mode') : T('Light mode');
   openSheet({
     cls: 'wide colors-sheet',
     label: T('Colours'),
     render: () => `${sheetHead(T('Colours'), `<button class="btn sm primary" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
       <div class="sheet-body pad">
-        <div class="cpv-box"><div class="cpv-bar"><b>${T('Preview')}</b><div class="seg" role="group">${['dark', 'light'].map(m => `<button class="${mode === m ? 'on' : ''}" data-a="mode" data-v="${m}" aria-pressed="${mode === m}">${m === 'dark' ? T('Dark') : T('Light')}</button>`).join('')}</div></div>
+        <div class="cpv-box"><div class="cpv-bar"><b>${T('Editing')}</b><div class="seg" role="group">${['dark', 'light'].map(m => `<button class="${mode === m ? 'on' : ''}" data-a="mode" data-v="${m}" aria-pressed="${mode === m}">${modeName(m)}</button>`).join('')}</div></div>
           <div class="cpv" style="${pvVars()}" inert>${colorPreview()}</div></div>
-        <p class="muted small cstyle-note">${y ? T('These are the Y2K style’s colours; the Clean style keeps its own.') : T('These are the Clean style’s colours; the Y2K style keeps its own.')}</p>
+        <p class="muted small cstyle-note">${y ? T('The Y2K style’s colours for {mode}. Light and dark mode, and the Clean style, keep their own.', { mode: modeName(mode).toLowerCase() }) : T('The Clean style’s colours for {mode}. Light and dark mode, and the Y2K style, keep their own.', { mode: modeName(mode).toLowerCase() })}</p>
         <h3 class="sub-h">${T('Ready-made')}</h3>
+        <p class="muted small csub">${T('A ready-made look sets both modes.')}</p>
         <div class="cpresets">${COLOR_PRESETS[st].map(presetHTML).join('')}</div>
-        ${colorGroups(st).map(g => `<details class="csec" data-sec="${g.id}" ${shut.has(g.id) ? '' : 'open'}><summary><b>${g.h}</b>${g.surf ? `<span class="csec-mode">${mode === 'dark' ? T('Dark mode') : T('Light mode')}</span>` : ''}${icon('down')}</summary>
-          ${g.surf ? `<p class="muted small">${mode === 'dark' ? T('For dark mode. Switch the preview to Light to change light mode’s.') : T('For light mode. Switch the preview to Dark to change dark mode’s.')}</p>` : ''}
+        ${colorGroups(st).map(g => `<details class="csec" data-sec="${g.id}" ${shut.has(g.id) ? '' : 'open'}><summary><b>${g.h}</b><span class="csec-mode">${modeName(mode)}</span>${icon('down')}</summary>
           ${g.slots.map(slotHTML).join('')}</details>`).join('')}
-        <div class="row-btns left"><button class="btn ghost" data-a="resetAll">${icon('reset')}${T('All back to default')}</button></div>
+        <div class="row-btns left"><button class="btn ghost" data-a="copy">${icon('copy')}${other() === 'light' ? T('Copy to light mode') : T('Copy to dark mode')}</button><button class="btn ghost" data-a="resetAll">${icon('reset')}${T('All back to default')}</button></div>
+        <p class="muted small">${T('Copy gives the other mode these main, side and set-type colours; each mode keeps its own background and text.')}</p>
       </div>`,
     onInput: (el, d) => {
       if (el.dataset.ck) { set(el.dataset.ck, normHex(el.value)); paint(d, el.dataset.ck, 'wheel'); }
@@ -1633,9 +1646,16 @@ function colorsSheet() {
     actions: {
       pick: (b, d) => { set(b.dataset.k, b.dataset.v); paint(d, b.dataset.k); },
       reset: (b, d) => { set(b.dataset.k, null); paint(d, b.dataset.k); },
-      preset: (b, d) => { draft = JSON.parse(JSON.stringify(COLOR_PRESETS[st][+b.dataset.i][1])); redraw(d); },
+      preset: (b, d) => { draft = cleanPal(COLOR_PRESETS[st][+b.dataset.i][1]); redraw(d); },
       resetAll: (b, d) => { draft = {}; redraw(d); },
       mode: (b, d) => { mode = b.dataset.v; redraw(d); },
+      copy: (b, d) => {
+        const from = draft[mode] || {}, to = { ...(draft[other()] || {}) };
+        for (const k of BRAND_KEYS) { if (from[k]) to[k] = from[k]; else delete to[k]; }
+        if (from.types) to.types = { ...from.types }; else delete to.types;
+        if (Object.keys(to).length) draft[other()] = to; else delete draft[other()];
+        toast(other() === 'light' ? T('Copied to light mode.') : T('Copied to dark mode.'));
+      },
       save: (b, d) => {
         state.settings[palKey(st)] = cleanPal(draft);
         save(); applyColors(); closeSheet(d); render(); renderWorkout();
@@ -3104,6 +3124,8 @@ function rankUpOf(w, x, s, mate) {
 /* ----- a record while you train: a gold banner, confetti, a fanfare and a stronger tap ----- */
 let prTimer = null;
 function prParty(x, gains, up = null) {
+  // a rank-up first fills the screen for a moment (not with Reduce Motion), then the banner says the rest
+  if (up && !calm() && !prParty.after) { rankTakeover(up, getEx(x.exId)); fanfare(true); hapticBurst(); prParty.after = true; setTimeout(() => { prParty(x, gains, up); prParty.after = false; }, 2250); return; }
   let el = $('#prfx');
   if (!el) { el = document.createElement('div'); el.id = 'prfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
   const ex = getEx(x.exId), k = ex.k;
@@ -3119,8 +3141,7 @@ function prParty(x, gains, up = null) {
     const r = m.getBoundingClientRect();
     confetti(r.left + r.width / 2, r.top + r.height / 2, { n: up ? 160 : 110, colors: up ? [...RK.TIERS[up[1]].c, RK.TIERS[up[1]].glow, '#FFFFFF'] : fxColors('gold'), angle: Math.PI / 2, spread: Math.PI * 1.7, power: up ? 1.1 : 0.95 });
   }, calm() ? 0 : 160);
-  fanfare(!!up);
-  hapticBurst();
+  if (!prParty.after) { fanfare(!!up); hapticBurst(); }
   clearTimeout(prTimer);
   prTimer = setTimeout(prHide, 3800);
 }
@@ -3486,24 +3507,29 @@ function cardProgress(st, rows) {
   });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, defs) };
 }
+// a rank card: the emblem in its light, the rank, the lift and the set, and how far the next rank is
+function rankCard(o, tier, kick, setText, sub, more, k) {
+  const t = RK.TIERS[tier], c = cardCtx(k, kick), ex = getEx(o.id), g = `url(#${c.id}t)`;
+  let h = `<circle cx="180" cy="150" r="190" fill="url(#${c.id}r)"/>${rays(180, 150, 220, t.glow, 0.09)}`;
+  h += RK.emblem(tier, c.id + 'em', tierName(tier)).replace('<svg class="rank-emb"', '<svg x="104" y="38" width="152" height="168"');
+  h += ctext({ ...c, rtl: false }, 180, 230, kick.toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: t.c[1], ls: 3, max: 300 });
+  h += `<text x="180" y="276" font-size="${fitText(tierName(tier).toLocaleUpperCase(LOC), 312, 44, 900, c.font, 26)[1]}" font-weight="900" fill="${g}" text-anchor="middle" letter-spacing="1">${esc(tierName(tier).toLocaleUpperCase(LOC))}</text>`;
+  h += ctext(c, 180, 306, ex.name, { size: 18, weight: 800, max: 312 });
+  if (setText) h += ctext(c, 180, 332, setText, { size: 14.5, weight: 700, fill: c.ink2, max: 312 });
+  if (sub) h += ctext(c, 180, 354, sub, { size: 12, weight: 600, fill: c.dim, max: 312 });
+  if (tier < 8 && o.now.tier === tier) {
+    const f = o.now.frac;
+    h += `<rect x="70" y="374" width="220" height="7" rx="3.5" fill="${c.muscle}"/><rect x="${c.rtl ? 70 + 220 * (1 - f) : 70}" y="374" width="${Math.max(7, 220 * f)}" height="7" rx="3.5" fill="${RK.TIERS[tier + 1].c[1]}"/>`;
+    h += ctext(c, 180, 398, rankNext(o), { size: 11, weight: 700, fill: c.ink2, max: 300 });
+  }
+  if (more) h += ctext(c, 180, 414, more, { size: 10.5, weight: 800, fill: t.c[1], max: 300 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 't', [t.c[0], t.c[1], t.c[2]]) + glow(c.id + 'r', t.glow, 0.38)) };
+}
 // a rank-up, big: the new emblem, the rank, the lift and the set that did it
 function cardRankUp(st) {
-  const u = st.rankUps[0], t = RK.TIERS[u.to], c = cardCtx('rankup', T('Rank up')), ex = getEx(u.o.id), g = `url(#${c.id}t)`;
-  let h = `<circle cx="180" cy="150" r="190" fill="url(#${c.id}r)"/>${rays(180, 150, 220, t.glow, 0.09)}`;
-  h += RK.emblem(u.to, c.id + 'em', tierName(u.to)).replace('<svg class="rank-emb"', '<svg x="104" y="38" width="152" height="168"');
-  h += ctext({ ...c, rtl: false }, 180, 230, T('Rank up').toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: t.c[1], ls: 3, max: 300 });
-  h += `<text x="180" y="276" font-size="${fitText(tierName(u.to).toLocaleUpperCase(LOC), 312, 44, 900, c.font, 26)[1]}" font-weight="900" fill="${g}" text-anchor="middle" letter-spacing="1">${esc(tierName(u.to).toLocaleUpperCase(LOC))}</text>`;
-  h += ctext(c, 180, 306, ex.name, { size: 18, weight: 800, max: 312 });
-  if (u.s) h += ctext(c, 180, 332, `${fmtSet(u.x, u.s)}${u.o.b.per ? ' ' + perText(u.o.b) : ''}`, { size: 14.5, weight: 700, fill: c.ink2, max: 312 });
-  h += ctext(c, 180, 354, T('from {tier} · est. 1RM {w}', { tier: tierName(u.from), w: fmtW(u.o.load, 1) }), { size: 12, weight: 600, fill: c.dim, max: 312 });
-  // how far to the next rank
-  if (u.to < 8) {
-    const f = u.o.now.frac;
-    h += `<rect x="70" y="374" width="220" height="7" rx="3.5" fill="${c.muscle}"/><rect x="${c.rtl ? 70 + 220 * (1 - f) : 70}" y="374" width="${Math.max(7, 220 * f)}" height="7" rx="3.5" fill="${RK.TIERS[u.to + 1].c[1]}"/>`;
-    h += ctext(c, 180, 398, rankNext(u.o), { size: 11, weight: 700, fill: c.ink2, max: 300 });
-  }
-  if (st.rankUps.length > 1) h += ctext(c, 180, 414, TN(st.rankUps.length - 1, 'And {n} more rank-up', 'And {n} more rank-ups'), { size: 10.5, weight: 800, fill: t.c[1], max: 300 });
-  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 't', [t.c[0], t.c[1], t.c[2]]) + glow(c.id + 'r', t.glow, 0.38)) };
+  const u = st.rankUps[0];
+  return rankCard(u.o, u.to, T('Rank up'), u.s ? `${fmtSet(u.x, u.s)}${u.o.b.per && u.o.b.per !== 'total' ? ' ' + perText(u.o.b) : ''}` : '',
+    T('from {tier} · est. 1RM {w}', { tier: tierName(u.from), w: fmtW(u.o.load, 1) }), st.rankUps.length > 1 ? TN(st.rankUps.length - 1, 'And {n} more rank-up', 'And {n} more rank-ups') : '', 'rankup');
 }
 // your muscles by rank, where you started and now, and your overall rank
 function cardRanks(st) {
@@ -3659,14 +3685,7 @@ function finishScreen(id, mode = 'new') {
       finShare: async () => {
         const cd = cards[cur], blob = await prep(cur);
         if (!blob) { toast(T('The picture couldn’t be made on this device.')); return; }
-        const file = new File([blob], `lifting-sanity-${new Date(w.start).toISOString().slice(0, 10)}-${cd.k}.png`, { type: 'image/png' });
-        try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } }
-        catch (e) { if (e && e.name === 'AbortError') return; }
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(file); a.download = file.name;
-        document.body.append(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-        toast(T('Picture saved.'));
+        await shareBlob(blob, `lifting-sanity-${new Date(w.start).toISOString().slice(0, 10)}-${cd.k}.png`);
       }
     }
   });
@@ -3993,6 +4012,7 @@ function exCardHTML(w, i, focus) {
       <button class="icon-btn" data-a="exMenu" data-e="${i}" aria-label="${T('Options for {name}', { name: esc(ex.name) })}">${icon('dots')}</button>
     </div>`;
   h += notesHTML(i, x, ctx);
+  h += rankHint(w, x, i);
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>${T('Last time you hit {n}+ reps on every set. Try <b>{w}</b> today.', { n: ctx.suggest.hi, w: esc(fmtW(ctx.suggest.w)) })}</span></p>`;
   else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>${exResetSince(x.exId) ? T('“Previous” is from before your reset ({date}). Records for this exercise start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) }) : T('“Previous” is from before your reset ({date}). Records for this block start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) })}</span></p>`;
   const two = isCompact(x), f1 = firstSide(x), del = ui.delMode === x.id;
@@ -5236,7 +5256,8 @@ function moreButton(shown, total, action) {
 function libRows(list) {
   const used = {};
   for (const w of state.workouts) for (const x of w.ex) used[x.exId] = w.start;
-  return list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · ' + T('one side') : ''}${e.custom ? ' · ' + T('yours') : ''}${used[e.id] ? ` · ${esc(relDay(used[e.id]))}` : ''}</small></span>${scorePill(e.id)}${icon('right', 'chev')}</button>`).join('');
+  const rk = rankOn() ? new Map(rankTable().map(o => [o.id, o.now.tier])) : null;
+  return list.map(e => `<button class="ex-row" data-a="openEx" data-id="${e.id}">${thumb(e.id, 'md')}<span class="ex-txt"><b>${esc(e.name)}</b><small>${esc(MUSCLES[e.m])} · ${esc(EQUIP[e.eq])}${e.uni ? ' · ' + T('one side') : ''}${e.custom ? ' · ' + T('yours') : ''}${used[e.id] ? ` · ${esc(relDay(used[e.id]))}` : ''}</small></span>${rk && rk.has(e.id) ? emblem(rk.get(e.id), 'xs ex-rank') : ''}${scorePill(e.id)}${icon('right', 'chev')}</button>`).join('');
 }
 function libListHTML() {
   const all = filterExercises(ui.lib), list = all.slice(0, ui.libLimit || PAGE);
@@ -5358,6 +5379,15 @@ function rankLoad(b, x, s, bw) {
   return e1rm(+s.w || 0, r);
 }
 const RANK_RECENT = 180 * DAY, RANK_FIRST = 14 * DAY;
+// your bodyweight on a day: the latest you'd given by then (your first one, for days before it)
+function bwAt(ts) {
+  const b = state.body, log = b.log || [];
+  if (!log.length) return b.bw;
+  let v = log[0].bw;
+  for (const e of log) { if (e.at <= ts) v = e.bw; else break; }
+  return v;
+}
+const ladderAt = (id, b, ts) => RK.ladder(b, { ...state.body, bw: bwAt(ts) }, b.conf === 'rough' ? rankAdj(id) : 0);
 const CONF_W = { data: 1, est: 0.85, rough: 0.6 };
 const rankAdj = id => (state.exPrefs[id] || {}).rankAdj || 0;
 const rankLadder = (id, b) => RK.ladder(b, state.body, b.conf === 'rough' ? rankAdj(id) : 0);
@@ -5367,7 +5397,7 @@ const rankLadder = (id, b) => RK.ladder(b, state.body, b.conf === 'rough' ? rank
 let rankMemo = ['', null];
 function rankTable(upTo = Infinity) {
   const p = state.body, last = state.workouts[state.workouts.length - 1];
-  const key = [state.workouts.length, last && last.id, last && last.end, p.sex, p.bw, p.age, Object.entries(state.exPrefs).filter(([, v]) => v && v.rankAdj).map(([k, v]) => k + v.rankAdj).join()].join('|');
+  const key = [state.workouts.length, last && last.id, last && last.end, p.sex, p.bw, p.age, (p.log || []).length, Object.entries(state.exPrefs).filter(([, v]) => v && v.rankAdj).map(([k, v]) => k + v.rankAdj).join()].join('|');
   if (upTo === Infinity && rankMemo[0] === key) return rankMemo[1];
   const now = upTo === Infinity ? Date.now() : upTo, m = new Map();
   for (const w of state.workouts) {
@@ -5376,13 +5406,14 @@ function rankTable(upTo = Infinity) {
       const b = rankBasis(x.exId);
       if (b.why) continue;
       let o = m.get(x.exId);
+      const bw = bwAt(w.start);
       for (const s of x.sets) {
-        const v = rankLoad(b, x, s, p.bw);
+        const v = rankLoad(b, x, s, bw);
         if (!(v > 0)) continue;
-        if (!o) { o = { id: x.exId, b, first: w.start, start: 0, best: 0, bestAt: 0, recent: 0 }; m.set(x.exId, o); }
+        if (!o) { o = { id: x.exId, b, first: w.start, start: 0, best: 0, bestAt: 0, bestSet: null, recent: 0, recentSet: null }; m.set(x.exId, o); }
         if (w.start < o.first + RANK_FIRST) o.start = Math.max(o.start, v);
-        if (v > o.best) { o.best = v; o.bestAt = w.start; }
-        if (w.start >= now - RANK_RECENT) o.recent = Math.max(o.recent, v);
+        if (v > o.best) { o.best = v; o.bestAt = w.start; o.bestSet = { x, s, at: w.start }; }
+        if (w.start >= now - RANK_RECENT && v > o.recent) { o.recent = v; o.recentSet = { x, s, at: w.start }; }
       }
     }
   }
@@ -5390,11 +5421,38 @@ function rankTable(upTo = Infinity) {
     o.lad = rankLadder(o.id, o.b);
     o.stale = !o.recent;
     o.load = o.recent || o.best;
+    o.set = o.recentSet || o.bestSet;
     o.now = RK.place(o.load, o.lad);
-    o.was = RK.place(o.start, o.lad);
+    // where you started, against the standards for your bodyweight back then
+    o.was = RK.place(o.start, ladderAt(o.id, o.b, o.first));
   }
   const out = [...m.values()].sort((a, b) => b.now.score - a.now.score);
   if (upTo === Infinity) rankMemo = [key, out];
+  return out;
+}
+// every rank-up in your history, newest first: an exercise's best ever moving it up a rank (against the standards for
+// your bodyweight on that day), from its second session on
+let rankUpMemo = ['', null];
+function rankUpHistory() {
+  rankTable();
+  const key = rankMemo[0];
+  if (rankUpMemo[0] === key) return rankUpMemo[1];
+  const run = new Map(), out = [];
+  for (const w of state.workouts) {
+    const bw = bwAt(w.start);
+    for (const x of w.ex) {
+      const b = rankBasis(x.exId);
+      if (b.why) continue;
+      let top = 0;
+      for (const s of x.sets) top = Math.max(top, rankLoad(b, x, s, bw));
+      const was = run.get(x.exId) || 0;
+      if (!(top > was)) continue;
+      if (was > 0) { const lad = ladderAt(x.exId, b, w.start), t0 = RK.place(was, lad).tier, t1 = RK.place(top, lad).tier; if (t1 > t0) out.push({ at: w.start, id: x.exId, from: t0, to: t1 }); }
+      run.set(x.exId, top);
+    }
+  }
+  out.reverse();
+  rankUpMemo = [key, out];
   return out;
 }
 // each muscle's rank: its best exercise (a helper muscle counts a tier lower)
@@ -5453,7 +5511,7 @@ function ranksSection() {
       <small>${all.tier < 8 ? T('{p}% of the way to {tier}', { p: Math.round(all.frac * 100), tier: tierName(all.tier + 1) }) : T('The top rank')} · ${TN(rows.length, 'from {n} lift', 'from {n} lifts')}</small></span></button>
     <div class="rank-maps"><figure>${rankBody(muscleRanks(rows, 'was'))}<figcaption>${TC('Start', 'rank')} · ${was ? tierName(was.tier) : '—'}</figcaption></figure><span class="rank-arrow">${icon(RTL ? 'left' : 'right')}</span><figure>${rankBody(muscleRanks(rows))}<figcaption>${T('Now')} · ${tierName(all.tier)}</figcaption></figure></div>
     <div class="rank-list">${rows.slice(0, 4).map(rankRow).join('')}</div>
-    <div class="row-btns left"><button class="btn sm" data-a="rankAll">${T('All your ranks')}</button><button class="btn sm ghost" data-a="rankSetup">${T('Your details')}</button></div>
+    <div class="row-btns left"><button class="btn sm" data-a="rankAll">${T('All your ranks')}</button><button class="btn sm ghost" data-a="rankSetup">${T('Bodyweight {w}', { w: fmtW(state.body.bw, 1) })}</button></div>
   </section>`;
 }
 // every rank, grouped by how sure it is, and how they work
@@ -5465,6 +5523,7 @@ function ranksSheet() {
       return `${sheetHead(T('Your ranks'))}<div class="sheet-body pad">
         <div class="rank-tiers">${RK.TIERS.map((t, i) => `<span>${emblem(i, 'sm')}<small>${tierName(i)}</small></span>`).join('')}</div>
         ${groups.map(([c, h]) => { const g = rows.filter(o => o.b.conf === c); return g.length ? `<h3 class="sub-h">${h}</h3><div class="rank-list">${g.map(rankRow).join('')}</div>` : ''; }).join('')}
+        ${(ups => ups.length ? `<h3 class="sub-h">${T('Rank-ups')}</h3><div class="rank-ups">${ups.slice(0, 30).map(u => `<button class="rank-up-row" data-a="openEx" data-id="${u.id}">${emblem(u.to, 'sm')}<span class="rank-up-t"><b>${esc(getEx(u.id).name)}</b><small>${tierName(u.from)} → <span style="color:${tierColor(u.to)}">${tierName(u.to)}</span></small></span><small class="rank-up-d">${esc(fmtShort(u.at))}</small></button>`).join('')}</div>` : '')(rankUpHistory())}
         <h3 class="sub-h">${T('How ranks work')}</h3>
         <div class="prose small rank-how">
           <p>${T('Each exercise is ranked from your best estimated 1RM in the last six months (your best ever if it’s been longer), against people of your sex and bodyweight.')}</p>
@@ -5494,9 +5553,79 @@ function rankBlock(id) {
       <small>${o ? `${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${b.per ? ' ' + perText(b) : ''} · ${esc(rankNext(o))}` : T('Log a set to get a rank.')}</small></div></div>
     <ol class="rank-ladder">${lad.map((v, i) => `<li class="${i === cur ? 'on' : ''}" style="--tc:${tierColor(i)}">${emblem(i, 'xs')}<span class="rl-n">${tierName(i)}</span><b dir="ltr">${i ? fmtW(v, 0) + '+' : '—'}</b></li>`).reverse().join('')}</ol>
     <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
+    ${o ? `<div class="row-btns left"><button class="btn sm" data-a="rankShare" data-id="${id}">${icon('share')}${T('Share your rank')}</button></div>` : ''}
     ${b.conf === 'rough' ? `<div class="rank-adj"><p class="small">${T('Next to free weights, this machine reads:')}</p><div class="seg" role="group">${[[-1, TC('Light', 'machine')], [0, T('Typical')], [1, T('Heavy')]].map(([v, l]) => `<button class="${rankAdj(id) === v ? 'on' : ''}" data-a="rankAdj" data-v="${v}" aria-pressed="${rankAdj(id) === v}">${l}</button>`).join('')}</div>
       <p class="muted small">${T('Heavy: it shows bigger numbers than free weights would (long levers, light stacks), so its standards go up a quarter. Light: down a fifth.')}</p></div>` : ''}
   </section>`;
+}
+// in a workout: the exercise's rank (today's sets count) and the next rank as a set at the reps you're aiming for:
+// the top of your rep range, or the reps of your best set. Weights round up to your weight step
+function rankHint(w, x, i) {
+  if (!rankOn()) return '';
+  const b = rankBasis(x.exId);
+  if (b.why) return '';
+  const row = rankTable().find(o => o.id === x.exId), bw = state.body.bw;
+  let load = row ? row.load : 0;
+  for (const o of w.ex) if (o.exId === x.exId) for (const s of o.sets) load = Math.max(load, rankLoad(b, o, s, bw));
+  if (!(load > 0)) return '';
+  const lad = row ? row.lad : rankLadder(x.exId, b), pl = RK.place(load, lad);
+  let next = '';
+  if (pl.tier < 8) {
+    const work = x.sets.find(s => s.t !== 'W' && s.tr), top = work ? +String(work.tr).split('-').pop() : 0;
+    const r = Math.min(E1RM_MAX_REPS, Math.max(1, top || (row && row.set ? recReps(row.set.x, row.set.s) : 5) || 5));
+    const need = pl.next / (r === 1 ? 1 : 1 + r / 30), step = +state.settings.step || (isLb() ? 5 : 2.5);
+    const up = kg => { const d = isLb() ? kg * KG_LB : kg, v = Math.ceil(d / step - 1e-9) * step; return isLb() ? v / KG_LB : v; };
+    const set = b.per === 'total' ? (need <= bw ? T('bodyweight × {r}', { r }) : `+${fmtW(up(need - bw))} × ${r}`) : `${fmtW(up(need))} × ${r}`;
+    next = T('{tier} at {set}', { tier: tierName(pl.tier + 1), set });
+  }
+  return `<button class="rank-hint" data-a="exInfo" data-e="${i}" style="--tc:${tierColor(pl.tier)}">${emblem(pl.tier, 'xs')}<span class="rank-hint-t"><b>${tierName(pl.tier)}${b.conf === 'rough' ? ' ≈' : ''}</b>${next ? `<span>${T('next: {target}', { target: next })}${b.per && b.per !== 'total' ? ' ' + perText(b) : ''}</span>` : `<span>${T('The top rank')}</span>`}</span><span class="rank-bar" style="--tc:${tierColor(Math.min(8, pl.tier + 1))}"><i style="width:${Math.round(pl.frac * 100)}%"></i></span></button>`;
+}
+// a rank-up, full screen for a moment: the new emblem rising out of light, then the banner
+function rankTakeover(up, ex) {
+  let el = $('#rankfx');
+  if (!el) { el = document.createElement('div'); el.id = 'rankfx'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'assertive'); el.hidden = true; document.body.append(el); }
+  const t = RK.TIERS[up[1]];
+  el.style.cssText = `--tc:${t.c[1]}; --tg:${t.glow}; --t0:${t.c[0]}`;
+  el.innerHTML = `<button class="rkfx" data-a="rankfxHide" aria-label="${esc(T('Rank up: {tier}!', { tier: tierName(up[1]) }))}"><span class="rkfx-rays"></span><span class="rkfx-glow"></span>
+    ${emblem(up[1], 'rkfx-emb')}<b class="rkfx-kick">${T('Rank up')}</b><b class="rkfx-tier">${tierName(up[1])}</b><span class="rkfx-ex">${esc(ex.name)}</span>
+    <span class="rkfx-from">${emblem(up[0], 'xs')}<span>${tierName(up[0])}</span>${icon(RTL ? 'left' : 'right')}${emblem(up[1], 'xs')}<span>${tierName(up[1])}</span></span></button>`;
+  el.hidden = false;
+  el.classList.remove('in', 'out'); void el.offsetWidth; el.classList.add('in');
+  setTimeout(() => { if (!el.hidden) confetti(innerWidth / 2, innerHeight * 0.4, { n: 180, colors: [...t.c, t.glow, '#FFFFFF'], power: 1.25 }); }, 260);
+  clearTimeout(rankfxTimer);
+  rankfxTimer = setTimeout(rankfxHide, 2100);
+}
+let rankfxTimer = null;
+function rankfxHide() {
+  const el = $('#rankfx');
+  clearTimeout(rankfxTimer);
+  if (!el || el.hidden) return;
+  el.classList.remove('in'); el.classList.add('out');
+  setTimeout(() => { if (el.classList.contains('out')) { el.hidden = true; el.classList.remove('out'); } }, 350);
+}
+// your rank in one exercise, as a card to share: the emblem, the rank, the lift and the set
+function cardRankOf(o) {
+  return rankCard(o, o.now.tier, T('Your rank'), o.set ? `${fmtSet(o.set.x, o.set.s)}${o.b.per && o.b.per !== 'total' ? ' ' + perText(o.b) : ''}` : '', T('est. 1RM {w} · {bw} bodyweight', { w: fmtW(o.load, 1), bw: fmtW(state.body.bw, 1) }), '', 'rank');
+}
+async function shareRank(id) {
+  const o = rankTable().find(r => r.id === id);
+  if (!o) return;
+  const cd = cardRankOf(o);
+  let blob = null;
+  try { blob = await cardPNG(cd); } catch (e) { blob = null; }
+  if (!blob) { toast(T('The picture couldn’t be made on this device.')); return; }
+  await shareBlob(blob, `lifting-sanity-rank-${id}.png`);
+}
+// a picture to the share sheet where there is one, or saved as a file
+async function shareBlob(blob, name) {
+  const file = new File([blob], name, { type: 'image/png' });
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } }
+  catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast(T('Picture saved.'));
 }
 // your details: which standards, bodyweight, and age if you like; saved, ranks are on
 function rankSetup() {
@@ -5520,7 +5649,10 @@ function rankSetup() {
         const bw = parseNum($('[data-f="bw"]', d.el).value), age = parseNum($('[data-f="age"]', d.el).value), kg = bw == null ? null : lb ? bw / KG_LB : bw;
         if (!(kg >= 30 && kg <= 250)) { toast(T('Type your bodyweight first.')); $('[data-f="bw"]', d.el).focus(); return; }
         if (age != null && !(age >= 10 && age <= 100)) { toast(T('That age doesn’t look right.')); return; }
-        state.body = { sex: p.sex, bw: +trimNum(kg, 2), age: age == null ? null : Math.round(age), at: Date.now() };
+        // each new bodyweight is kept with its day, so older workouts are ranked at the bodyweight you had then
+        const bwKg = +trimNum(kg, 2), log = (state.body && state.body.log ? state.body.log : []).slice();
+        if (!log.length || Math.abs(log[log.length - 1].bw - bwKg) > 0.05) log.push({ at: Date.now(), bw: bwKg });
+        state.body = { sex: p.sex, bw: bwKg, age: age == null ? null : Math.round(age), at: Date.now(), log: log.slice(-200) };
         state.settings.ranks = true;
         save(); closeSheet(d); render();
         toast(T('Ranks are on.'));
@@ -5662,7 +5794,7 @@ VIEWS.settings = function () {
     ${row(T('Layout'), T('One exercise at a time with big next and previous buttons, or every exercise in one list.'), seg('setView', s.view, [['focus', T('One at a time')], ['list', T('List')]]))}
     ${row(T('One-side exercises'), T('How left and right are logged on one-arm and one-leg exercises. You can also change it on each exercise.'), seg('setUniStyle', s.uniStyle || 'rows', [['rows', T('Separate rows')], ['one', T('One row')]]))}
     ${row(T('Number pad'), T('Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.'), seg('setKeypad', s.keypad, [['auto', T('Auto')], ['app', T('In-app pad')], ['system', T('Keyboard')]]))}
-    ${s.effort !== 'off' ? row(T('{eff} on the number pad', { eff: effName() }), T('Next goes from weight to reps to {eff}, and one tap on a choice moves on to the next set; Log logs the set straight away. Off: Next skips it, and you tap the {eff} box to set it.', { eff: effName() }), toggle(s.padRir !== false, 'tgl', 'data-k="padRir"')) : ''}
+    ${s.effort !== 'off' ? row(T('{eff} on the number pad', { eff: effName() }), T('Next goes from weight to reps to {eff}: one tap on a choice logs the set with it (Next logs the target shown). Log logs the set straight away. Off: Next skips it, and you tap the {eff} box to set it.', { eff: effName() }), toggle(s.padRir !== false, 'tgl', 'data-k="padRir"')) : ''}
     ${row(T('Default rest'), T('Each exercise can have its own.'), `<label class="select-wrap sm"><select data-f="rest">${REST_PRESETS.map(v => `<option value="${v}" ${v === s.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>`)}
     ${row(T('Start rest timer when a set is checked'), '', toggle(s.autoRest, 'tgl', 'data-k="autoRest"'))}
     ${row(T('Move to the next exercise when one is done'), T('Slides to it one at a time, or scrolls down to it in the list.'), toggle(s.autoNext, 'tgl', 'data-k="autoNext"'))}
@@ -5675,7 +5807,7 @@ VIEWS.settings = function () {
     ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
-    ${row(T('Colours'), s.style === 'y2k' ? T('Every colour of the Y2K style: frame, neons, background, cards, text, set types and more, with a preview before you save.') : T('Every colour: accent, background, cards, text, greys, set types and more, with ready-made looks and a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${(s.style === 'y2k' ? ['frame', 'accent', 'hot', 'dark.bg'] : ['accent', 'good', 'gold', 'dark.bg']).map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
+    ${row(T('Colours'), s.style === 'y2k' ? T('Every colour of the Y2K style: frame, neons, background, cards, text, set types and more, with a preview before you save.') : T('Every colour: accent, background, cards, text, greys, set types and more, with ready-made looks and a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${(s.style === 'y2k' ? ['frame', 'accent', 'hot', 'bg'] : ['accent', 'good', 'gold', 'bg']).map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
   </div>
   <h2 class="section-h">${T('Your data')}</h2><div class="card list-card">
@@ -5697,6 +5829,13 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 40, items: [
+    ['check', 'The RIR step logs the set', 'On the number pad, picking the RIR (or pressing Next on it) now logs the set and starts the rest timer.'],
+    ['sliders', 'Colours for each theme', 'Dark mode and light mode keep their own colours, as do Clean and Y2K: a change to one never touches another. Copy colours across in one tap.'],
+    ['trophy', 'Your rank as you train', 'Each exercise shows its rank and the next one as a set to beat, like “Platinum at 95 kg × 6”.'],
+    ['flame', 'Bigger rank-ups', 'A new rank fills the screen for a moment. Share any lift’s rank card, see every rank-up you’ve had, and spot your ranks in the exercise list.'],
+    ['chart', 'Bodyweight over time', 'Each bodyweight you give is kept with its day, so older workouts are ranked at the bodyweight you had then.']
+  ] },
   { v: 39, items: [
     ['trophy', 'Lift ranks', 'Every lift gets a rank, Wood to Olympian, from how much you lift for your bodyweight. The standards come from 659,000 competition results. Optional: turn them on in Progress or Settings.'],
     ['chart', 'Your muscles by rank', 'Progress shows your body in rank colours, from where you started to now, with each lift’s ladder in its details.'],
@@ -6089,7 +6228,11 @@ const ACT = {
     if (!fld) { kpClose(); return; }
     kpShow(kpCurrent());
     const { x } = fld, sides = sidesInOrder(x, fld.set);
-    if (ui.kp.f === 'rir' && sides.length > 1 && sides[0] === fld.set) { kpGo(x.sets.indexOf(sides[1]), 'rir'); return; }
+    if (ui.kp.f === 'rir') {
+      if (sides.length > 1 && sides[0] === fld.set) { kpGo(x.sets.indexOf(sides[1]), 'rir'); return; }
+      // the end of a set: Next logs it with the RIR shown (the target, unless one was picked), like ✓
+      if (!sides.every(o => o.done)) { ACT.kpLog(); return; }
+    }
     const cells = $$(`#workout .exc[data-e="${ui.kp.e}"] .cell[data-a="kp"]`);
     const nx = cells.slice(cells.indexOf(kpCell()) + 1).find(c => c.dataset.f !== 'rir' || rirStep(x, x.sets[+c.dataset.s]));
     if (!nx) { kpClose(); return; }
@@ -6105,7 +6248,8 @@ const ACT = {
     if (two) toggleBoth(ui.kp.e, Math.min(...rows.map(o => x.sets.indexOf(o))), true);
     else toggleSet(ui.kp.e, ui.kp.s, true);
   },
-  // a RIR choice on the pad: then the other side of a one-row set, or on to the next set
+  // a RIR choice on the pad: then the other side of a one-row set; the RIR being the last thing in a set, the choice
+  // logs it (rest timer and all). A set logged already just takes the new RIR
   kpEff: b => {
     const fld = kpField();
     if (!fld || ui.kp.f !== 'rir') return;
@@ -6115,11 +6259,14 @@ const ACT = {
     save(); renderWorkout();
     const sides = sidesInOrder(x, set), mate = sides.length > 1 && sides[0] === set ? sides[1] : null;
     if (mate) { kpGo(x.sets.indexOf(mate), 'rir'); return; }
+    if (!sides.every(o => o.done)) { ACT.kpLog(); return; }
     if (state.settings.padRir !== false) ACT.kpNext();
     else kpClose();
   },
   kpClose: () => kpClose(),
   prfxHide: () => prHide(),
+  rankfxHide: () => rankfxHide(),
+  rankShare: b => shareRank(b.dataset.id),
   effPick: b => {
     const x = A().ex[+b.dataset.e], s = x.sets[+b.dataset.s];
     // data-one: just this side (one-row left/right), and the choices stay open until both sides have one

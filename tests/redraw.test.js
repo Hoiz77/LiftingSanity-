@@ -27,8 +27,8 @@ const { open, report } = require('./lib');
     await act('pad next', () => nth('#keypad [data-a="kpNext"]'));
     // on the reps of a working set with no RIR yet, whatever the day's plan, so Next goes to it
     await act('pad next, to the RIR', async () => { await t.ev(`(() => { const s = A().ex[ui.kp.e].sets[ui.kp.s]; s.t = 'N'; s.done = false; delete s.rir; ui.kp.f = 'r'; renderKeypad(); })()`); await nth('#keypad [data-a="kpNext"]'); });
-    await act('pad RIR, on', () => nth('#keypad [data-a="kpEff"]', 1));
-    await act('pad log', () => nth('#keypad [data-a="kpLog"]'));
+    await act('pad RIR, logged', () => nth('#keypad [data-a="kpEff"]', 1));
+    await act('pad log', async () => { await nth('#workout .set-row:not(.head):not(.done) .cell[data-f="r"]'); await t.p.waitForTimeout(250); await nth('#keypad [data-a="kpLog"]'); });
     await act('RIR box', () => nth('#workout .cell.eff', 2));
     await act('pick an effort', () => nth('#keypad [data-a="kpEff"]', 1));
     await act('add a set', () => nth('#workout [data-a="addSet"]'));
