@@ -52,10 +52,11 @@ async function open(o = {}) {
   if (!o.seed && !o.fresh) o.seed = '{"v":1}';
   // "What's new" counts as seen unless a test asks for it (`news: true`, as if updating from the version before)
   if (o.seed) await p.addInitScript(([d, news]) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.clear(); localStorage.setItem('liftingsanity:data:v1', d); if (!news) localStorage.setItem('liftingsanity:seen-version', '9999'); } }, [typeof o.seed === 'string' ? o.seed : JSON.stringify(o.seed), !!o.news]);
-  await p.goto(site.url);
+  // page loads get longer than other steps: a busy test machine (and the web fonts, when a test loads them) can be slow
+  await p.goto(site.url, { timeout: 30000 });
   await p.waitForFunction(() => window.LiftingSanity);
   await p.waitForTimeout(300);
-  if (o.settings) { await p.evaluate(s => { Object.assign(window.LiftingSanity.state.settings, s); window.LiftingSanity.save(); }, o.settings); await p.reload(); await p.waitForFunction(() => window.LiftingSanity); await p.waitForTimeout(400); }
+  if (o.settings) { await p.evaluate(s => { Object.assign(window.LiftingSanity.state.settings, s); window.LiftingSanity.save(); }, o.settings); await p.reload({ timeout: 30000 }); await p.waitForFunction(() => window.LiftingSanity); await p.waitForTimeout(400); }
   const t = {
     ctx, p, errors,
     // run code inside the app (its own functions and state are in scope)
