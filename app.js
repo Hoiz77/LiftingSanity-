@@ -71,7 +71,20 @@ const parseLib = text => text.trim().split('\n').map(line => {
 const LIB = parseLib(window.FORGE_LIBRARY);
 const LIB_MAP = new Map(LIB.map(e => [e.id, e]));
 // the open exercises-dataset adds ~1,200 more; names already in the curated list keep the curated entry
-for (const e of window.LS_EXTRA ? parseLib(window.LS_EXTRA) : []) if (!LIB_MAP.has(e.id)) { LIB.push(e); LIB_MAP.set(e.id, e); }
+// the extra library lists squats, leg presses and lunges with the glutes as the main muscle; they're quads-first
+// lifts (the core library has them that way), with the glutes helping. A few others are put right too
+const uniq = a => [...new Set(a)];
+const MUSCLE_FIX = { 'dumbbell-neutral-grip-bench-press': ['chest', ['triceps', 'frontdelts']], 'dumbbell-twisting-bench-press': ['chest', ['triceps', 'frontdelts']], 'chin-ups-narrow-parallel-grip': ['lats', ['biceps', 'upperback']] };
+function fixMuscles(e) {
+  const n = e.name.toLowerCase(), mixed = /curl|extension|press .*|row|twist|swing|pass through|bowling|stretch|jump|high knees|kick|calf|thrust/;
+  if (e.m === 'glutes' && (/squat|leg press|lunge/.test(n)) && !mixed.test(n.replace(/leg press/, '')) && !/curtsy|\blateral|sumo|sissy/.test(n)) {
+    e.m = 'quads';
+    e.sec = uniq(['glutes', ...(/squat|leg press/.test(n) ? ['adductors'] : []), ...e.sec.filter(x => !['quads', 'glutes', 'hamstrings', 'calves'].includes(x))]);
+  }
+  if (MUSCLE_FIX[e.id]) [e.m, e.sec] = [MUSCLE_FIX[e.id][0], [...MUSCLE_FIX[e.id][1]]];
+  return e;
+}
+for (const e of window.LS_EXTRA ? parseLib(window.LS_EXTRA) : []) if (!LIB_MAP.has(e.id)) { fixMuscles(e); LIB.push(e); LIB_MAP.set(e.id, e); }
 // with Arabic names chosen, each exercise shows its Arabic name; the English one stays on it (e.en) for search,
 // the science notes and video links
 if (window.AR_NAMES && window.LS_AR_NAMES) for (const e of LIB) { e.en = e.name; e.name = window.LS_AR_NAMES[e.id] || e.name; }
@@ -304,11 +317,14 @@ function bodySprite() {
   let el = $('#bd-sprite');
   if (!el) { document.body.insertAdjacentHTML('afterbegin', '<svg id="bd-sprite" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"></svg>'); el = $('#bd-sprite'); }
   el.innerHTML = `<defs>${['front', 'back'].map(v => `<image id="bd-${v}" href="${bodyImg(v, L.src, sex)}" width="${BD.w}" height="${BD.h}"/>${Object.entries(BD[sex][v]).map(([k, d]) => `<path id="bm-${v}-${k}" d="${d}"/>`).join('')}`).join('')}
-    ${rampFilter('bd-base', L.base || [[0, '#000000'], [1, '#FFFFFF']])}${rampFilter('bd-hit', hitRamp(L.hit, L.src))}${rampFilter('bd-hit2', hitRamp(L.hit2, L.src))}${glowFilter('bd-glow')}${softFilter('bd-soft', 4)}
+    ${rampFilter('bd-base', L.base || [[0, '#3C3E45'], [BD_MID.light, '#A3A6AE'], [1, '#FFFFFF']])}${rampFilter('bd-hit', hitRamp(L.hit, L.src))}${rampFilter('bd-hit2', hitRamp(L.hit2, L.src))}${glowFilter('bd-glow')}${softFilter('bd-soft', 4)}
+    <filter id="bd-edge" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.2"/></filter>
     <path id="bd-heart" d="M282 268c-15-11-28-21-28-34 0-9 7-15 15-15 6 0 10 3 13 8 3-5 7-8 13-8 8 0 15 6 15 15 0 13-13 23-28 34z"/></defs>`;
   // the key under an exercise's pictures uses the same two colours
   document.documentElement.style.setProperty('--bd-hit', L.hit);
   document.documentElement.style.setProperty('--bd-hit2', L.hit2);
+  document.documentElement.style.setProperty('--bd-rim', mixHex(L.hit, '#FFFFFF', 0.5));
+  document.documentElement.style.setProperty('--bd-rim2', mixHex(L.hit2, '#FFFFFF', 0.5));
 }
 const BACK_VIEW = new Set(['lats', 'upperback', 'traps', 'lowerback', 'reardelts', 'triceps', 'hamstrings', 'glutes', 'calves', 'abductors']);
 const LOWER_BODY = new Set(['quads', 'hamstrings', 'glutes', 'calves', 'adductors', 'abductors']);
@@ -339,12 +355,41 @@ function bodyMask(view, keys) {
   return id;
 }
 // one view of the body with an exercise's muscles: the main one in full colour, the helpers in the second colour; big ones glow
-function figure(view, ex, crop, big) {
+// The big pictures let the rest of the body step back a little so the worked muscles stand out, and give each worked
+// muscle a soft rim of light; the exercise details' map (key) also gives each muscle a layer of its own (data-m), so the
+// key under it can light one up. Small pictures stay as plain as possible (there are hundreds in a list)
+function figure(view, ex, crop, big, key) {
   const { main, help } = figMuscles(ex), P = BD[figSex()][view];
   const mk = main.filter(k => P[k]), hk = help.filter(k => P[k]);
-  const layer = (keys, two) => `<g mask="url(#${bodyMask(view, keys)})"${two ? ' opacity=".85"' : ''}><use href="#bd-${view}" filter="url(#${two ? 'bd-hit2' : 'bd-hit'})"/></g>`;
+  const layer = (keys, two) => `<g${key ? ` data-m="${keys[0]}"` : ''} mask="url(#${bodyMask(view, keys)})"${two ? ' opacity=".8"' : ''}><use href="#bd-${view}" filter="url(#${two ? 'bd-hit2' : 'bd-hit'})"/></g>`;
+  const rim = (keys, two) => `<g${key ? ` data-m="${keys[0]}"` : ''} fill="none" stroke="var(--bd-${two ? 'rim2' : 'rim'})" stroke-width="${two ? 1 : 1.5}" stroke-opacity="${two ? 0.7 : 0.95}" filter="url(#bd-edge)">${keys.map(k => `<use href="#bm-${view}-${k}" vector-effect="non-scaling-stroke"/>`).join('')}</g>`;
   const heart = ex.m === 'cardio' && view === 'front' ? `<use href="#bd-heart" fill="${(figLookNow || figLook()).hit}"${big ? ' filter="url(#bd-glow)"' : ''}/>` : '';
-  return `<svg viewBox="${CROPS[figSex()][crop]}" aria-hidden="true"><use href="#bd-${view}"${styleNow() === 'y2k' ? ' filter="url(#bd-base)"' : ''}/>${hk.length ? layer(hk, true) : ''}${mk.length ? (big ? `<g filter="url(#bd-glow)">${layer(mk)}</g>` : layer(mk)) : ''}${heart}</svg>`;
+  const each = (keys, two) => key ? keys.map(k => layer([k], two)).join('') : layer(keys, two);
+  const helpers = !hk.length ? '' : each(hk, true) + (!big ? '' : key ? hk.map(k => rim([k], true)).join('') : rim(hk, true));
+  const mains = !mk.length ? '' : big ? `<g filter="url(#bd-glow)">${each(mk)}</g>${key ? mk.map(k => rim([k])).join('') : rim(mk)}` : layer(mk);
+  const recede = styleNow() === 'y2k' || big ? ' filter="url(#bd-base)"' : '';
+  return `<svg viewBox="${CROPS[figSex()][crop]}" aria-hidden="true"><use href="#bd-${view}"${recede}/>${helpers}${mains}${heart}</svg>`;
+}
+// the key under the big body map: the main muscle and its helpers, each a button that lights it up on the body
+function muscleKey(ex) {
+  const P = BD[figSex()], onMap = m => !!(P.front[m] || P.back[m]), { main, help } = figMuscles(ex);
+  const hs = help.filter(m => m !== ex.m && onMap(m));
+  const chip = (m, isMain) => onMap(m)
+    ? `<button class="mchip ${isMain ? 'main' : ''}" data-a="hlMuscle" data-m="${m}" aria-pressed="false"><i class="dot ${isMain ? 'hit' : 'hit-2'}"></i><span>${esc(MUSCLES[m] || m)}</span>${isMain ? `<small>${T('main')}</small>` : ''}</button>`
+    : `<span class="mchip main plain"><i class="dot hit"></i><span>${esc(MUSCLES[m] || m)}</span></span>`;
+  const n = main.filter(onMap).length + hs.length;
+  return `<div class="mkey" role="group" aria-label="${T('Muscles worked')}">${main.map(m => chip(m, true)).join('')}${hs.map(m => chip(m)).join('')}</div>
+    ${n ? `<p class="mkey-hint muted small">${hs.length ? T('The main muscle, then the ones that help. Tap one to find it on the body.') : T('Tap it to find it on the body.')}</p>` : ''}`;
+}
+// light up one muscle on the body map (and dim the rest); a second tap puts it back
+function hlMuscle(b) {
+  const root = b.closest('.sheet-body') || document, map = root.querySelector('.exd-map'), m = b.dataset.m;
+  if (!map) return;
+  const on = map.dataset.hl !== m;
+  for (const c of root.querySelectorAll('[data-a="hlMuscle"]')) c.setAttribute('aria-pressed', String(on && c === b));
+  if (on) map.dataset.hl = m; else delete map.dataset.hl;
+  for (const g of map.querySelectorAll('g[data-m]')) g.classList.toggle('lit', on && g.dataset.m === m);
+  haptic();
 }
 /* ----- exercise illustrations: RepDB free tier (repdb.co), loaded from RepDB's own published copy ----- */
 const VIS = window.LS_VISUALS || { base: '', map: {} };
@@ -545,7 +590,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -574,6 +619,11 @@ function migrate(s) {
   for (const k of Object.keys(d)) if (s[k] == null) s[k] = d[k];
   for (const k of ['custom', 'templates', 'splits', 'workouts']) s[k] = Array.isArray(s[k]) ? s[k].filter(o => o && typeof o === 'object') : [];
   for (const k of ['exPrefs', 'exResets', 'flags']) if (typeof s[k] !== 'object' || Array.isArray(s[k])) s[k] = {};
+  // a lighter restart is kept per reset (when it happened → 0.8 or 0.9); anything else is dropped
+  for (const p of Object.values(s.exPrefs)) if (p && typeof p === 'object' && p.restarts != null) {
+    const r = typeof p.restarts === 'object' && !Array.isArray(p.restarts) ? Object.fromEntries(Object.entries(p.restarts).filter(([, v]) => v === 0.8 || v === 0.9)) : {};
+    if (Object.keys(r).length) p.restarts = r; else delete p.restarts;
+  }
   s.settings = Object.assign(d.settings, typeof s.settings === 'object' ? s.settings : {});
   s.settings.colors = cleanPal(s.settings.colors);
   s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
@@ -584,6 +634,13 @@ function migrate(s) {
     log: (Array.isArray(bd.log) ? bd.log : []).filter(e => e && +e.at > 0 && +e.bw >= 30 && +e.bw <= 250).map(e => ({ at: +e.at, bw: +e.bw })).sort((a, b) => a.at - b.at) } : null;
   if (s.body && !s.body.log.length) s.body.log = [{ at: s.body.at || 0, bw: s.body.bw }];
   if (!Array.isArray(s.blocks) || !s.blocks.length) s.blocks = d.blocks;
+  s.blocks = s.blocks.filter(b => b && typeof b === 'object');
+  if (!s.blocks.length) s.blocks = d.blocks;
+  for (const b of s.blocks) {
+    b.start = +b.start || 0;
+    if (![0.8, 0.9].includes(b.load)) delete b.load;
+    if (!['program', 'break', 'injury', 'fresh'].includes(b.why)) delete b.why;
+  }
   // a record with something missing is mended rather than stopping the app from opening
   const mend = w => {
     w.ex = Array.isArray(w.ex) ? w.ex.filter(x => x && typeof x === 'object' && x.exId) : [];
@@ -992,6 +1049,25 @@ function tplWorkingSets(t) { return sum(t.ex, x => sum(x.sets, s => s.t !== 'W' 
 /* ============================== Blocks & resets ============================== */
 
 const curBlock = () => state.blocks[state.blocks.length - 1];
+// why a new block starts, and how heavy its first session of each lift is (the share of last time's weights): after a
+// break or an injury it starts lighter, the way a return to training usually does
+const BLOCK_WHY = [['program', 'New program', 1], ['break', 'After a break', 0.9], ['injury', 'After an injury', 0.8], ['fresh', 'Fresh start', 1]];
+const LOADS = [1, 0.9, 0.8];
+const loadName = f => f >= 1 ? TC('Same', 'weights') : T('{p}% lighter', { p: Math.round((1 - f) * 100) });
+// the first session after a reset suggests last time's weights times this; once you've done the exercise again, it's 1
+function restartLoad(exId) {
+  const base = baseline(exId), own = ((state.exPrefs[exId] || {}).restarts || {})[base], b = curBlock();
+  if (own != null && base !== b.start) return LOADS.includes(own) ? own : 1;
+  return b.start === base && LOADS.includes(b.load) ? b.load : 1;
+}
+// a weight made lighter for a fresh start, on your weight step; assisted exercises get more help instead
+function lighterW(w, f, k) {
+  if (!(f < 1) || !(w > 0)) return w;
+  const step = toKg(state.settings.step) || 1;
+  return k === 'aw' ? Math.round(w / f / step) * step : Math.max(step, Math.round(w * f / step) * step);
+}
+// sessions so far in a block
+const blockCount = b => workoutsIn(...blockRange(b)).length;
 function blockAt(ts) {
   let b = state.blocks[0];
   for (const x of state.blocks) if (x.start <= ts) b = x;
@@ -1012,17 +1088,26 @@ function resetStamp(exId) {
   const w = state.active;
   return w && w.mode !== 'edit' && (!exId || w.ex.some(x => x.exId === exId)) ? Math.min(Date.now(), w.start) : Date.now();
 }
-// one exercise's progression starts fresh: records, charts and weight tips count from now; nothing is deleted
+// one exercise's progression starts fresh: records, charts and weight tips count from now; nothing is deleted.
+// Its next session can start lighter
 function resetExercise(exId, done) {
-  const ex = getEx(exId);
-  confirmSheet({
-    title: T('Reset {name}?', { name: ex.name }),
-    text: T('Records, charts and “try more weight” tips for this exercise start fresh from today. Other exercises are not touched. Nothing is deleted: earlier sessions stay in History and in the All time view, and you can undo this.'),
-    ok: T('Reset this exercise'), onOk: () => {
-      const at = resetStamp(exId);
-      (state.exResets[exId] = state.exResets[exId] || []).push(at);
-      save(); refreshAll(); if (done) done();
-      toast(T('{name}: fresh start. Earlier sessions are kept.', { name: ex.name }), { label: T('Undo'), fn: () => { undoExReset(exId, at); if (done) done(); } });
+  const ex = getEx(exId), pick = { load: 1 }, weighted = hasWeight(ex.k);
+  openSheet({
+    cls: 'small block-new',
+    render: () => `<div class="sheet-body pad confirm"><h2>${T('Reset {name}?', { name: esc(ex.name) })}</h2>
+      <p>${T('Records, charts and “try more weight” tips for this exercise start fresh from today. Other exercises are not touched. Nothing is deleted: earlier sessions stay in History and in the All time view, and you can undo this.')}</p>
+      ${weighted ? `<p class="bn-l">${T('Its next session')}</p>
+      <div class="seg bn-load" role="group" aria-label="${T('Its next session')}">${LOADS.map(f => `<button class="${pick.load === f ? 'on' : ''}" data-a="load" data-v="${f}" aria-pressed="${pick.load === f}">${loadName(f)}</button>`).join('')}</div>` : ''}
+      <div class="row-btns"><button class="btn" data-a="sheetClose">${T('Cancel')}</button><button class="btn primary" data-a="ok">${icon('reset')}${T('Reset this exercise')}</button></div></div>`,
+    actions: {
+      load: (b, def) => { pick.load = +b.dataset.v; refreshSheet(def); },
+      ok: (b, def) => {
+        const at = resetStamp(exId);
+        (state.exResets[exId] = state.exResets[exId] || []).push(at);
+        if (pick.load < 1) { const pr = state.exPrefs[exId] = state.exPrefs[exId] || {}; (pr.restarts = pr.restarts || {})[at] = pick.load; }
+        save(); closeSheet(def); refreshAll(); if (done) done();
+        toast(T('{name}: fresh start. Earlier sessions are kept.', { name: ex.name }), { label: T('Undo'), fn: () => { undoExReset(exId, at); if (done) done(); } });
+      }
     }
   });
 }
@@ -1030,7 +1115,11 @@ function resetExercise(exId, done) {
 function undoExReset(exId, at) {
   const r = state.exResets[exId];
   const i = !r ? -1 : at != null ? r.lastIndexOf(at) : r.length - 1;
-  if (i >= 0) { r.splice(i, 1); if (!r.length) delete state.exResets[exId]; recalcPRs(); }
+  if (i >= 0) {
+    const pr = state.exPrefs[exId];
+    if (pr && pr.restarts) { delete pr.restarts[r[i]]; if (!Object.keys(pr.restarts).length) delete pr.restarts; }
+    r.splice(i, 1); if (!r.length) delete state.exResets[exId]; recalcPRs();
+  }
   save(); refreshAll();
 }
 function blockRange(b) {
@@ -2483,8 +2572,9 @@ VIEWS.train = function () {
   const split = activeSplit();
   const streak = streakWeeks();
   let h = `<header class="page-h"><div><p class="eyebrow">${esc(dfmt(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' }))}</p><h1>${T('Train')}</h1></div>
-    <div class="page-h-side">${streak ? `<span class="streak">${icon('flame')}${TN(streak, '<b>{n}</b> week', '<b>{n}</b> weeks')}</span>` : ''}<span class="sess">${T('Session <b>#{n}</b> next', { n: state.workouts.length + 1 })}</span></div></header>`;
+    <div class="page-h-side">${streak ? `<span class="streak">${icon('flame')}${TN(streak, '<b>{n}</b> week', '<b>{n}</b> weeks')}</span>` : ''}<span class="sess">${T('Session <b>#{n}</b> next', { n: state.workouts.length + 1 })}</span>${state.blocks.length > 1 ? `<span class="blk">${esc(blkName(curBlock()))} · ${T('week {n}', { n: Math.floor((Date.now() - curBlock().start) / (7 * DAY)) + 1 })}</span>` : ''}</div></header>`;
   h += weekStrip();
+  h += freshCard();
   if (!storageOK) h += `<div class="notice bad">${icon('info')}<p>${T('This browser is blocking storage, so nothing you log will be kept. Open Lifting Sanity in Safari, or add it to your Home Screen.')}</p></div>`;
   h += installHint();
   h += backupNudge();
@@ -2498,6 +2588,14 @@ VIEWS.train = function () {
   h += programLibrary();
   return h;
 };
+// a new block with no workout in it yet: what's different now, until the first session of it is done
+function freshCard() {
+  const b = curBlock();
+  if (state.blocks.length < 2 || blockCount(b) || (state.active && state.active.mode !== 'edit')) return '';
+  return `<section class="card fresh-card"><span class="fresh-ic">${icon('reset')}</span><div><p class="eyebrow accent">${T('New block')}</p>
+    <b>${T('{name} · fresh start', { name: esc(blkName(b)) })}</b>
+    <p>${T('Your next workout sets new baselines: what you lift becomes the bar to beat, and records count again from the session after.')}${b.load ? ' ' + T('Suggested weights start {p}% lighter than last time.', { p: Math.round((1 - b.load) * 100) }) : ''}</p></div></section>`;
+}
 // this week at a glance: a dot for each day, filled on the days you trained
 function weekStrip() {
   const ws = weekStart(Date.now()), today = dayStart(Date.now());
@@ -3266,8 +3364,21 @@ function workoutStory(w) {
     mark: LIFE_MARKS.filter(m => before < m && life >= m).pop() || null,
     streak: streakAt(w.start), weekCount: all.filter(o => weekStart(o.start) === wk).length,
     cmp: prev ? compareTo(w, prev) : null,
+    baselines: baselinesOf(w),
     ...rankStory(w)
   };
+}
+// the exercises a workout did for the first time since a reset or a new block (with history from before it): their best
+// set is the new bar to beat
+function baselinesOf(w) {
+  const out = [];
+  for (const x of w.ex) {
+    if (out.some(o => o.x.exId === x.exId)) continue;
+    const bs = bestSet(x), lp = bs && lastPerf(x.exId, w.start, w.editOf || w.id);
+    const base = baselineAt(x.exId, w.start);
+    if (lp && lp.w.start < base) out.push({ x, s: bs, block: base === blockAt(w.start).start });
+  }
+  return out;
 }
 // the ranks a workout moved up (only exercises that had a rank before it), and every rank just after it
 function rankStory(w) {
@@ -3448,6 +3559,23 @@ function cardRecords(st) {
   });
   if (n > 4) h += ctext(c, 180, 250 + 4 * 40 - 4, T('+{n} more', { n: n - 4 }), { size: 12, weight: 700, fill: c.ink2 });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.32)) };
+}
+// a fresh start: the first session of a block (or of an exercise after its reset) sets the bars to beat
+function cardBaselines(st) {
+  const c = cardCtx('baselines', T('New baselines')), list = st.baselines, n = list.length, b = blockAt(st.w.start);
+  let h = `<circle cx="180" cy="104" r="160" fill="url(#${c.id}r)"/>`;
+  h += `<g transform="translate(136 34) scale(3.7)" fill="none" stroke="${c.accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICONS.reset}"/></g>`;
+  h += ctext(c, 180, 156, (state.blocks.length > 1 && list.some(o => o.block) ? T('{name} starts here', { name: blkName(b) }) : T('Fresh start')).toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: c.accent, ls: 2.2, max: 300 });
+  h += ctext(c, 180, 192, TN(n, '{n} new baseline', '{n} new baselines'), { size: 28, weight: 900, max: 312 });
+  h += ctext(c, 180, 214, T('The bars to beat from your next session'), { size: 12.5, weight: 600, fill: c.ink2, max: 312 });
+  list.slice(0, 4).forEach((o, i) => {
+    const y = 252 + i * 38;
+    h += `<rect x="20" y="${y - 20}" width="320" height="32" rx="10" fill="#FFFFFF" fill-opacity=".05"/>`;
+    h += ctext(c, 32, y + 1, getEx(o.x.exId).name, { size: 13.5, weight: 700, anchor: 'start', max: 196 });
+    h += ctext(c, 328, y + 1, fmtSet(o.x, o.s), { size: 13.5, weight: 800, fill: c.accent, anchor: 'end', max: 110 });
+  });
+  if (n > 4) h += ctext(c, 180, 252 + 4 * 38 - 2, T('+{n} more', { n: n - 4 }), { size: 12, weight: 700, fill: c.ink2 });
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, glow(c.id + 'r', c.accent, 0.26)) };
 }
 const FLAME_OUT = 'M50 4C58 22 84 36 84 70C84 96 68 114 50 114S16 96 16 70C16 52 26 40 34 32C34 46 40 54 48 56C42 38 44 20 50 4Z';
 const FLAME_IN = 'M50 50C56 62 68 70 68 86C68 100 60 110 50 110S32 100 32 86C32 76 38 70 43 64C44 72 47 76 52 77C48 68 47 59 50 50Z';
@@ -3651,6 +3779,7 @@ function finCards(st) {
   if (st.rankUps.length) out.push(cardRankUp(st));
   out.push(cardWorkout(st));
   if (st.prs.length) out.push(cardRecords(st));
+  if (st.baselines.length) out.push(cardBaselines(st));
   if (st.rankRows.length) out.push(cardRanks(st));
   out.push(cardExercises(st));
   if (st.muscles.length) out.push(cardMuscles(st));
@@ -3721,9 +3850,12 @@ function finishScreen(id, mode = 'new') {
   const mood = st.count || st.mark ? 'milestone' : st.prs.length ? 'pr' : 'done';
   const pick = [T('Great work!'), T('Strong session!'), T('Nice work!'), T('Another one done!')];
   const title = past ? w.name : !fresh ? T('Changes saved') : st.n === 1 ? T('First workout done!') : st.count ? T('Workout #{n}!', { n: st.n })
-    : st.prs.length ? TN(st.prs.length, 'New record!', 'New records!') : pick[[...String(w.id)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % pick.length];
+    : st.prs.length ? TN(st.prs.length, 'New record!', 'New records!') : st.baselines.length ? T('Fresh start!') : pick[[...String(w.id)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % pick.length];
   // under a title that already has the number in it, the workout's name and day instead
-  const sub = past ? `${fmtDate(w.start)} · ${T('Workout #{n}', { n: st.n })}` : fresh && (st.count || st.n === 1) ? `${w.name} · ${fmtDate(w.start)}` : `${T('Your workout number {n}', { n: st.n })} · ${w.name}`;
+  // a fresh start says where in the new block you are
+  const bk = blockAt(w.start), bn = workoutsIn(...blockRange(bk)).indexOf(w) + 1;
+  const sub = past ? `${fmtDate(w.start)} · ${T('Workout #{n}', { n: st.n })}` : fresh && (st.count || st.n === 1) ? `${w.name} · ${fmtDate(w.start)}`
+    : fresh && st.baselines.length && state.blocks.length > 1 && bn > 0 ? `${blkName(bk)} · ${T('session {n}', { n: bn })} · ${w.name}` : `${T('Your workout number {n}', { n: st.n })} · ${w.name}`;
   const face = st.count ? `<b>${st.n}</b>` : mood === 'done' ? icon('check') : icon('trophy');
   const maxM = st.muscles.length ? st.muscles[0][1] : 1;
   let cur = 0, timer = null;
@@ -4061,7 +4193,17 @@ function exCtx(w, x) {
     return done.filter(o => cat(o) === cat(s))[k]
       || done.filter(o => (o.t === 'W') === isW && (s.side ? !o.side : o.side === 'L'))[k] || null;
   });
-  return { lp, prevSets, suggest: suggestion(x, lp), prs: livePRs(w, x) };
+  // the first session after a reset: last time's weights, lighter if the block (or the exercise) starts lighter
+  return { lp, prevSets, suggest: suggestion(x, lp), prs: livePRs(w, x), load: lp && lp.archived && w.mode !== 'edit' ? restartLoad(x.exId) : 1 };
+}
+// an exercise's first session after a reset: today sets the bar, and the weights may start lighter
+function freshNote(x, ctx) {
+  const own = exResetSince(x.exId), b = curBlock(), k = getEx(x.exId).k;
+  const ws = ctx.lp.x.sets.filter(o => o.done && o.t !== 'W' && o.w > 0).map(o => o.w), top = !ws.length ? 0 : k === 'aw' ? Math.min(...ws) : Math.max(...ws);
+  const what = own ? T('Fresh start for this exercise') : T('{name} · fresh start', { name: esc(blkName(b)) });
+  const v = { p: Math.round((1 - ctx.load) * 100), from: esc(fmtW(top)), to: esc(fmtW(lighterW(top, ctx.load, k))) };
+  const light = !(ctx.load < 1 && hasWeight(k) && top > 0) ? '' : k === 'aw' ? T('More help to start: {from} → <b>{to}</b> of assistance.', v) : T('Weights start {p}% lighter: {from} → <b>{to}</b>.', v);
+  return `<div class="fresh-note">${icon('reset')}<div><b>${what}</b><span>${T('Today sets your new baseline; records count again from your next session. “Previous” is your last session, {date}.', { date: esc(fmtShort(ctx.lp.w.start)) })}${light ? ' ' + light : ''}</span></div></div>`;
 }
 function suggestion(x, lp) {
   const k = getEx(x.exId).k;
@@ -4085,6 +4227,7 @@ function placeholder(x, j, ctx) {
   const mate = partnerOf(x, s);
   const sug = ctx.suggest && !NO_SUGGEST.has(s.t) ? ctx.suggest : null;
   if (prev) for (const f of ['w', 'r', 'sec', 'dist']) if (prev[f] != null) out[f] = prev[f];
+  if (prev && ctx.load < 1) out.w = lighterW(out.w, ctx.load, k);
   if (sug) { out.w = sug.w; out.r = sug.r; }
   if (today) {
     if (today.w != null) out.w = today.w;
@@ -4138,7 +4281,7 @@ function exCardHTML(w, i, focus) {
   h += notesHTML(i, x, ctx);
   h += rankHint(w, x, i);
   if (ctx.suggest) h += `<p class="hint good">${icon('up')}<span>${T('Last time you hit {n}+ reps on every set. Try <b>{w}</b> today.', { n: ctx.suggest.hi, w: esc(fmtW(ctx.suggest.w)) })}</span></p>`;
-  else if (ctx.lp && ctx.lp.archived) h += `<p class="hint">${icon('archive')}<span>${exResetSince(x.exId) ? T('“Previous” is from before your reset ({date}). Records for this exercise start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) }) : T('“Previous” is from before your reset ({date}). Records for this block start fresh.', { date: esc(fmtShort(ctx.lp.w.start)) })}</span></p>`;
+  else if (ctx.lp && ctx.lp.archived) h += freshNote(x, ctx);
   const two = isCompact(x), f1 = firstSide(x), del = ui.delMode === x.id;
   h += `<div class="sets ${del ? 'deleting' : ''}" style="--cols:${setCols(k, effOn, two)}"><div class="set-row head"><span>${TC('Set', 'column')}</span><span>${T('Previous')}</span>`;
   if (hasWeight(k)) h += `<span>${esc(weightLabel(k))}</span>`;
@@ -5425,9 +5568,9 @@ function exerciseSheet(exId) {
       <div class="sheet-body pad exd">${ex.en ? `<p class="exd-en" lang="en" dir="ltr">${esc(ex.en)}</p>` : ''}
         <div class="exd-hero">${photo ? `<img class="exd-photo" src="${photo}" alt="${T('Your photo of {name}', { name: esc(ex.name) })}">` : ''}
           ${art ? `<figure class="exd-art ${art.length > 1 ? motionOn() ? 'moving' : 'still' : ''}${artKind(exId)}"${art.length > 1 && motionOn() ? ' data-mv="pic"' : ''}>${artFrames(exId, art, ex.name)}${art.length > 1 && motionOn() ? '<span class="exd-step"><i></i><i></i></span>' : ''}<figcaption>${artNote(exId) ? `<b class="similar">${icon('info', 'inline')} ${T('Similar picture. {note}.', { note: esc(artNote(exId)) })}</b>` : ''}<span>${T('Illustration: {credit}', { credit: artCredit(exId) })}</span></figcaption></figure>` : ''}
-          <div class="exd-map"><figure>${figure('front', ex, 'full', true)}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full', true)}<figcaption>${T('Back')}</figcaption></figure></div></div>
-        <div class="exd-legend"><span><i class="dot hit"></i>${T('Main: {muscle}', { muscle: esc(MUSCLES[ex.m]) })}</span>${ex.sec.length ? `<span><i class="dot hit-2"></i>${T('Also: {muscles}', { muscles: esc(ex.sec.map(m => MUSCLES[m]).join(T(', '))) })}</span>` : ''}
-          <button class="btn sm" data-a="photo">${icon('camera')}${photo ? T('Change photo') : T('Add your own photo')}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">${T('Remove photo')}</button>` : ''}</div>
+          <div class="exd-map"><figure>${figure('front', ex, 'full', true, true)}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full', true, true)}<figcaption>${T('Back')}</figcaption></figure></div></div>
+        ${muscleKey(ex)}
+        <div class="exd-legend"><button class="btn sm" data-a="photo">${icon('camera')}${photo ? T('Change photo') : T('Add your own photo')}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">${T('Remove photo')}</button>` : ''}</div>
         ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}${T('How to do it')}<span class="muted">${TN(steps.length, '{n} steps', '{n} steps')}</span>${icon('down', 'chev')}</summary>
           <ol class="steps">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol><p class="muted small">${T('Instructions from the open {link} (MIT).', { link: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })}</p></details>` : ''}
         ${scienceHTML(exId)}
@@ -5817,7 +5960,7 @@ VIEWS.progress = function () {
   h += ranksSection();
   h += weekCard();
   h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(blkName(b))}${icon('edit')}</button></h2>
-      <p class="muted">${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(inBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
+      <p class="muted">${b.why ? `${esc(T(BLOCK_WHY.find(x => x[0] === b.why)[1]))}${b.load ? ` (${esc(loadName(b.load))})` : ''} · ` : ''}${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(inBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
       <div class="block-btns"><button class="btn" data-a="blockReset">${icon('reset')}${T('Reset progression')}</button>${archived.length ? `<button class="btn ghost" data-a="blockUndo">${icon('undo')}${T('Undo reset')}</button>` : ''}</div></div>
     <p class="small muted">${T('Starting a new block gives you fresh records and charts for everything, for a new program, after a break or after an injury. To start just one exercise fresh, tap {icon} next to it under Your lifts, or use its ⋯ menu in a workout. Everything stays saved below and in History.', { icon: icon('reset', 'inline') })}</p></section>`;
   h += `<div class="tiles four">
@@ -5879,24 +6022,91 @@ function liftsSection(from, to, title) {
   }).join('')}</div><button class="btn wide reset-any" data-a="resetAny">${icon('reset')}${T('Reset one exercise…')}</button></section>`;
 }
 function blockResetSheet() {
-  const n = state.blocks.length + 1;
+  const n = state.blocks.length + 1, pick = { why: 'program', load: 1 };
   openSheet({
-    cls: 'small', focus: '#blkName',
+    cls: 'small block-new',
     render: () => `<div class="sheet-body pad confirm"><h2>${T('Start a new block?')}</h2>
-      <p>${T('Records, charts, “try more weight” tips and progress all start fresh from today.')}</p>
-      <p>${T('<b>Nothing is deleted.</b> {name} is saved under Earlier blocks, every workout stays in History, and the All time view still shows it. You can undo this.', { name: esc(blkName(curBlock())) })}</p>
-      <label class="field"><span>${T('Name for the new block')}</span><input id="blkName" value="${T('Block {n}', { n })}" autocomplete="off"></label>
+      <p class="muted">${T('Why are you starting fresh?')}</p>
+      <div class="chips wrap bn-why" role="group" aria-label="${T('Why are you starting fresh?')}">${BLOCK_WHY.map(([v, l]) => `<button class="chip ${pick.why === v ? 'on' : ''}" data-a="why" data-v="${v}" aria-pressed="${pick.why === v}">${T(l)}</button>`).join('')}</div>
+      <p class="bn-l">${T('First session of each lift')}</p>
+      <div class="seg bn-load" role="group" aria-label="${T('First session of each lift')}">${LOADS.map(f => `<button class="${pick.load === f ? 'on' : ''}" data-a="load" data-v="${f}" aria-pressed="${pick.load === f}">${loadName(f)}</button>`).join('')}</div>
+      <p class="small muted">${pick.load < 1 ? T('Suggested weights start {p}% under last time, then build back up from there. A gentler start is the usual advice after time off.', { p: Math.round((1 - pick.load) * 100) }) : T('Suggested weights pick up where you left off.')}</p>
+      <ul class="bn-what">
+        <li>${icon('trophy')}<span>${T('<b>Records start over.</b> Your first session of each lift sets the bar; beating it counts from the next one.')}</span></li>
+        <li>${icon('chart')}<span>${T('<b>Charts and Progress</b> show the new block, with an All time view for everything.')}</span></li>
+        <li>${icon('up')}<span>${T('<b>“Try more weight” tips</b> follow what you do in the new block.')}</span></li>
+        <li>${icon('archive')}<span>${T('<b>Nothing is deleted.</b> {name} is kept under Earlier blocks and every workout stays in History. You can undo this.', { name: esc(blkName(curBlock())) })}</span></li>
+      </ul>
+      <label class="field"><span>${T('Name for the new block')}</span><input id="blkName" value="${esc(pick.name != null ? pick.name : T('Block {n}', { n }))}" autocomplete="off"></label>
       <div class="row-btns"><button class="btn" data-a="sheetClose">${T('Cancel')}</button><button class="btn primary" data-a="ok">${icon('reset')}${T('Start new block')}</button></div></div>`,
     actions: {
+      // a reason picks the usual starting weights for it; you can still pick others
+      why: (b, def) => { pick.name = $('#blkName', def.el).value; pick.why = b.dataset.v; pick.load = BLOCK_WHY.find(w => w[0] === pick.why)[2]; refreshSheet(def); },
+      load: (b, def) => { pick.name = $('#blkName', def.el).value; pick.load = +b.dataset.v; refreshSheet(def); },
       ok: (b, def) => {
         const name = $('#blkName', def.el).value.trim() || T('Block {n}', { n });
-        const nb = { id: uid(), name, start: resetStamp() };
+        const prev = curBlock(), nb = { id: uid(), name, start: resetStamp(), why: pick.why, ...(pick.load < 1 ? { load: pick.load } : {}) };
         state.blocks.push(nb);
         save(true); closeSheet(def); refreshAll();
-        toast(T('{name} started. Earlier progress is saved.', { name }), { label: T('Undo'), fn: () => { const i = state.blocks.indexOf(nb); if (i > 0) { state.blocks.splice(i, 1); recalcPRs(); save(); refreshAll(); } } });
+        const undo = () => { const i = state.blocks.indexOf(nb); if (i > 0) { state.blocks.splice(i, 1); recalcPRs(); save(); refreshAll(); } };
+        setTimeout(() => blockShow(prev, nb, undo), canMove() && !calm() ? 260 : 0);
       }
     }
   });
+}
+// the moment a new block starts: the block you finished, what you did in it and your biggest gains, then the new one
+function blockGains(b) {
+  const [f, t] = blockRange(b), out = [];
+  const ids = [...new Set(workoutsIn(f, t).flatMap(w => w.ex.filter(x => x.sets.some(s => s.done)).map(x => x.exId)))];
+  for (const id of ids) {
+    const ex = getEx(id);
+    if (ex.k !== 'wr') continue;
+    const pts = exSeries(id, 'e1rm', Math.max(f, baselineAt(id, t - 1)), t);
+    if (pts.length < 2) continue;
+    const first = pts[0].y, best = Math.max(...pts.map(p => p.y));
+    if (first > 0 && best > first) out.push({ id, first, best, g: best / first - 1 });
+  }
+  return out.sort((a, b) => b.g - a.g);
+}
+function blockShow(prev, nb, undo) {
+  const [f, t] = blockRange(prev), ws = workoutsIn(f, t), gains = blockGains(prev).slice(0, 3);
+  const weeks = ws.length ? Math.max(1, Math.round((ws[ws.length - 1].start - ws[0].start) / (7 * DAY)) + 1) : 0;
+  const recs = sum(ws, w => (w.prs || []).length);
+  const def = openSheet({
+    cls: 'finish block-show', label: T('{name} starts now', { name: blkName(nb) }),
+    render: () => `<div class="fin" data-mood="done">
+      <div class="fin-glow" aria-hidden="true"></div>
+      <header class="fin-top"><button class="fin-btn" data-a="sheetClose" aria-label="${T('Close')}">${icon('x')}</button><span></span></header>
+      <div class="sheet-body fin-body">
+        ${ws.length ? `<section class="bs-past">
+          <p class="eyebrow">${T('{name} complete', { name: esc(blkName(prev)) })}</p>
+          <p class="bs-dates">${esc(fmtShort(prev.start || ws[0].start))} – ${esc(fmtShort(Math.min(Date.now(), t)))} · ${TN(weeks, '{n} week', '{n} weeks')}</p>
+          <div class="bs-tiles"><div><b>${ws.length}</b><small>${TN(ws.length, 'session', 'sessions')}</small></div><div><b>${esc(fmtVol(sum(ws, workoutVolume)))}</b><small>${T('lifted')}</small></div><div><b>${recs}</b><small>${TN(recs, 'record', 'records')}</small></div></div>
+          ${gains.length ? `<p class="bs-h">${T('Biggest gains')}</p><ul class="bs-gains">${gains.map(g => `<li><span>${esc(getEx(g.id).name)}</span><small dir="ltr">${esc(fmtMetric('e1rm', g.first, 'wr'))} → <b>${esc(fmtMetric('e1rm', g.best, 'wr'))}</b></small><em dir="ltr">+${Math.round(g.g * 100)}%</em></li>`).join('')}</ul><p class="muted small">${T('Est. 1RM, first session to best.')}</p>` : ''}
+        </section>` : ''}
+        <section class="fin-hero bs-new">
+          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span><svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${icon('reset')}</span></div>
+          <h1 class="fin-title">${T('{name} starts now', { name: esc(blkName(nb)) }).split(' ').map((wd, i) => `<span class="w" style="--i:${i}">${wd}</span>`).join(' ')}</h1>
+          <p class="fin-sub">${nb.why ? esc(T(BLOCK_WHY.find(w => w[0] === nb.why)[1])) + ' · ' : ''}${esc(fmtDate(nb.start))}</p>
+          <ul class="bs-next">
+            <li>${icon('trophy')}<span>${T('Your next session of each lift sets the bar to beat.')}</span></li>
+            ${nb.load ? `<li>${icon('down')}<span>${T('Suggested weights start {p}% lighter than last time.', { p: Math.round((1 - nb.load) * 100) })}</span></li>` : ''}
+            <li>${icon('chart')}<span>${T('Records, charts and tips count from today.')}</span></li>
+          </ul>
+        </section>
+      </div>
+      <footer class="fin-foot"><button class="btn" data-a="undo">${icon('undo')}${T('Undo')}</button><button class="btn primary" data-a="sheetClose">${T('Let’s go')}</button></footer>
+    </div>`,
+    actions: { undo: (b, d) => { d.undone = true; undo(); closeSheet(d); toast(T('{name} is back.', { name: blkName(prev) })); } },
+    onClose: d => { if (!d.undone) toast(T('{name} started. Earlier progress is saved.', { name: blkName(nb) }), { label: T('Undo'), fn: () => { undo(); toast(T('{name} is back.', { name: blkName(prev) })); } }); }
+  });
+  setTimeout(() => {
+    if (!def.el.isConnected) return;
+    const m = $('.bs-new .fin-medal', def.el).getBoundingClientRect();
+    confetti(m.left + m.width / 2, m.top + m.height / 2, { n: 90, colors: fxColors('party'), power: 0.9 });
+    haptic();
+  }, calm() ? 0 : 700);
+  return def;
 }
 function blockSheet(id) {
   const b = state.blocks.find(x => x.id === id);
@@ -5954,6 +6164,7 @@ VIEWS.settings = function () {
   </div>
   <h2 class="section-h">${T('Your data')}</h2><div class="card list-card">
     ${row(T('Back up'), esc(backupText()) + ' ' + T('Saves everything, photos included, to a file in Files or iCloud Drive.'), `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}${T('Save file')}</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}${T('Copy')}</button></div>`)}
+    ${row(T('Spreadsheet'), T('Every set you’ve logged as a CSV file, for Numbers, Excel or Google Sheets.'), `<button class="btn sm" data-a="exportCSV">${icon('download')}${T('Export CSV')}</button>`)}
     ${row(T('Restore'), T('Load a backup file. Replaces what’s on this device.'), `<div class="btn-pair"><label class="btn sm">${icon('upload')}${T('Choose file')}<input type="file" accept=".json,application/json" data-f="importFile" hidden></label><button class="btn sm ghost" data-a="importPaste">${T('Paste')}</button></div>`)}
     ${row(T('Copies on this device'), TN(COPY_DAYS, 'The last {n} day, kept automatically. Go back to one if something goes wrong.', 'The last {n} days, kept automatically. Go back to one if something goes wrong.'), `<button class="btn sm" data-a="copies">${icon('clock')}${T('View')}</button>`)}
     ${row(T('Sample history'), demo ? T('Sample workouts are mixed into your history.') : T('Load 8 weeks of example workouts to see what the charts look like.'), demo ? `<button class="btn sm" data-a="demoOff">${T('Remove samples')}</button>` : `<button class="btn sm" data-a="demoOn">${T('Load samples')}</button>`)}
@@ -5971,6 +6182,12 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 44, items: [
+    ['reset', 'A new block feels new', 'Reset progression asks why you’re starting fresh; after a break or an injury, each lift’s first session suggests 10% or 20% lighter weights. Starting it shows the block you finished and its biggest gains, Train shows the new block until its first workout, each exercise says it’s a fresh start, and the finish screen shows your new baselines.'],
+    ['dumbbell', 'Muscles, clearer', 'In an exercise’s details the rest of the body steps back and each worked muscle gets a rim of light. A key under the body lists the main muscle and the ones that help: tap one to find it on the body.'],
+    ['download', 'Export to a spreadsheet', 'Settings, under Your data, saves every set you’ve logged as a CSV file for Numbers, Excel or Google Sheets.'],
+    ['check', 'Fixes', 'About 20 squats, leg presses and lunges now name the quads as their main muscle, with the glutes helping. Two dumbbell presses now count for the chest, and the narrow-grip chin-up for the lats.']
+  ] },
   { v: 43, items: [
     ['flask', 'Ranks, with their sources', 'How ranks work now lists the 35 studies and datasets behind the ranks, by topic: the standards, your bodyweight, age, women and men, the 1RM estimate, other exercises and machines, each with what it found and a link.'],
     ['trophy', 'Each rank shows its evidence', 'An exercise’s rank names the studies behind its own standard (an incline bench, the study that measured the bench at each angle), or says plainly when its ratio is a rule of thumb.']
@@ -6113,26 +6330,51 @@ async function copiesSheet() {
 async function exportFile() {
   if (!photosLoaded) { toast(T('Your photos are still loading. Try again in a second.')); return; }
   const name = `lifting-sanity-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  const blob = new Blob([exportData()], { type: 'application/json' });
-  // inside claude.ai the page can't download on its own, so the viewer saves through the host
+  if (await saveBlob(new Blob([exportData()], { type: 'application/json' }), name, T('Lifting Sanity backup'))) { markBackedUp(); toast(T('Backup saved.')); }
+}
+// a file to the share sheet (Save to Files) where there is one, else downloaded; true once it's saved. Inside claude.ai
+// the page can't download on its own, so the viewer saves through the host
+async function saveBlob(blob, name, title) {
   const host = window.claude && window.claude.use ? await window.claude.use('downloads').catch(() => null) : null;
   if (host) {
-    try { await host.save({ filename: name, data: blob }); markBackedUp(); toast(T('Backup saved.')); }
-    catch (e) { if (!e || e.code !== 'declined') toast(T('Saving isn’t available here. Use Copy instead.')); }
-    return;
+    try { await host.save({ filename: name, data: blob }); return true; }
+    catch (e) { if (!e || e.code !== 'declined') toast(T('Saving isn’t available here. Use Copy instead.')); return false; }
   }
   try {
-    const file = new File([blob], name, { type: 'application/json' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: T('Lifting Sanity backup') }); markBackedUp(); toast(T('Backup saved.')); return; }
-  } catch (e) { if (e && e.name === 'AbortError') return; }
+    const file = new File([blob], name, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title }); return true; }
+  } catch (e) { if (e && e.name === 'AbortError') return false; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   document.body.append(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  markBackedUp();
-  toast(T('Backup saved.'));
+  return true;
+}
+// every logged set as a spreadsheet row (Numbers, Excel, Google Sheets), in your units, oldest first
+function csvText() {
+  const q = v => { const t = v == null ? '' : String(v); return /[",\n\r]/.test(t) || /^[=+\-@]/.test(t) ? `"${(/^[=+\-@]/.test(t) ? "'" : '') + t.replace(/"/g, '""')}"` : t; };
+  const pad = n => String(n).padStart(2, '0'), when = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const rows = [['Date', 'Workout', 'Exercise', 'Set', 'Type', `Weight (${isLb() ? 'lb' : 'kg'})`, 'Reps', state.settings.effort === 'rpe' ? 'RPE' : 'RIR', 'Side', 'Seconds', 'Distance', 'Distance unit', 'Note']];
+  for (const w of [...state.workouts].sort((a, b) => a.start - b.start)) for (const x of w.ex) {
+    const e = getEx(x.exId), k = e.k;
+    let n = 0;
+    for (const st of x.sets) {
+      if (st.done === false) continue;
+      n++;
+      rows.push([when(w.start), w.name || '', e.en || e.name, n, (SET_TYPES[st.t] || SET_TYPES.N).label,
+        hasWeight(k) && st.w != null ? dispW(st.w) : '', hasReps(k) && st.r != null ? st.r : '',
+        st.rir != null && hasReps(k) ? (state.settings.effort === 'rpe' ? 10 - st.rir : st.rir) : '', st.side || '',
+        hasTime(k) && st.sec ? st.sec : '', hasDist(k) && st.dist ? dispDist(st.dist, k) : '', hasDist(k) && st.dist ? (k === 'wdist' ? (isLb() ? 'yd' : 'm') : (isLb() ? 'mi' : 'km')) : '', n === 1 ? (x.note || '') : '']);
+    }
+  }
+  return '\ufeff' + rows.map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
+}
+async function exportCSV() {
+  if (!state.workouts.length) { toast(T('Nothing logged yet.')); return; }
+  const name = `lifting-sanity-sets-${new Date().toISOString().slice(0, 10)}.csv`;
+  if (await saveBlob(new Blob([csvText()], { type: 'text/csv' }), name, T('Lifting Sanity sets'))) toast(T('Spreadsheet saved.'));
 }
 // the shape a backup must have before anything on the device is touched
 function backupProblem(d) {
@@ -6456,6 +6698,7 @@ const ACT = {
   resetAny: () => pickExercises({ single: true, title: T('Reset which exercise?'), onPick: ([id]) => resetExercise(id) }),
   // progress
   blockReset: () => blockResetSheet(),
+  hlMuscle: b => hlMuscle(b),
   shareWeek: async () => {
     const text = ['LIFTING-SANITY', '$ cat weekly_stats.log', ...weekLines().map(l => '> ' + l)].join('\n');
     try { if (navigator.share && !inFrame) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -6503,6 +6746,7 @@ const ACT = {
   tgl: b => { const k = b.dataset.k; state.settings[k] = !state.settings[k]; save(); render(); if (k === 'wake') wake(state.settings.wake); },
   testSound: () => { unlockAudio(); const s = state.settings.sound; state.settings.sound = true; beep(); state.settings.sound = s; },
   exportFile: () => exportFile(),
+  exportCSV: () => exportCSV(),
   exportCopy: () => {
     if (!photosLoaded) { toast(T('Your photos are still loading. Try again in a second.')); return; }
     const text = exportData();

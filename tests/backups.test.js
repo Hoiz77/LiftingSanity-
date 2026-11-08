@@ -58,6 +58,13 @@ const { open, report } = require('./lib');
   r.ok(/Go back to this copy\?/.test(await t.sheetText()), 'going back to a copy asks first');
   await t.inSheet('[data-a="ok"]', 700);
   r.ok((await t.state()).workouts.length === 4 && !!(await p.evaluate(() => localStorage.getItem('liftingsanity:data:v1:before-restore'))), 'going back restores the copy, and what was there is set aside');
+  // the spreadsheet: every logged set as a row, in your units; commas, quotes and formula-looking text kept safe
+  await t.ev(`(() => { state.workouts[0].name = 'Push, "heavy"'; state.workouts[0].ex[0].note = '=SUM(A1)'; save(true); })()`);
+  await t.tab('settings');
+  const [csv] = await Promise.all([p.waitForEvent('download'), t.click('[data-a="exportCSV"]', 500)]);
+  const rows = require('fs').readFileSync(await csv.path(), 'utf8').split('\r\n').filter(Boolean);
+  r.ok(csv.suggestedFilename().endsWith('.csv') && rows[0].replace(/^\ufeff/, '').startsWith('Date,Workout,Exercise,Set,Type,Weight (kg),Reps,RIR') && rows.length === 5 && rows.slice(1).every(l => /,1,Working set,50,5,/.test(l)), 'Export CSV saves every set as a spreadsheet row, in your units', rows.slice(0, 2));
+  r.ok(rows[1].includes('"Push, ""heavy"""') && rows[1].endsWith(`"'=SUM(A1)"`), 'commas and quotes stay in their cell, and a note that looks like a formula stays text', rows[1]);
   await t.tab('settings'); await t.click('[data-a="eraseAll"]', 400); await p.fill('#eraseBox', 'ERASE'); await t.inSheet('[data-a="ok"]', 800);
   r.ok(await t.ev('listCopies().then(l => l.length)') === 0, 'Erase everything removes the copies too');
   await r.done(t);

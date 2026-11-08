@@ -75,5 +75,21 @@ const { open, report } = require('./lib');
   const fx = await p.evaluate(() => { const f = document.querySelector('#rankfx:not([hidden])'); return f && { old: !!f.querySelector('.rkfx-old .rank-emb'), now: !!f.querySelector('.rkfx-new .rank-emb'), rings: f.querySelectorAll('.rkfx-ring').length, sparks: f.querySelectorAll('.rkfx-sparks i').length, shine: !!f.querySelector('.emb-shine'), text: f.textContent.replace(/\s+/g, ' ') }; });
   r.ok(fx && fx.old && fx.now && fx.rings === 2 && fx.sparks === 16 && fx.shine && /Rank up/.test(fx.text) && /Platinum/.test(fx.text), 'a rank-up: the old emblem breaks, the new one lands with rings of light, sparks and a shine', fx);
   await t.ev('rankfxHide()'); await p.waitForTimeout(500);
+
+  // the key under the details' map: the main muscle first, each one lights up on the body when tapped
+  await t.ev(`exerciseSheet('lever-shoulder-press')`); await p.waitForTimeout(800);
+  const key = await p.evaluate(() => { const s = document.querySelector('.sheet-wrap.in'); return { chips: [...s.querySelectorAll('.mkey .mchip')].map(c => c.textContent.trim()), main: (s.querySelector('.mchip.main') || {}).dataset?.m, layers: [...new Set([...s.querySelectorAll('.exd-map g[data-m]')].map(g => g.dataset.m))] }; });
+  r.ok(key.main === 'frontdelts' && /^Front delts\s*main$/i.test(key.chips[0]) && key.chips.includes('Triceps') && key.layers.includes('triceps') && key.layers.includes('frontdelts'), 'the details’ key: the main muscle first, then its helpers, each with its own layer on the map', key);
+  await t.inSheet('[data-a="hlMuscle"][data-m="triceps"]', 250);
+  const lit = await p.evaluate(() => { const m = document.querySelector('.sheet-wrap.in .exd-map'); return { hl: m.dataset.hl, lit: [...m.querySelectorAll('g.lit')].map(g => g.dataset.m), dim: +getComputedStyle(m.querySelector('g[data-m="frontdelts"]')).opacity, on: document.querySelector('.sheet-wrap.in [data-m="triceps"][aria-pressed="true"]') !== null }; });
+  r.ok(lit.hl === 'triceps' && lit.lit.length && lit.lit.every(x => x === 'triceps') && lit.dim < 0.3 && lit.on, 'tapping Triceps lights them on the body and dims the rest', lit);
+  await t.inSheet('[data-a="hlMuscle"][data-m="triceps"]', 250);
+  r.ok(await p.evaluate(() => !document.querySelector('.sheet-wrap.in .exd-map').dataset.hl), 'a second tap puts it back');
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
+  const fb = await t.ev(`(LIB.find(e => e.m === 'fullbody') || {}).id`);
+  await t.ev(`exerciseSheet(${JSON.stringify(fb)})`); await p.waitForTimeout(800);
+  const fk = await p.evaluate(() => { const s = document.querySelector('.sheet-wrap.in'); const ids = [...s.querySelectorAll('.mkey [data-a="hlMuscle"]')].map(c => c.dataset.m); const layers = new Set([...s.querySelectorAll('.exd-map g[data-m]')].map(g => g.dataset.m)); return { plain: !!s.querySelector('.mkey .mchip.plain'), ids, all: ids.every(m => layers.has(m)) }; });
+  r.ok(fk.plain && fk.ids.length >= 4 && fk.all, 'a full-body exercise: “Full body” as a label, and a chip for every muscle painted on the map', { fb, ...fk });
+  await t.ev('closeAllSheets()'); await p.waitForTimeout(300);
   await r.done(t);
 })();
