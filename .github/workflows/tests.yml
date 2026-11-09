@@ -30,7 +30,7 @@ jobs:
       - run: npm test
 
   webkit:
-    name: First launch to restored backup, colours, celebrations and contrast (WebKit, iPhone)
+    name: First launch to restored backup, colours, celebrations, contrast and access (WebKit, iPhone)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -50,5 +50,8 @@ jobs:
         env:
           LS_BROWSER: webkit
       - run: node tests/contrast.test.js
+        env:
+          LS_BROWSER: webkit
+      - run: node tests/access.test.js
         env:
           LS_BROWSER: webkit

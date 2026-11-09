@@ -1,4 +1,4 @@
-// layout on phone widths, in both styles (and in Arabic): no text or button runs off the screen or out of its card, the page never
+// layout on phone widths, in both styles (and in Arabic, and at the larger text sizes): no text or button runs off the screen or out of its card, the page never
 // scrolls sideways, and short button labels sit in the middle of their buttons. Uses the real fonts when online.
 const { open, report } = require('./lib');
 const CUT = () => {
@@ -30,9 +30,11 @@ const CUT = () => {
 (async () => {
   const r = report('Layout: nothing cut off, nothing sideways, labels centred');
   // every width in English, and the middle one in Arabic (right to left, longer words)
-  const runs = ['clean', 'y2k'].flatMap(style => [...[375, 393, 430].map(width => ({ style, width, lang: 'en' })), { style, width: 393, lang: 'ar' }]);
-  for (const { style, width, lang } of runs) {
-    const t = await open({ width, height: 852, fonts: true, settings: { style } });
+  const runs = ['clean', 'y2k'].flatMap(style => [...[375, 393, 430].map(width => ({ style, width, lang: 'en' })), { style, width: 393, lang: 'ar' },
+    // Text size: Larger in English (Clean) and all in Arabic (Y2K), and Large on the narrowest phone
+    { style, width: 393, lang: style === 'y2k' ? 'ar' : 'en', text: 'xl' }, ...(style === 'clean' ? [{ style, width: 375, lang: 'en', text: 'l' }] : [])]).filter(o => !process.env.LS_TEXT_ONLY || o.text);
+  for (const { style, width, lang, text } of runs) {
+    const t = await open({ width, height: 852, fonts: true, settings: { style, ...(text ? { text } : {}) } });
     // Arabic as it starts in Clean; with Arabic exercise names, units and terms in Y2K
     if (lang === 'ar') { await t.p.evaluate(all => { localStorage.setItem('liftingsanity:lang', 'ar'); if (all) { localStorage.setItem('liftingsanity:arNames', '1'); localStorage.setItem('liftingsanity:arTerms', '1'); } }, style === 'y2k'); await t.p.reload(); await t.p.waitForFunction(() => window.LiftingSanity); await t.p.waitForTimeout(500); }
     const p = t.p, found = [];
@@ -65,7 +67,7 @@ const CUT = () => {
     await check('done for today');
     await t.click('[data-a="planReview"]', 600); await check('plan review');
     await t.ev('closeAllSheets()'); await p.waitForTimeout(400); await t.tab('settings'); await t.click('[data-a="openColors"]', 700); await check('colours');
-    r.ok(!found.length, `${style} at ${width}px wide${lang === 'ar' ? (style === 'y2k' ? ', all in Arabic' : ', in Arabic') : ''}`, found);
+    r.ok(!found.length, `${style} at ${width}px wide${lang === 'ar' ? (style === 'y2k' ? ', all in Arabic' : ', in Arabic') : ''}${text ? `, text size ${text === 'xl' ? 'Larger' : 'Large'}` : ''}`, found);
     await t.ctx.close();
   }
   await r.done();

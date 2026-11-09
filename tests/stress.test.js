@@ -9,7 +9,7 @@ const SETUPS = [
   { style: 'y2k', view: 'list', uniStyle: 'rows', w: 375 }, { style: 'clean', view: 'focus', uniStyle: 'one', w: 430, effort: 'rpe', unit: 'lb' }
 ];
 // things that leave the page or need a person (files, sharing)
-const SKIP = ['exportFile', 'exportCopy', 'demoOff', 'install', 'dismissInstall', 'reload', 'shareWeek'];
+const SKIP = ['exportFile', 'exportCSV', 'exportCopy', 'demoOff', 'install', 'dismissInstall', 'reload', 'shareWeek'];
 const ODD = ['', '0', '-3', '1e9', '0.5', 'abc', '12', '7', '100', '2.5', ' ', '99999', '1:30', '00:45'];
 const CHECKS = () => {
   const s = window.LiftingSanity.state, out = [], txt = document.body.innerText;

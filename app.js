@@ -207,6 +207,8 @@ function relDay(ts) {
   if (n < 60) return TN(Math.round(n / 7), '{n} week ago', '{n} weeks ago');
   return fmtDateY(ts);
 }
+// today's date as you see it on the phone (not in UTC, which is a day off late at night), for file names
+const fileDay = (ts = Date.now()) => toLocalInput(ts).slice(0, 10);
 function toLocalInput(ts) { const d = new Date(ts); return new Date(ts - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 // estimated 1RM (Epley), only from sets of 1 to 12 reps with a positive weight: higher-rep sets still count as
 // training, records for weight, reps and volume, they just don't feed this estimate (it gets unreliable past ~12)
@@ -590,7 +592,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -625,6 +627,7 @@ function migrate(s) {
     if (Object.keys(r).length) p.restarts = r; else delete p.restarts;
   }
   s.settings = Object.assign(d.settings, typeof s.settings === 'object' ? s.settings : {});
+  if (!['l', 'xl'].includes(s.settings.text)) delete s.settings.text;
   s.settings.colors = cleanPal(s.settings.colors);
   s.settings.colorsY2k = cleanPal(s.settings.colorsY2k);
   if (s.settings.figure !== 'male' && s.settings.figure !== 'female') delete s.settings.figure;
@@ -1447,7 +1450,16 @@ function applyTheme() {
   if (sheet) sheet.media = y2k ? 'all' : 'not all';
   if (y2k) startY2k();
   else { clearInterval(hudTimer); const hud = $('#hud'); if (hud) hud.innerHTML = ''; }
+  applyText();
   applyColors();
+}
+// Text size: every font size in the styles is multiplied by --fs (an installed web app on iPhone doesn't follow the
+// system's text size, so the app has its own)
+const TEXT_SIZES = { m: 1, l: 1.1, xl: 1.2 };
+function applyText() {
+  const f = TEXT_SIZES[state.settings.text] || 1;
+  if (f === 1) document.documentElement.style.removeProperty('--fs'); else document.documentElement.style.setProperty('--fs', f);
+  document.documentElement.dataset.text = f === 1 ? 'm' : state.settings.text;
 }
 /* ============================== Colours: every colour, for each style (Clean and Y2K) and each mode (dark and light) ============================== */
 
@@ -1863,6 +1875,7 @@ function render() {
   const page = VIEWS[ui.tab](), tip = tipHTML(ui.tab);
   v.innerHTML = tip ? (page.includes('</header>') ? page.replace('</header>', '</header>' + tip) : tip + page) : page;
   keepImgs(v, shown);
+  nameSwitches(v);
   renderMini();
   requestAnimationFrame(() => drawCharts($('#view')));
 }
@@ -2345,7 +2358,7 @@ function toast(msg, action) {
   el.classList.add('in');
   toast.action = action;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('in'), action ? 5000 : 2600);
+  toastTimer = setTimeout(() => el.classList.remove('in'), action ? 8000 : Math.max(2600, 1400 + msg.length * 45)); // longer messages stay long enough to read
 }
 
 /* ============================== Sheets ============================== */
@@ -2361,12 +2374,17 @@ function openSheet(def) {
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap' + (def.full ? ' full' : '') + (def.cls ? ' ' + def.cls : '');
   wrap.dataset.sheet = def.id;
-  wrap.innerHTML = `<div class="sheet-backdrop" data-a="sheetClose"></div><div class="sheet" role="dialog" aria-modal="true"${def.label ? ` aria-label="${esc(def.label)}"` : ''}></div>`;
+  wrap.innerHTML = `<div class="sheet-backdrop" data-a="sheetClose" aria-hidden="true"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1"${def.label ? ` aria-label="${esc(def.label)}"` : ''}></div>`;
+  // what opened it gets the focus back when it closes (a button, not a text field: that would bring the keyboard up)
+  const from = document.activeElement;
+  def.opener = from && from !== document.body && from.matches('button, a, [role="button"], summary') ? from : null;
   $('#sheets').append(wrap);
   def.el = wrap;
   refreshSheet(def);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('in')));
   if (def.focus) setTimeout(() => { const f = $(def.focus, wrap); if (f) f.focus(); }, 280);
+  // the focus moves into the sheet, so VoiceOver and a keyboard start reading there and not on the page behind it
+  else setTimeout(() => { if (sheets[sheets.length - 1] === def && !wrap.contains(document.activeElement)) $('.sheet', wrap).focus({ preventScroll: true }); }, 300);
   return def;
 }
 function refreshSheet(def) {
@@ -2378,6 +2396,7 @@ function refreshSheet(def) {
   panel.innerHTML = def.render(def);
   const nb = $('.sheet-body', panel);
   if (nb) nb.scrollTop = sc;
+  nameSwitches(panel);
   requestAnimationFrame(() => drawCharts(panel));
 }
 function closeSheet(def) {
@@ -2395,6 +2414,8 @@ function closeSheet(def) {
   setTimeout(rm, 520);
   const top = sheets[sheets.length - 1];
   if (top) top.el.classList.remove('behind');
+  const o = def.opener, at = document.activeElement;
+  if (o && o.isConnected && !o.closest('[inert], [hidden]') && (!at || at === document.body || wrap.contains(at))) o.focus({ preventScroll: true });
   if (def.onClose) def.onClose(def);
 }
 function closeAllSheets() { while (sheets.length) closeSheet(); }
@@ -2596,16 +2617,25 @@ function freshCard() {
     <b>${T('{name} · fresh start', { name: esc(blkName(b)) })}</b>
     <p>${T('Your next workout sets new baselines: what you lift becomes the bar to beat, and records count again from the session after.')}${b.load ? ' ' + T('Suggested weights start {p}% lighter than last time.', { p: Math.round((1 - b.load) * 100) }) : ''}</p></div></section>`;
 }
-// this week at a glance: a dot for each day, filled on the days you trained
+// how many sessions a week your split plans: a split with rest days repeats its cycle through the week (every other
+// day is 3 or 4, so 3 is the week you can always make); one without rest days is its training days
+function weekGoal() {
+  const sp = activeSplit();
+  if (!sp) return 0;
+  const n = sp.days.length, train = sp.days.filter(d => !isRest(d) && tplById(d)).length;
+  return !train ? 0 : n > train ? Math.max(1, Math.floor(7 * train / n)) : Math.min(train, 7);
+}
+// this week at a glance: a dot for each day, filled on the days you trained, and how far along the week's sessions are
 function weekStrip() {
   const ws = weekStart(Date.now()), today = dayStart(Date.now());
   const done = state.workouts.filter(w => w.start >= ws && w.end);
   const on = new Set(done.map(w => dayStart(w.start)));
-  const vol = done.reduce((a, w) => a + workoutVolume(w), 0);
+  const vol = done.reduce((a, w) => a + workoutVolume(w), 0), goal = weekGoal(), hit = goal > 0 && done.length >= goal;
   return `<section class="week" aria-label="${T('This week')}"><div class="week-days">${Array.from({ length: 7 }, (_, i) => {
     const d = new Date(ws); d.setDate(d.getDate() + i); const t = d.getTime();
     return `<span class="wd ${on.has(t) ? 'on' : ''} ${t === today ? 'today' : ''} ${t > today ? 'later' : ''}"><small>${esc(dfmt(t, { weekday: 'narrow' }))}</small><b>${on.has(t) ? icon('check', 'thick') : d.getDate()}</b></span>`;
-  }).join('')}</div><p class="week-sum">${vol ? TN(done.length, '<b>{n}</b> workout this week · <b>{vol}</b>', '<b>{n}</b> workouts this week · <b>{vol}</b>', { vol: esc(fmtVol(vol)) }) : TN(done.length, '<b>{n}</b> workout this week', '<b>{n}</b> workouts this week')}</p></section>`;
+  }).join('')}</div>${goal ? `<p class="week-sum ${hit ? 'hit' : ''}">${hit ? `<span class="week-hit">${icon('check', 'thick')}${T('Week’s goal reached')}</span>` : ''}<span>${TN(goal, '<b>{d}</b> of {n} workout this week', '<b>{d}</b> of {n} workouts this week', { d: done.length })}${vol ? ` · <b>${esc(fmtVol(vol))}</b>` : ''}</span><span class="week-bar" aria-hidden="true"><i style="width:${Math.min(100, Math.round(done.length / goal * 100))}%"></i></span></p>`
+    : `<p class="week-sum">${vol ? TN(done.length, '<b>{n}</b> workout this week · <b>{vol}</b>', '<b>{n}</b> workouts this week · <b>{vol}</b>', { vol: esc(fmtVol(vol)) }) : TN(done.length, '<b>{n}</b> workout this week', '<b>{n}</b> workouts this week')}</p>`}</section>`;
 }
 function installHint() {
   if (inFrame || !state.settings.installHint || navigator.standalone || matchMedia('(display-mode: standalone)').matches) return '';
@@ -2634,15 +2664,19 @@ function splitCard(split) {
     : st.state === 'done' ? `<p class="eyebrow good">${icon('check')}${T('Done for today')}</p><h3>${T('Nice work')}</h3><p class="muted">${st.rests ? TN(st.rests, 'Next up: <b>{name}</b> {when}, after a rest day', 'Next up: <b>{name}</b> {when}, after {n} rest days', { name: esc(t ? t.name : ''), when: whenText(st.due) }) : T('Next up: <b>{name}</b> {when}', { name: esc(t ? t.name : ''), when: whenText(st.due) })}</p>`
     : `<p class="eyebrow accent">${T('Up next · Day {day} of {n}', { day: pos + 1, n })}</p><h3>${esc(t.name)}</h3><div class="facts"><span>${icon('dumbbell')}${TN(t.ex.length, '{n} exercises', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(t), '{n} working sets', '{n} working sets', { n: trimNum(tplWorkingSets(t), 1) })}</span><span>${icon('clock')}${TN(est, 'about {n} min', 'about {n} min')}</span><span>${icon('calendar')}${last ? T('last done {when}', { when: relDay(last.start) }) : T('not done yet')}</span></div>`;
   const strip = t ? t.ex.filter(x => artOf(x.exId) || photos.get(x.exId)).slice(0, 4) : [];
+  // today's workout starts from the top of its card, above the list of what's in it (no scrolling to begin); on a
+  // rest day or once it's done, training anyway stays under the list
+  const startBtn = !t ? '' : `<button class="btn ${st.state === 'due' ? 'primary' : ''} big" data-a="startDay" data-split="${split.id}" data-day="${pos}">${icon('play')}${st.state === 'due' ? T('Start {name}', { name: esc(t.name) }) : T('Train anyway: start {name}', { name: esc(t.name) })}</button>`;
   return `<section class="split">
     <div class="split-h"><div><p class="eyebrow">${restDays ? TN(trainDays, 'Your split · {n} training day + {r} rest', 'Your split · {n} training days + {r} rest', { r: restDays }) : TN(trainDays, 'Your split · {n} training day', 'Your split · {n} training days')}</p><h2>${esc(split.name)}</h2>${splitVersionLine(split)}</div>
       <div class="split-actions"><button class="btn sm review-btn" data-a="planReview" data-id="${split.id}">${icon('flask')}${T('Review')}</button><button class="btn sm" data-a="splitSwitch">${icon('swap')}${T('Change')}</button><button class="btn sm" data-a="splitEdit" data-id="${split.id}">${icon('edit')}${T('Edit')}</button></div></div>
     ${t ? `<div class="upnext ${st.state === 'due' ? '' : 'resting'}">
       ${strip.length >= 3 ? `<div class="strip" aria-hidden="true">${strip.map(x => thumb(x.exId, 'tile')).join('')}</div>` : ''}
       <div class="upnext-b">${head}
+      ${st.state === 'due' ? startBtn : ''}
       <ol class="ex-preview">${(ui.nextOpen ? t.ex : t.ex.slice(0, 5)).map(x => `<li><span>${thumb(x.exId, 'md')}<span class="exn"><b>${esc(getEx(x.exId).name)}</b><small>${esc(scheme(x.sets))}</small></span></span></li>`).join('')}</ol>
       ${t.ex.length > 5 ? `<button class="btn sm more-ex" data-a="nextOpen">${ui.nextOpen ? T('Show less') : T('Show all {n} exercises', { n: t.ex.length })}${icon(ui.nextOpen ? 'up' : 'down')}</button>` : ''}
-      <button class="btn ${st.state === 'due' ? 'primary' : ''} big" data-a="startDay" data-split="${split.id}" data-day="${pos}">${icon('play')}${st.state === 'due' ? T('Start {name}', { name: esc(t.name) }) : T('Train anyway: start {name}', { name: esc(t.name) })}</button>
+      ${st.state === 'due' ? '' : startBtn}
     </div></div>` : ''}
     <p class="eyebrow">${T('Any day, any time')}</p>
     <div class="days">${days.map((d, i) => !d ? '' : isRest(d)
@@ -3915,7 +3949,7 @@ function finishScreen(id, mode = 'new') {
       finShare: async () => {
         const cd = cards[cur], blob = await prep(cur);
         if (!blob) { toast(T('The picture couldn’t be made on this device.')); return; }
-        await shareBlob(blob, `lifting-sanity-${new Date(w.start).toISOString().slice(0, 10)}-${cd.k}.png`);
+        await shareBlob(blob, `lifting-sanity-${fileDay(w.start)}-${cd.k}.png`);
       }
     }
   });
@@ -5028,12 +5062,20 @@ function markKpCell(scroll) {
   const s = c.classList.contains('sides') && A().ex[ui.kp.e].sets[ui.kp.s];
   for (const n of c.querySelectorAll(':scope > span')) n.classList.toggle('kp-side', !!s && n.classList.contains('side-' + s.side));
   if (!scroll) return;
-  requestAnimationFrame(() => {
+  const fit = () => {
     const main = $('#workout .wo-main'), kp = $('#keypad');
-    if (!main || kp.hidden) return;
-    const r = c.getBoundingClientRect(), top = kp.getBoundingClientRect().top, mtop = main.getBoundingClientRect().top;
+    if (!main || kp.hidden || !c.isConnected) return;
+    // where the pad's top will be once it has slid in (the first tap finds it still on its way up)
+    const kr = kp.getBoundingClientRect(), tr = (getComputedStyle(kp).translate || '').split(' ')[1] || '0';
+    const r = c.getBoundingClientRect(), top = kr.top - (tr.endsWith('%') ? parseFloat(tr) / 100 * kr.height : parseFloat(tr) || 0), mtop = main.getBoundingClientRect().top;
     if (r.bottom > top - 16) main.scrollBy({ top: r.bottom - top + 72, behavior: 'smooth' });
     else if (r.top < mtop + 8) main.scrollBy({ top: r.top - mtop - 72, behavior: 'smooth' });
+  };
+  requestAnimationFrame(() => {
+    fit();
+    // and once more when the pad has arrived, in case its place couldn't be worked out while it moved
+    const kp = $('#keypad'), a = kp.getAnimations ? kp.getAnimations().find(o => o !== kp._out) : null;
+    if (a) a.finished.then(() => { if (kpCell() === c) fit(); }).catch(() => {});
   });
 }
 
@@ -5206,6 +5248,13 @@ function customExerciseSheet(id, name, onSaved) {
     },
     onInput: (el) => { const f = el.dataset.f; if (f) d[f] = el.value; }
   });
+}
+// a switch takes the name of the row it sits in (VoiceOver reads "Sound when rest is over, switch, on")
+function nameSwitches(root) {
+  for (const b of root.querySelectorAll('.switch[role="switch"]:not([aria-label])')) {
+    const t = b.closest('.set-item'), h = t && t.querySelector('b');
+    if (h) b.setAttribute('aria-label', h.textContent.trim());
+  }
 }
 function toggle(on, action, extra = '') {
   return `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${!!on}" data-a="${action}" ${extra}><span></span></button>`;
@@ -6130,18 +6179,19 @@ VIEWS.settings = function () {
   const row = (title, desc, ctl) => `<div class="set-item"><div><b>${title}</b>${desc ? `<p class="muted">${desc}</p>` : ''}</div>${ctl}</div>`;
   const demo = state.workouts.some(w => w.demo);
   return `<header class="page-h"><div><p class="eyebrow">${T('Saved on this device')}</p><h1>${T('Settings')}</h1></div></header>
+  <nav class="chips set-jump" aria-label="${T('Jump to')}">${[['logging', T('Logging')], ['workout', T('During a workout')], ['look', T('Look')], ['data', T('Your data')], ['install', T('Install on your phone')]].map(([k, l]) => `<button class="chip" data-a="setJump" data-v="${k}">${esc(l)}</button>`).join('')}</nav>
   <div class="card list-card guide-row">
     ${row(T('Guide'), T('A plan that fits you, a tour of the app, the words you’ll see and tips as you go.'), `<button class="btn sm" data-a="openGuide">${icon('info')}${T('Open')}</button>`)}
     ${row(T('What’s new'), T('What changed in the last few updates.'), `<button class="btn sm" data-a="openNews">v${APP_VERSION}</button>`)}
     ${RK ? row(T('Lift ranks'), rankOn() ? T('{standards}, {bw}{age}. Wood to Olympian for each lift, from your bodyweight.', { standards: state.body.sex === 'F' ? T('Women’s standards') : T('Men’s standards'), bw: fmtW(state.body.bw, 1), age: state.body.age ? T(', age {n}', { n: state.body.age }) : '' }) : T('Wood to Olympian for each lift, from your bodyweight. Off: no ranks anywhere.'), rankOn() ? `<div class="btn-pair"><button class="btn sm" data-a="rankSetup">${T('Edit')}</button>${toggle(true, 'rankToggle')}</div>` : toggle(false, 'rankToggle')) : ''}
   </div>
-  <h2 class="section-h">${T('Logging')}</h2><div class="card list-card">
+  <h2 class="section-h" id="set-logging">${T('Logging')}</h2><div class="card list-card">
     ${row(T('Units'), T('Weights you already logged convert automatically.'), seg('setUnit', s.unit, [['kg', term('kg')], ['lb', term('lb')]]))}
     ${row(T('Effort'), T('RIR: reps left in the tank. RPE: how hard, out of 10.'), seg('setEffort', s.effort, [['rir', term('RIR')], ['rpe', term('RPE')], ['off', T('Off')]]))}
     ${row(T('Weight step'), T('Used for warm-ups and “try more weight” tips.'), `<label class="select-wrap sm"><select data-f="step">${(s.unit === 'lb' ? [1, 2.5, 5, 10] : [0.5, 1, 1.25, 2, 2.5, 5]).map(v => `<option value="${v}" ${+s.step === v ? 'selected' : ''}>${v} ${s.unit}</option>`).join('')}</select></label>`)}
     ${row(T('Bar weight'), T('For the plate calculator and warm-ups.'), `<label class="select-wrap sm"><select data-f="bar">${(s.unit === 'lb' ? [15, 25, 35, 45, 55] : [7, 10, 15, 20, 25]).map(v => `<option value="${v}" ${+s.bar === v ? 'selected' : ''}>${v} ${s.unit}</option>`).join('')}</select></label>`)}
   </div>
-  <h2 class="section-h">${T('During a workout')}</h2><div class="card list-card">
+  <h2 class="section-h" id="set-workout">${T('During a workout')}</h2><div class="card list-card">
     ${row(T('Layout'), T('One exercise at a time with big next and previous buttons, or every exercise in one list.'), seg('setView', s.view, [['focus', T('One at a time')], ['list', T('List')]]))}
     ${row(T('One-side exercises'), T('How left and right are logged on one-arm and one-leg exercises. You can also change it on each exercise.'), seg('setUniStyle', s.uniStyle || 'rows', [['rows', T('Separate rows')], ['one', T('One row')]]))}
     ${row(T('Number pad'), T('Auto uses the in-app pad on iPhone, with Next, + / − and Log keys, and the normal keyboard on iPad.'), seg('setKeypad', s.keypad, [['auto', T('Auto')], ['app', T('In-app pad')], ['system', T('Keyboard')]]))}
@@ -6152,17 +6202,18 @@ VIEWS.settings = function () {
     ${row(T('Sound when rest is over'), `<button class="link" data-a="testSound">${T('Play it')}</button>`, toggle(s.sound, 'tgl', 'data-k="sound"'))}
     ${row(T('Keep the screen awake'), T('While a workout is open.'), toggle(s.wake, 'tgl', 'data-k="wake"'))}
   </div>
-  <h2 class="section-h">${T('Look')}</h2><div class="card list-card">
+  <h2 class="section-h" id="set-look">${T('Look')}</h2><div class="card list-card">
     ${row(T('Language'), T('العربية: the app reads right to left. How-to steps stay in English; exercise names, units and gym terms can be switched to Arabic too.'), seg('setLang', LANG, [['en', 'English'], ['ar', 'العربية']]))}
     ${RTL ? row(T('Exercise names'), T('In Arabic, or as they’re known in gyms and videos. Search finds an exercise by either name.'), seg('setArNames', window.AR_NAMES ? 'ar' : 'en', [['en', T('In English')], ['ar', T('In Arabic')]])) : ''}
     ${RTL ? row(T('Units and gym terms'), T('kg, RIR, 1RM, set letters and the like, in Arabic: كغ، احتياط، أقصى رفعة.'), seg('setArTerms', window.AR_TERMS ? 'ar' : 'en', [['en', T('As they are')], ['ar', T('In Arabic')]])) : ''}
     ${row(T('Theme'), '', seg('setTheme', s.theme, [['auto', T('Auto')], ['dark', T('Dark')], ['light', T('Light')]]))}
+    ${row(T('Text size'), T('Bigger words and numbers everywhere, easier to read between sets.'), seg('setText', TEXT_SIZES[s.text] ? s.text : 'm', [['m', T('Default')], ['l', T('Large')], ['xl', T('Larger')]]))}
     ${row(T('Style'), T('Clean is the default look. Y2K is a dense, retro desktop look: cobalt and chrome, pixel type, LCD readouts and a HUD.'), seg('setStyle', s.style || 'clean', [['clean', T('Clean')], ['y2k', 'Y2K']]))}
     ${row(T('Body in pictures'), T('The build of the body in the muscle pictures, the end-of-workout cards and your ranks.'), seg('setFigure', figSex(), [['male', T('Man')], ['female', T('Woman')]]))}
     ${row(T('Colours'), s.style === 'y2k' ? T('Every colour of the Y2K style: frame, neons, background, cards, text, set types and more, with a preview before you save.') : T('Every colour: accent, background, cards, text, greys, set types and more, with ready-made looks and a preview before you save.'), `<button class="btn sm" data-a="openColors"><span class="cdots">${(s.style === 'y2k' ? ['frame', 'accent', 'hot', 'bg'] : ['accent', 'good', 'gold', 'bg']).map(k => `<i style="background:${colorOf(k)}"></i>`).join('')}</span>${T('Change')}</button>`)}
     ${row(T('Movement animations'), `${T('Exercise pictures and the “How it works” diagrams move through a rep. Off shows the start and finish side by side.')}${reduceMotion.matches ? ' ' + T('Reduce Motion is on in your device settings, so they stay still.') : ''}`, seg('setMotion', s.motion === false ? 'off' : 'on', [['on', T('On')], ['off', T('Off')]]))}
   </div>
-  <h2 class="section-h">${T('Your data')}</h2><div class="card list-card">
+  <h2 class="section-h" id="set-data">${T('Your data')}</h2><div class="card list-card">
     ${row(T('Back up'), esc(backupText()) + ' ' + T('Saves everything, photos included, to a file in Files or iCloud Drive.'), `<div class="btn-pair"><button class="btn sm" data-a="exportFile">${icon('download')}${T('Save file')}</button><button class="btn sm ghost" data-a="exportCopy">${icon('copy')}${T('Copy')}</button></div>`)}
     ${row(T('Spreadsheet'), T('Every set you’ve logged as a CSV file, for Numbers, Excel or Google Sheets.'), `<button class="btn sm" data-a="exportCSV">${icon('download')}${T('Export CSV')}</button>`)}
     ${row(T('Restore'), T('Load a backup file. Replaces what’s on this device.'), `<div class="btn-pair"><label class="btn sm">${icon('upload')}${T('Choose file')}<input type="file" accept=".json,application/json" data-f="importFile" hidden></label><button class="btn sm ghost" data-a="importPaste">${T('Paste')}</button></div>`)}
@@ -6170,7 +6221,7 @@ VIEWS.settings = function () {
     ${row(T('Sample history'), demo ? T('Sample workouts are mixed into your history.') : T('Load 8 weeks of example workouts to see what the charts look like.'), demo ? `<button class="btn sm" data-a="demoOff">${T('Remove samples')}</button>` : `<button class="btn sm" data-a="demoOn">${T('Load samples')}</button>`)}
     ${row(T('Erase everything'), T('Deletes all workouts, templates and settings on this device.'), `<button class="btn sm danger" data-a="eraseAll">${T('Erase')}</button>`)}
   </div>
-  <h2 class="section-h">${T('Install on your phone')}</h2><div class="card pad prose">
+  <h2 class="section-h" id="set-install">${T('Install on your phone')}</h2><div class="card pad prose">
     <ol><li>${T('<b>iPhone or iPad:</b> open Lifting Sanity in <b>Safari</b>, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.')}</li><li>${T('<b>Android:</b> open it in Chrome, tap <b>⋮</b>, then <b>Add to Home screen</b> or <b>Install app</b>.')}</li><li>${T('Open it from your Home Screen. It runs full screen and works without internet.')}</li></ol>
     <p class="muted small">${T('Your workouts are stored on this device only, and nobody else can see them: sharing the link shares the app, not your data. Browsers can clear storage for websites you haven’t opened in a while, and the Home Screen app is protected from that. Back up now and then anyway.')}</p>
   </div>
@@ -6182,6 +6233,13 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 45, items: [
+    ['play', 'Start without scrolling', 'On Train, Start sits right under today’s workout, above its list of exercises. Settings has shortcuts at the top to jump to each section.'],
+    ['flame', 'A goal for the week', 'The week on Train counts your workouts against what your split plans, with a bar that fills and a badge when you reach it.'],
+    ['sliders', 'Bigger text, stronger contrast', 'Settings → Look → Text size makes every word and number bigger (Large or Larger). Grey text is easier to read, and with Increase Contrast on in your phone’s settings it gets stronger still. Small buttons take a tap from further out, and Undo messages stay up longer.'],
+    ['info', 'Better with VoiceOver', 'Every switch says what it’s for and whether it’s on. A sheet is read from its top when it opens, and closing it takes you back to where you were.'],
+    ['check', 'Fixes', 'On a small iPhone the number pad no longer covers the number you’re typing the first time it opens. Backup and export files carry your date, not yesterday’s late at night.']
+  ] },
   { v: 44, items: [
     ['reset', 'A new block feels new', 'Reset progression asks why you’re starting fresh; after a break or an injury, each lift’s first session suggests 10% or 20% lighter weights. Starting it shows the block you finished and its biggest gains, Train shows the new block until its first workout, each exercise says it’s a fresh start, and the finish screen shows your new baselines.'],
     ['dumbbell', 'Muscles, clearer', 'In an exercise’s details the rest of the body steps back and each worked muscle gets a rim of light. A key under the body lists the main muscle and the ones that help: tap one to find it on the body.'],
@@ -6329,7 +6387,7 @@ async function copiesSheet() {
 }
 async function exportFile() {
   if (!photosLoaded) { toast(T('Your photos are still loading. Try again in a second.')); return; }
-  const name = `lifting-sanity-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const name = `lifting-sanity-backup-${fileDay()}.json`;
   if (await saveBlob(new Blob([exportData()], { type: 'application/json' }), name, T('Lifting Sanity backup'))) { markBackedUp(); toast(T('Backup saved.')); }
 }
 // a file to the share sheet (Save to Files) where there is one, else downloaded; true once it's saved. Inside claude.ai
@@ -6373,7 +6431,7 @@ function csvText() {
 }
 async function exportCSV() {
   if (!state.workouts.length) { toast(T('Nothing logged yet.')); return; }
-  const name = `lifting-sanity-sets-${new Date().toISOString().slice(0, 10)}.csv`;
+  const name = `lifting-sanity-sets-${fileDay()}.csv`;
   if (await saveBlob(new Blob([csvText()], { type: 'text/csv' }), name, T('Lifting Sanity sets'))) toast(T('Spreadsheet saved.'));
 }
 // the shape a backup must have before anything on the device is touched
@@ -6727,6 +6785,8 @@ const ACT = {
   setKeypad: b => { state.settings.keypad = b.dataset.v; save(); render(); },
   setUniStyle: b => { state.settings.uniStyle = b.dataset.v; for (const p of Object.values(state.exPrefs)) delete p.uniStyle; save(); render(); },
   setTheme: b => { state.settings.theme = b.dataset.v; applyTheme(); save(); render(); },
+  setJump: b => { const el = document.getElementById('set-' + b.dataset.v); if (el) el.scrollIntoView({ behavior: calm() ? 'auto' : 'smooth', block: 'start' }); },
+  setText: b => { if (b.dataset.v === 'm') delete state.settings.text; else state.settings.text = b.dataset.v; applyText(); save(); render(); renderWorkout(); },
   profSet: b => {
     const id = b.dataset.id, v = b.dataset.v, p = state.exPrefs[id] = state.exPrefs[id] || {};
     if (!v) delete p.profile;
