@@ -236,6 +236,7 @@ const ICONS = {
   play: 'M8 5.5v13l10.5-6.5z',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
+  order: 'M8 5v14M8 5L5 8M8 5l3 3M16 19V5M16 19l-3-3M16 19l3-3',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   search: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M20 20l-4-4',
   trophy: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 6h3v1a3 3 0 0 1-3 3M7 6H4v1a3 3 0 0 0 3 3',
@@ -592,7 +593,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -608,7 +609,7 @@ function defaults() {
     v: 1,
     settings: {
       unit: 'kg', effort: 'rir', rest: 120, autoRest: true, autoNext: true, view: 'focus',
-      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows', padRir: true
+      sound: true, wake: true, theme: 'auto', bar: 20, step: 2.5, installHint: true, keypad: 'auto', uniStyle: 'rows', padRir: true, tplAsk: true
     },
     custom: [], exPrefs: {}, templates: [], splits: [], activeSplit: null, body: null,
     workouts: [], active: null, rest: null,
@@ -1071,6 +1072,8 @@ function lighterW(w, f, k) {
 }
 // sessions so far in a block
 const blockCount = b => workoutsIn(...blockRange(b)).length;
+// your own workouts: the sample ones (for looking around) never count towards your week, your block's summary or an export
+const mine = ws => ws.filter(w => !w.demo);
 function blockAt(ts) {
   let b = state.blocks[0];
   for (const x of state.blocks) if (x.start <= ts) b = x;
@@ -2355,11 +2358,48 @@ let toastTimer;
 function toast(msg, action) {
   const el = $('#toast');
   el.innerHTML = `<span>${esc(msg)}</span>${action ? `<button data-a="toastAct">${esc(action.label)}</button>` : ''}`;
+  el.classList.remove('dragging'); el.style.transform = ''; el.style.opacity = '';
   el.classList.add('in');
   toast.action = action;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('in'), action ? 8000 : Math.max(2600, 1400 + msg.length * 45)); // longer messages stay long enough to read
+  toastTimer = setTimeout(() => el.classList.remove('in'), action ? 6000 : Math.max(2600, 1400 + msg.length * 45)); // longer messages stay long enough to read
 }
+// a message can be flicked away: up, down or to a side, and it's gone
+(() => {
+  const el = $('#toast');
+  let d = null;
+  el.addEventListener('pointerdown', ev => { d = el.classList.contains('in') ? { x: ev.clientX, y: ev.clientY, v: 0, on: false, id: ev.pointerId } : null; });
+  el.addEventListener('pointermove', ev => {
+    if (!d || ev.pointerId !== d.id) return;
+    const dx = ev.clientX - d.x, dy = ev.clientY - d.y;
+    if (!d.on) {
+      if (Math.hypot(dx, dy) < 6) return;
+      d.on = true; d.side = Math.abs(dx) > Math.abs(dy);
+      try { el.setPointerCapture(d.id); } catch (e) { /* the finger has already gone */ }
+      el.classList.add('dragging');
+    }
+    d.v = d.side ? dx : dy;
+    el.style.transform = d.side ? `translate(calc(-50% + ${d.v}px), 0)` : `translate(-50%, ${d.v}px)`;
+    el.style.opacity = Math.max(0.15, 1 - Math.abs(d.v) / 130);
+  });
+  const end = () => {
+    if (!d) return;
+    const { on, side, v } = d;
+    d = null;
+    if (!on) return;
+    ui.held = true; setTimeout(() => { ui.held = false; }, 350); // the finger coming up isn't a tap on Undo
+    el.classList.remove('dragging');
+    if (Math.abs(v) < 26) { el.style.transform = ''; el.style.opacity = ''; return; }
+    // it carries on the way it was going, then it's put away
+    clearTimeout(toastTimer);
+    const far = Math.sign(v) * 160;
+    el.style.transform = side ? `translate(calc(-50% + ${far}px), 0)` : `translate(-50%, ${far}px)`;
+    el.style.opacity = 0;
+    setTimeout(() => { el.classList.remove('in'); el.style.transform = ''; el.style.opacity = ''; }, 230);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+})();
 
 /* ============================== Sheets ============================== */
 
@@ -2628,7 +2668,7 @@ function weekGoal() {
 // this week at a glance: a dot for each day, filled on the days you trained, and how far along the week's sessions are
 function weekStrip() {
   const ws = weekStart(Date.now()), today = dayStart(Date.now());
-  const done = state.workouts.filter(w => w.start >= ws && w.end);
+  const done = mine(state.workouts).filter(w => w.start >= ws && w.end);
   const on = new Set(done.map(w => dayStart(w.start)));
   const vol = done.reduce((a, w) => a + workoutVolume(w), 0), goal = weekGoal(), hit = goal > 0 && done.length >= goal;
   return `<section class="week" aria-label="${T('This week')}"><div class="week-days">${Array.from({ length: 7 }, (_, i) => {
@@ -4005,19 +4045,75 @@ function finishScreen(id, mode = 'new') {
   if (fresh && !still) setTimeout(seen, 2300); else seen();
   return def;
 }
+// one exercise of a workout as a template's entry (old: the entry it replaces, for its note and targets)
+function tplExOf(x, old) {
+  return {
+    exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: old ? old.note || '' : '', ...(old && old.free ? { free: old.free } : {}),
+    sets: x.sets.map((s, j) => {
+      const os = old ? old.sets[j] : null;
+      const t = { t: s.t, tr: s.tr || (os && os.tr) || (hasReps(getEx(x.exId).k) && s.t !== 'W' ? String(recReps(x, s) || '') : ''), trir: s.trir ?? (os ? os.trir : null) };
+      if (s.side) t.side = s.side;
+      if (s.w != null) t.tw = s.w;
+      return t;
+    })
+  };
+}
 function tplExFromWorkout(w, oldTpl) {
-  return w.ex.map(x => {
-    const old = oldTpl ? oldTpl.ex.find(o => o.exId === x.exId) : null;
-    return {
-      exId: x.exId, rest: x.rest, uni: x.uni, ss: x.ss, note: old ? old.note || '' : '', ...(old && old.free ? { free: old.free } : {}),
-      sets: x.sets.map((s, j) => {
-        const os = old ? old.sets[j] : null;
-        const t = { t: s.t, tr: s.tr || (os && os.tr) || (hasReps(getEx(x.exId).k) && s.t !== 'W' ? String(recReps(x, s) || '') : ''), trir: s.trir ?? (os ? os.trir : null) };
-        if (s.side) t.side = s.side;
-        if (s.w != null) t.tw = s.w;
-        return t;
-      })
-    };
+  return w.ex.map(x => tplExOf(x, oldTpl ? oldTpl.ex.find(o => o.exId === x.exId) : null));
+}
+/* ----- a workout that came from a template: adding, removing, replacing or moving an exercise can change the template
+   too, there and then (it asks; Settings turns the question off) ----- */
+// the template to ask about: not when editing a past workout, and not with the question turned off
+const askTpl = w => w && w.mode !== 'edit' && w.tplId && state.settings.tplAsk !== false ? tplById(w.tplId) || null : null;
+// which entry of the template an exercise of the workout stands for: the same exercise, counted in order
+function tplIndexOf(t, w, x) {
+  const nth = w.ex.filter(o => o.exId === x.exId).indexOf(x);
+  let k = -1;
+  for (let i = 0; i < t.ex.length; i++) if (t.ex[i].exId === x.exId && ++k === nth) return i;
+  return -1;
+}
+// the template changed: say so, with a way back
+function tplChanged(t, before, msg) {
+  save(); render();
+  toast(msg || T('“{name}” changed.', { name: t.name }), { label: T('Undo'), fn: () => { if (state.templates.includes(t)) { t.ex = before; save(); render(); } } });
+}
+// the template's exercises in the workout's order (ones the workout doesn't have stay where they are)
+function tplOrderLike(t, w) {
+  const used = new Set(), pos = t.ex.map(e => { const i = w.ex.findIndex((x, n) => x.exId === e.exId && !used.has(n)); if (i >= 0) used.add(i); return i; });
+  const slots = pos.map((p, i) => p >= 0 ? i : -1).filter(i => i >= 0);
+  const sorted = slots.slice().sort((a, b) => pos[a] - pos[b]).map(i => t.ex[i]);
+  const out = t.ex.slice();
+  slots.forEach((slot, k) => { out[slot] = sorted[k]; });
+  return out;
+}
+function askTplAdd(w, added) {
+  const t = askTpl(w), last = added[added.length - 1];
+  const move = () => { if (A() === w && w.ex.length > 1 && w.ex.includes(last)) toast(T('Added at the end.'), { label: T('Move'), fn: () => { if (A() === w && w.ex.includes(last)) orderSheet(last.id); } }); };
+  if (!t) { move(); return; }
+  let done = false;
+  const d = confirmSheet({
+    title: T('Add to “{name}” too?', { name: t.name }),
+    text: TN(added.length, '{list} is in today’s workout. Add it to the template as well, so it’s there next time?', '{list} are in today’s workout. Add them to the template as well, so they’re there next time?', { list: esc(added.map(x => getEx(x.exId).name).join(T(', '))) }),
+    ok: T('Add to template'), cancel: T('Just today'),
+    onOk: () => { const before = t.ex.slice(); t.ex.push(...added.filter(x => w.ex.includes(x)).map(x => tplExOf(x, null))); done = true; tplChanged(t, before, T('Added to “{name}” too.', { name: t.name })); }
+  });
+  d.onClose = () => { if (!done) move(); };
+}
+function askTplReplace(w, t, ti, y, oldName) {
+  if (!t || ti < 0 || !t.ex[ti]) return;
+  const e = t.ex[ti], name = getEx(y.exId).name;
+  confirmSheet({
+    title: T('Use it in “{name}” from now on?', { name: t.name }),
+    text: T('{new} replaced {old} today. Swap it in the template as well?', { new: esc(name), old: esc(oldName) }),
+    ok: T('Change template'), cancel: T('Just today'),
+    onOk: () => {
+      const before = t.ex.slice();
+      // the same kind of exercise keeps the template's sets and targets (not its weights); another kind takes today's
+      t.ex[ti] = getEx(e.exId).k === getEx(y.exId).k
+        ? { exId: y.exId, rest: e.rest, uni: y.uni, ss: e.ss, note: '', sets: e.sets.map(o => ({ t: o.t, tr: o.tr || '', trir: o.trir ?? null, ...(o.side ? { side: o.side } : {}) })) }
+        : { ...tplExOf(y, null), ss: e.ss };
+      tplChanged(t, before);
+    }
   });
 }
 function templateFromWorkout(w) {
@@ -4198,7 +4294,7 @@ function workoutParts(w) {
       const ss = ssInfo(w, i), { done: d, total: t } = setTally(x);
       return `<button class="nav-ex ${i === w.cur ? 'cur' : ''} ${exComplete(x) ? 'complete' : ''} ${ui.flashEx === x.id ? 'done-now' : ''} ${ss ? 'ss' : ''}" data-a="woGo" data-i="${i}">
         ${thumb(x.exId, 'sm nav-pic')}<span class="nav-txt"><span class="nav-name">${esc(getEx(x.exId).name)}</span><span class="nav-bar"><i style="width:${t ? Math.round(d / t * 100) : 0}%"></i></span></span><span class="nav-n">${exComplete(x) ? icon('check') : ss ? ss.label : `${d}/${t}`}</span></button>`;
-    }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">${T('Add exercise')}</span></button></nav>`;
+    }).join('')}<button class="nav-ex add" data-a="woAddEx">${icon('plus')}<span class="nav-name">${T('Add exercise')}</span></button>${w.ex.length > 1 ? `<button class="nav-ex add order" data-a="woOrder">${icon('order')}<span class="nav-name">${T('Reorder')}</span></button>` : ''}</nav>`;
   const cards = !w.ex.length ? [] : focus ? [exCardHTML(w, w.cur, true)] : w.ex.map((x, i) => exCardHTML(w, i, false));
   // what decides the layout: anything else can be updated card by card
   const tip = tipHTML('workout');
@@ -4211,7 +4307,7 @@ function workoutHTML(w, P = workoutParts(w)) {
     h += `<div class="wo-empty"><h2>${T('Add your first exercise')}</h2><p class="muted">${TN(LIB.length, 'Search {n} exercises or create your own.', 'Search {n} exercises or create your own.', { n: LIB.length.toLocaleString(LOC) })}</p><button class="btn primary big" data-a="woAddEx">${icon('plus')}${T('Add exercises')}</button></div>`;
   } else {
     h += P.cards.join('');
-    if (!P.focus) h += `<button class="btn wide add-ex" data-a="woAddEx">${icon('plus')}${T('Add exercises')}</button>`;
+    if (!P.focus) h += `<div class="add-ex"><button class="btn wide" data-a="woAddEx">${icon('plus')}${T('Add exercises')}</button>${w.ex.length > 1 ? `<button class="btn wide" data-a="woOrder">${icon('order')}${T('Reorder')}</button>` : ''}</div>`;
   }
   h += `<div class="wo-spacer"></div></div></div></div>`;
   return h;
@@ -4782,6 +4878,7 @@ function exMenu(i) {
     [T('History and records'), 'chart', () => exerciseSheet(x.exId)],
     [T('Replace exercise'), 'swap', () => pickExercises({ single: true, title: T('Replace with'), onPick: ([id]) => {
       let y = x;
+      const tpl = askTpl(w), ti = tpl && id !== x.exId ? tplIndexOf(tpl, w, x) : -1, oldName = ex.name;
       // sets already done stay logged under the exercise they were done on; the new one takes the sets still to do
       if (x.sets.some(s => s.done)) {
         const todo = x.sets.filter(s => !s.done && !(partnerOf(x, s) || {}).done);
@@ -4795,6 +4892,7 @@ function exMenu(i) {
       setUni(y, hasReps(d.k) && !!((state.exPrefs[id] || {}).uni ?? d.uni));
       for (const s of y.sets) if (!s.done) { delete s.w; delete s.r; delete s.sec; delete s.dist; delete s.tw; }
       save(); renderWorkout(true);
+      askTplReplace(w, tpl, ti, y, oldName);
     } })],
     [T('Note for today'), 'note', () => exNote(i), { sub: x.note || T('How it felt, pain, tempo…') }],
     [T('Machine setup'), 'pin', () => exSetup(i), { sub: setupOf(x.exId) || T('Seat, pads, handles…; shown every time you do this exercise') }],
@@ -4810,13 +4908,26 @@ function exMenu(i) {
     }, { sub: T('Alternate sets, then rest after both') }] : null,
     ex.k === 'wr' ? [T('Add suggested warm-ups'), 'flame', () => addWarmups(i)] : null,
     BAR_EQUIP.has(ex.eq) ? [T('Plate calculator'), 'plate', () => plateSheet(x.sets.find(s => !s.done && s.t !== 'W')?.w ?? x.sets[x.sets.length - 1]?.w)] : null,
-    i > 0 ? [T('Move up'), 'up', () => { w.ex.splice(i - 1, 0, w.ex.splice(i, 1)[0]); w.cur = i - 1; save(); renderWorkout(); }] : null,
-    i < w.ex.length - 1 ? [T('Move down'), 'down', () => { w.ex.splice(i + 1, 0, w.ex.splice(i, 1)[0]); w.cur = i + 1; save(); renderWorkout(); }] : null,
+    w.ex.length > 1 ? [T('Move it in the order'), 'order', () => orderSheet(x.id), { sub: T('Drag it, or tap where it should go') }] : null,
     [T('Remove exercise'), 'trash', () => {
+      // the template's entry for it is found before it goes (a template is never left empty)
+      const tpl = askTpl(w), ti = tpl && tpl.ex.length > 1 ? tplIndexOf(tpl, w, x) : -1;
       const removed = w.ex.splice(i, 1)[0];
       if (w.cur >= w.ex.length) w.cur = Math.max(0, w.ex.length - 1);
       save(); renderWorkout();
-      toast(T('Removed {name}.', { name: ex.name }), { label: T('Undo'), fn: () => { if (A() === w) { w.ex.splice(i, 0, removed); w.cur = i; save(); renderWorkout(); } } });
+      let before = null;
+      const said = () => toast(before ? T('Removed {name}, today and from “{tpl}”.', { name: ex.name, tpl: tpl.name }) : T('Removed {name}.', { name: ex.name }), { label: T('Undo'), fn: () => {
+        if (A() === w) { w.ex.splice(Math.min(i, w.ex.length), 0, removed); w.cur = w.ex.indexOf(removed); save(); renderWorkout(); }
+        if (before && state.templates.includes(tpl)) { tpl.ex = before; save(); render(); }
+      } });
+      if (ti < 0) { said(); return; }
+      const d = confirmSheet({
+        title: T('Remove from “{name}” too?', { name: tpl.name }),
+        text: T('{ex} is out of today’s workout. Take it out of the template as well, so it’s gone next time?', { ex: esc(ex.name) }),
+        ok: T('Remove from template'), cancel: T('Just today'),
+        onOk: () => { before = tpl.ex.slice(); tpl.ex.splice(ti, 1); tidySupersets(tpl.ex); save(); render(); }
+      });
+      d.onClose = said;
     }, { danger: true }]
   ]);
 }
@@ -4883,6 +4994,7 @@ function woMenu() {
     w.mode === 'edit' ? [T('Date and time'), 'calendar', () => dateSheet(), { sub: fmtDate(w.start) + ', ' + fmtTime(w.start) }] : null,
     [state.settings.view === 'focus' ? T('Show all exercises in a list') : T('Show one exercise at a time'), state.settings.view === 'focus' ? 'rows' : 'layout', () => { state.settings.view = state.settings.view === 'focus' ? 'list' : 'focus'; save(); renderWorkout(true); fadeUp($('#workout .wo-main')); }],
     [T('Add exercises'), 'plus', () => addExercisesToWorkout()],
+    w.ex.length > 1 ? [T('Reorder exercises'), 'order', () => orderSheet(), { sub: T('Drag them, or tap one and tap where it should go') }] : null,
     w.mode === 'edit'
       ? [T('Cancel editing'), 'x', () => confirmSheet({ title: T('Cancel editing?'), text: T('Your changes to this workout won’t be saved.'), ok: T('Discard changes'), danger: true, cancel: T('Keep editing'), onOk: () => discardActive() }), { danger: true }]
       : [T('Discard workout'), 'trash', () => confirmSheet({ title: T('Discard this workout?'), text: T('Every set you logged in it will be deleted. This can’t be undone.'), ok: T('Discard workout'), danger: true, cancel: T('Keep it'), onOk: () => discardActive() }), { danger: true }]
@@ -4916,15 +5028,181 @@ function addExercisesToWorkout() {
     title: T('Add exercises'),
     onPick: ids => {
       const w = A();
-      const first = w.ex.length;
-      for (const id of ids) {
-        w.ex.push(wexFresh(id));
-      }
+      const first = w.ex.length, added = ids.map(id => wexFresh(id));
+      w.ex.push(...added);
       w.cur = first;
       save(); renderWorkout(true);
+      if (added.length) askTplAdd(w, added);
     }
   });
 }
+/* ----- the order of a workout's exercises: drag one by its handle (or press and hold it), or tap one and then tap
+   where it should go. It's the same sheet from the strip, the list, both menus and a long press on the strip ----- */
+function moveEx(w, from, to) {
+  if (from === to || from < 0 || to < 0 || from >= w.ex.length || to >= w.ex.length) return false;
+  const cur = w.ex[w.cur];
+  w.ex.splice(to, 0, w.ex.splice(from, 1)[0]);
+  tidySupersets(w.ex);
+  w.cur = Math.max(0, w.ex.indexOf(cur)); // the exercise you're on stays the one you're on
+  save();
+  return true;
+}
+function orderSheet(pickId) {
+  const w = A();
+  if (!w || w.ex.length < 2) return;
+  const was = w.ex.map(x => x.id).join();
+  const st = { pick: pickId && w.ex.some(x => x.id === pickId) ? pickId : null };
+  const row = (x, i) => {
+    const { done: d, total: t } = setTally(x), name = getEx(x.exId).name, on = st.pick === x.id;
+    const status = exComplete(x) ? T('Done') : d ? T('{done} of {total} sets', { done: d, total: t }) : TN(t, '{n} set', '{n} sets');
+    const say = st.pick && !on ? T('Put it here, at {n}: {name}', { n: i + 1, name }) : T('{name}, {n} of {total}', { name, n: i + 1, total: w.ex.length });
+    return `<li class="ord-row ${on ? 'picked' : ''} ${exComplete(x) ? 'complete' : ''}" data-id="${x.id}">
+      <button class="ord-main" data-a="ordPick" data-id="${x.id}" aria-pressed="${on}" aria-label="${esc(say)}"><span class="ord-n">${i + 1}</span>${thumb(x.exId, 'sm')}<span class="ord-txt"><b>${esc(name)}</b><small>${status}${i === w.cur ? ` · <em>${T('now')}</em>` : ''}</small></span></button>
+      <span class="ord-grip" data-grip aria-hidden="true">${icon('grip')}</span></li>`;
+  };
+  const picked = () => w.ex.find(x => x.id === st.pick);
+  const def = openSheet({
+    cls: 'order', label: T('Reorder exercises'),
+    render: () => `${sheetHead(T('Reorder exercises'), `<button class="btn sm primary" data-a="sheetClose">${T('Done')}</button>`, '<span></span>')}
+      <div class="sheet-body pad">
+        <p class="ord-hint ${st.pick ? 'on' : ''}" role="status">${st.pick && picked() ? T('Now tap where {name} should go.', { name: `<b>${esc(getEx(picked().exId).name)}</b>` }) : T('Drag an exercise by its handle, or press and hold it. Or tap one, then tap where it should go.')}</p>
+        <ol class="ord-list ${st.pick ? 'picking' : ''}">${w.ex.map(row).join('')}</ol>
+      </div>`,
+    actions: {
+      ordPick: (b, d) => {
+        const id = b.dataset.id, to = w.ex.findIndex(x => x.id === id), from = w.ex.findIndex(x => x.id === st.pick);
+        if (to < 0) return;
+        haptic();
+        if (from < 0) { st.pick = id; refreshSheet(d); return; }
+        const pid = st.pick;
+        st.pick = null;
+        if (from === to) { refreshSheet(d); return; }
+        // the rows slide from where they were to where they are now
+        const at = new Map($$('.ord-row', d.el).map(r => [r.dataset.id, r.getBoundingClientRect().top]));
+        moveEx(w, from, to); renderWorkout(); refreshSheet(d);
+        for (const r of $$('.ord-row', d.el)) {
+          const dy = at.get(r.dataset.id) - r.getBoundingClientRect().top;
+          if (dy && canMove() && !calm()) r.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 280, easing: EASE });
+        }
+        const moved = $(`.ord-row[data-id="${pid}"]`, d.el);
+        if (moved) moved.scrollIntoView({ block: 'nearest' });
+      }
+    },
+    onClose: () => {
+      if (A() !== w) return;
+      renderWorkout();
+      const t = askTpl(w);
+      if (w.ex.map(x => x.id).join() === was || !t) return;
+      // today's order is kept for today; the template can take it too
+      const next = tplOrderLike(t, w);
+      if (next.every((e, i) => e === t.ex[i])) return;
+      toast(T('New order for today.'), { label: T('Keep it in the template'), fn: () => { if (!state.templates.includes(t)) return; const before = t.ex.slice(); t.ex = tplOrderLike(t, w); tidySupersets(t.ex); tplChanged(t, before); } });
+    }
+  });
+  orderDrag(def, w, st);
+  if (st.pick) requestAnimationFrame(() => { const r = $(`.ord-row[data-id="${st.pick}"]`, def.el); if (r) r.scrollIntoView({ block: 'center' }); });
+  return def;
+}
+// dragging a row: it follows the finger, the others step aside, and the list scrolls when it nears an edge
+function orderDrag(def, w, st) {
+  const wrap = def.el;
+  let d = null, hold = 0, press = null, settling = false;
+  const begin = (rowEl, y) => {
+    const body = $('.sheet-body', wrap), rows = $$('.ord-row', wrap), from = rows.indexOf(rowEl);
+    if (settling || from < 0 || !body) return;
+    const rects = rows.map(r => r.getBoundingClientRect());
+    d = { row: rowEl, rows, from, to: from, y0: y, y, body, s0: body.scrollTop, tops: rects.map(r => r.top), hs: rects.map(r => r.height), gap: rows.length > 1 ? rects[1].top - rects[0].bottom : 0, raf: 0 };
+    for (const r of rows) r.classList.remove('picked');
+    st.pick = null;
+    rowEl.classList.add('drag'); wrap.classList.add('ord-dragging');
+    haptic();
+    const auto = () => {
+      if (!d) return;
+      const b = d.body.getBoundingClientRect(), edge = 70;
+      const v = d.y < b.top + edge ? -Math.min(16, (b.top + edge - d.y) / 4) : d.y > b.bottom - edge ? Math.min(16, (d.y - (b.bottom - edge)) / 4) : 0;
+      if (v) { const was = d.body.scrollTop; d.body.scrollTop = was + v; if (d.body.scrollTop !== was) place(); }
+      d.raf = requestAnimationFrame(auto);
+    };
+    d.raf = requestAnimationFrame(auto);
+  };
+  // how far the dragged row sits from its own place once it has passed the rows up to `to`
+  const slot = to => { let off = 0; if (to > d.from) for (let j = d.from + 1; j <= to; j++) off += d.hs[j] + d.gap; else for (let j = to; j < d.from; j++) off -= d.hs[j] + d.gap; return off; };
+  const place = () => {
+    const { rows, from, tops, hs, gap, body } = d, n = rows.length;
+    const off = Math.max(tops[0] - tops[from] - 10, Math.min(tops[n - 1] + hs[n - 1] - tops[from] - hs[from] + 10, d.y - d.y0 + body.scrollTop - d.s0));
+    d.row.style.transform = `translateY(${off}px) scale(1.02)`;
+    // it takes a row's place once its leading edge is past that row's middle
+    const top = tops[from] + off, bottom = top + hs[from];
+    let to = from;
+    for (let j = from + 1; j < n; j++) if (bottom > tops[j] + hs[j] / 2) to = j;
+    for (let j = from - 1; j >= 0; j--) if (top < tops[j] + hs[j] / 2) to = j;
+    if (to !== d.to) { d.to = to; haptic(); }
+    const shift = hs[from] + gap;
+    rows.forEach((r, j) => {
+      const up = j > from && j <= to, down = j < from && j >= to;
+      if (j !== from) r.style.transform = up ? `translateY(${-shift}px)` : down ? `translateY(${shift}px)` : '';
+      // the numbers follow as it moves
+      const n = $('.ord-n', r); if (n) n.textContent = (j === from ? to : up ? j - 1 : down ? j + 1 : j) + 1;
+    });
+  };
+  const end = cancel => {
+    clearTimeout(hold); hold = 0; press = null;
+    if (!d) return;
+    const { row, from } = d, to = cancel ? from : d.to;
+    cancelAnimationFrame(d.raf);
+    // it settles into its slot, then the new order is made real
+    row.classList.add('settle'); row.style.transform = `translateY(${slot(to)}px)`;
+    if (cancel) for (const r of d.rows) if (r !== row) r.style.transform = '';
+    d = null; settling = true; ui.held = true;
+    setTimeout(() => { ui.held = false; }, 400);
+    setTimeout(() => {
+      settling = false;
+      wrap.classList.remove('ord-dragging');
+      if (!sheets.includes(def) || A() !== w) return;
+      if (to !== from) { moveEx(w, from, to); renderWorkout(); }
+      refreshSheet(def);
+    }, calm() ? 0 : 200);
+  };
+  // a finger: the handle picks the row up at once; anywhere else on it after a short hold (a quick swipe scrolls the list)
+  wrap.addEventListener('touchstart', ev => {
+    if (d || settling || ev.touches.length !== 1) return;
+    const rowEl = ev.target.closest('.ord-row'), t = ev.touches[0];
+    if (!rowEl) return;
+    if (ev.target.closest('[data-grip]')) { begin(rowEl, t.clientY); return; }
+    press = { x: t.clientX, y: t.clientY };
+    hold = setTimeout(() => { hold = 0; if (press) begin(rowEl, press.y); }, 230);
+  }, { passive: true });
+  wrap.addEventListener('touchmove', ev => {
+    const t = ev.touches[0];
+    if (d) { if (ev.cancelable) ev.preventDefault(); d.y = t.clientY; place(); return; }
+    if (hold && press && (Math.abs(t.clientX - press.x) > 8 || Math.abs(t.clientY - press.y) > 8)) { clearTimeout(hold); hold = 0; press = null; }
+  }, { passive: false });
+  wrap.addEventListener('touchend', () => end(false));
+  wrap.addEventListener('touchcancel', () => end(true));
+  // a mouse or trackpad: press and move
+  wrap.addEventListener('mousedown', ev => {
+    const rowEl = ev.target.closest('.ord-row');
+    if (d || settling || ev.button || !rowEl) return;
+    const y0 = ev.clientY;
+    let on = false;
+    const mv = e => { if (!on && Math.abs(e.clientY - y0) < 5) return; if (!on) { on = true; begin(rowEl, y0); } if (!d) return; e.preventDefault(); d.y = e.clientY; place(); };
+    const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); if (on) end(false); };
+    addEventListener('mousemove', mv); addEventListener('mouseup', up);
+  });
+}
+// press and hold an exercise in the workout's strip: it's picked up, ready to be put somewhere else
+let navHold = 0, navAt = null;
+document.addEventListener('touchstart', ev => {
+  clearTimeout(navHold); ui.held = false;
+  const b = ev.touches.length === 1 && ev.target.closest ? ev.target.closest('#workout .nav-ex[data-i]') : null;
+  if (!b || !A() || A().ex.length < 2 || sheets.length) return;
+  const i = +b.dataset.i;
+  navAt = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+  navHold = setTimeout(() => { const x = A() && A().ex[i]; if (!x || sheets.length) return; ui.held = true; haptic(); orderSheet(x.id); }, 480);
+}, { passive: true });
+document.addEventListener('touchmove', ev => { if (navAt && (Math.abs(ev.touches[0].clientX - navAt.x) > 10 || Math.abs(ev.touches[0].clientY - navAt.y) > 10)) { clearTimeout(navHold); navAt = null; } }, { passive: true });
+// (the tap that a lifted finger makes comes straight away; after that, taps count again)
+for (const e of ['touchend', 'touchcancel']) document.addEventListener(e, () => { clearTimeout(navHold); navAt = null; if (ui.held) setTimeout(() => { ui.held = false; }, 350); }, { passive: true });
 function plateSheet(kg) {
   const lb = isLb();
   const plates = lb ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25, 0.5];
@@ -5277,19 +5555,21 @@ function templateEditor(tplId, opts = {}) {
     full: true,
     render: () => (tidySupersets(d.ex), `${sheetHead(isNew ? T('New template') : T('Edit template'), `<button class="btn primary sm" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
       <div class="sheet-body pad tpl-ed">
-        <label class="field"><span>${T('Name')}</span><input data-f="name" value="${esc(d.name)}" autocomplete="off"></label>
-        <label class="field"><span>${T('Notes')}</span><textarea data-f="note" rows="2" placeholder="${T('Focus, tempo, anything to remember')}">${esc(d.note || '')}</textarea></label>
+        <label class="tpl-name"><span class="eyebrow">${T('Template')}</span><input data-f="name" value="${esc(d.name)}" autocomplete="off" aria-label="${T('Name')}" placeholder="${T('Name')}"></label>
+        ${d.ex.length ? `<div class="facts tpl-facts"><span>${icon('dumbbell')}${TN(d.ex.length, '{n} exercise', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(d), '{n} working sets', '{n} working sets', { n: trimNum(tplWorkingSets(d), 1) })}</span><span>${icon('clock')}${TN(estMinutes(d), 'about {n} min', 'about {n} min')}</span></div>` : ''}
+        <label class="tpl-note"><span class="eyebrow">${icon('note')}${T('Notes')}</span><textarea data-f="note" rows="2" placeholder="${T('Focus, tempo, anything to remember')}">${esc(d.note || '')}</textarea></label>
         ${d.ex.map((x, i) => {
           const ex = getEx(x.exId);
-          return `<div class="tex"><div class="tex-h"><span class="tex-n">${i + 1}</span><span class="tex-name"><b>${esc(ex.name)}</b><small>${esc(MUSCLES[ex.m])} · ${esc(scheme(x.sets))}${x.ss ? ' · ' + T('superset') : ''}</small></span><button class="icon-btn" data-a="texMenu" data-i="${i}" aria-label="${T('Options')}">${icon('dots')}</button></div>
-            <div class="tset head"><span>${T('Set')}</span><span>${esc(U())}</span><span>${T('Target reps')}</span><span>${effName()}</span><span></span></div>
+          return `<section class="tex"><div class="tex-h">${thumb(x.exId, 'md')}<span class="tex-name"><small class="eyebrow">${T('Exercise {n}', { n: i + 1 })} · ${esc(MUSCLES[ex.m])}${ex.eq && EQUIP[ex.eq] ? ' · ' + esc(EQUIP[ex.eq]) : ''}</small><b>${esc(ex.name)}</b></span><button class="icon-btn" data-a="texMenu" data-i="${i}" aria-label="${T('Options')}">${icon('dots')}</button></div>
+            <div class="tex-meta"><span class="tex-scheme">${esc(scheme(x.sets))}</span>${x.ss ? `<span class="tex-ss">${icon('link')}${T('superset')}</span>` : ''}
+              <label class="tex-rest">${icon('timer')}<span>${T('Rest')}</span><select data-f="rest" data-i="${i}" aria-label="${T('Rest')}">${REST_PRESETS.map(v => `<option value="${v}" ${v === (x.rest || state.settings.rest) ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label></div>
+            <div class="tsets"><div class="tset head"><span>${T('Set')}</span><span>${esc(U())}</span><span>${T('Reps')}</span><span>${effName()}</span><span></span></div>
             ${x.sets.map((s, j) => `<div class="tset ${s.side ? (isPairTail(x.sets, j) ? 'pair-tail' : 'pair-head') : ''}">${badge(s.t, setLabel(x.sets, j), `data-a="tType" data-i="${i}" data-j="${j}"`, s.side)}
               <input class="cell" data-f="tw" data-i="${i}" data-j="${j}" inputmode="decimal" value="${s.tw != null ? dispW(s.tw) : ''}" placeholder="–" autocomplete="off" aria-label="${T('Starting weight')}">
               <input class="cell" data-f="tr" data-i="${i}" data-j="${j}" value="${esc(s.tr || '')}" placeholder="${s.t === 'W' ? T('any') : '8-12'}" autocomplete="off" aria-label="${T('Target reps')}">
               <input class="cell" data-f="trir" data-i="${i}" data-j="${j}" inputmode="decimal" value="${s.trir != null ? effDisp(s.trir) : ''}" placeholder="–" aria-label="${T('Target {eff}', { eff: effName() })}">
-              <button class="icon-btn" data-a="tDel" data-i="${i}" data-j="${j}" aria-label="${T('Delete set')}">${icon('x')}</button></div>`).join('')}
-            <div class="tex-f"><button class="btn sm" data-a="tAdd" data-i="${i}">${icon('plus')}${T('Set')}</button><button class="btn sm ghost" data-a="tAddW" data-i="${i}">${icon('flame')}${T('Warm-up')}</button>
-              <label class="select-wrap sm"><span>${T('Rest')}</span><select data-f="rest" data-i="${i}">${REST_PRESETS.map(v => `<option value="${v}" ${v === (x.rest || state.settings.rest) ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label></div></div>`;
+              <button class="icon-btn tdel" data-a="tDel" data-i="${i}" data-j="${j}" aria-label="${T('Delete set')}">${icon('x')}</button></div>`).join('')}</div>
+            <div class="tex-f"><button class="btn sm ghost" data-a="tAdd" data-i="${i}">${icon('plus')}${T('Add set')}</button><button class="btn sm ghost warm" data-a="tAddW" data-i="${i}">${icon('flame')}${T('Warm-up')}</button></div></section>`;
         }).join('')}
         <button class="btn wide" data-a="addEx">${icon('plus')}${T('Add exercises')}</button>
         ${isNew ? '' : `<button class="btn wide danger ghost" data-a="del">${icon('trash')}${T('Delete template')}</button>`}
@@ -6106,11 +6386,12 @@ function blockResetSheet() {
 // the moment a new block starts: the block you finished, what you did in it and your biggest gains, then the new one
 function blockGains(b) {
   const [f, t] = blockRange(b), out = [];
-  const ids = [...new Set(workoutsIn(f, t).flatMap(w => w.ex.filter(x => x.sets.some(s => s.done)).map(x => x.exId)))];
+  const real = mine(workoutsIn(f, t)), own = new Set(real.map(w => w.id));
+  const ids = [...new Set(real.flatMap(w => w.ex.filter(x => x.sets.some(s => s.done)).map(x => x.exId)))];
   for (const id of ids) {
     const ex = getEx(id);
     if (ex.k !== 'wr') continue;
-    const pts = exSeries(id, 'e1rm', Math.max(f, baselineAt(id, t - 1)), t);
+    const pts = exSeries(id, 'e1rm', Math.max(f, baselineAt(id, t - 1)), t).filter(p => own.has(p.wid));
     if (pts.length < 2) continue;
     const first = pts[0].y, best = Math.max(...pts.map(p => p.y));
     if (first > 0 && best > first) out.push({ id, first, best, g: best / first - 1 });
@@ -6118,7 +6399,7 @@ function blockGains(b) {
   return out.sort((a, b) => b.g - a.g);
 }
 function blockShow(prev, nb, undo) {
-  const [f, t] = blockRange(prev), ws = workoutsIn(f, t), gains = blockGains(prev).slice(0, 3);
+  const [f, t] = blockRange(prev), ws = mine(workoutsIn(f, t)), gains = blockGains(prev).slice(0, 3);
   const weeks = ws.length ? Math.max(1, Math.round((ws[ws.length - 1].start - ws[0].start) / (7 * DAY)) + 1) : 0;
   const recs = sum(ws, w => (w.prs || []).length);
   const def = openSheet({
@@ -6201,6 +6482,7 @@ VIEWS.settings = function () {
     ${row(T('Move to the next exercise when one is done'), T('Slides to it one at a time, or scrolls down to it in the list.'), toggle(s.autoNext, 'tgl', 'data-k="autoNext"'))}
     ${row(T('Sound when rest is over'), `<button class="link" data-a="testSound">${T('Play it')}</button>`, toggle(s.sound, 'tgl', 'data-k="sound"'))}
     ${row(T('Keep the screen awake'), T('While a workout is open.'), toggle(s.wake, 'tgl', 'data-k="wake"'))}
+    ${row(T('Ask to change the template'), T('When you add, remove or replace an exercise in a workout that came from a template: just today, or in the template too.'), toggle(s.tplAsk !== false, 'tgl', 'data-k="tplAsk"'))}
   </div>
   <h2 class="section-h" id="set-look">${T('Look')}</h2><div class="card list-card">
     ${row(T('Language'), T('العربية: the app reads right to left. How-to steps stay in English; exercise names, units and gym terms can be switched to Arabic too.'), seg('setLang', LANG, [['en', 'English'], ['ar', 'العربية']]))}
@@ -6233,6 +6515,12 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 46, items: [
+    ['order', 'Move exercises around', 'In a workout, Reorder (at the end of the exercise strip, under the list and in the ⋯ menus) opens the order: drag an exercise by its handle or press and hold it, or tap one and then tap where it should go. A long press on an exercise in the strip picks it up.'],
+    ['edit', 'Change the template as you go', 'Add, remove or replace an exercise in a workout that came from a template and it asks: just today, or in the template too? Yes changes the template there and then, with Undo. A new order can be kept in the template as well. Settings can turn the question off.'],
+    ['layout', 'A better-looking template editor', 'Editing a template looks like a workout now: a picture and a card for each exercise, calm number boxes, and its rest as a chip.'],
+    ['check', 'Smaller things', 'A message at the bottom goes with a swipe up, down or sideways, and one with Undo stays 6 seconds. Sample workouts no longer count towards your week’s goal, a finished block’s summary or the spreadsheet export.']
+  ] },
   { v: 45, items: [
     ['play', 'Start without scrolling', 'On Train, Start sits right under today’s workout, above its list of exercises. Settings has shortcuts at the top to jump to each section.'],
     ['flame', 'A goal for the week', 'The week on Train counts your workouts against what your split plans, with a bar that fills and a badge when you reach it.'],
@@ -6415,7 +6703,7 @@ function csvText() {
   const q = v => { const t = v == null ? '' : String(v); return /[",\n\r]/.test(t) || /^[=+\-@]/.test(t) ? `"${(/^[=+\-@]/.test(t) ? "'" : '') + t.replace(/"/g, '""')}"` : t; };
   const pad = n => String(n).padStart(2, '0'), when = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   const rows = [['Date', 'Workout', 'Exercise', 'Set', 'Type', `Weight (${isLb() ? 'lb' : 'kg'})`, 'Reps', state.settings.effort === 'rpe' ? 'RPE' : 'RIR', 'Side', 'Seconds', 'Distance', 'Distance unit', 'Note']];
-  for (const w of [...state.workouts].sort((a, b) => a.start - b.start)) for (const x of w.ex) {
+  for (const w of mine(state.workouts).sort((a, b) => a.start - b.start)) for (const x of w.ex) {
     const e = getEx(x.exId), k = e.k;
     let n = 0;
     for (const st of x.sets) {
@@ -6430,7 +6718,7 @@ function csvText() {
   return '\ufeff' + rows.map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
 }
 async function exportCSV() {
-  if (!state.workouts.length) { toast(T('Nothing logged yet.')); return; }
+  if (!mine(state.workouts).length) { toast(T('Nothing logged yet.')); return; }
   const name = `lifting-sanity-sets-${fileDay()}.csv`;
   if (await saveBlob(new Blob([csvText()], { type: 'text/csv' }), name, T('Lifting Sanity sets'))) toast(T('Spreadsheet saved.'));
 }
@@ -6576,6 +6864,7 @@ const ACT = {
   woPrev: () => woGo(A().cur - 1, true),
   woNext: () => { const w = A(); const n = nextExIndex(w, w.cur); woGo(n == null ? w.cur + 1 : n, true); },
   woAddEx: () => addExercisesToWorkout(),
+  woOrder: () => orderSheet(),
   woRest: () => restChooser({ title: T('Start a rest timer'), current: state.rest ? state.rest.total : null, onPick: v => startRest(v) }),
   exMenu: b => exMenu(+b.dataset.e),
   exInfo: b => exerciseSheet(A().ex[+b.dataset.e].exId),
@@ -6877,6 +7166,7 @@ function warmArt() {
 }
 document.addEventListener('click', ev => {
   if (ui.dragged && ev.timeStamp - ui.dragged < 450) { ui.dragged = 0; return; }
+  if (ui.held) { ui.held = false; return; } // the finger coming up after a press-and-hold isn't a tap
   // a screen on its way out (a closing sheet, the workout sliding away) takes no taps
   if (ev.target.closest && ev.target.closest('[inert]')) return;
   if (!ev.target.closest('.row-del')) closeSwipes();
@@ -7022,7 +7312,7 @@ sheetHost.addEventListener('touchstart', ev => {
   sheetDrag = null;
   if (ev.touches.length !== 1 || matchMedia('(min-width: 760px)').matches) return;
   const panel = ev.target.closest('.sheet'), def = sheets[sheets.length - 1];
-  if (!panel || !def || def.el !== panel.parentElement || ev.target.closest('input,textarea,select,.chart,.sci-curve-box,.prof-pick')) return;
+  if (!panel || !def || def.el !== panel.parentElement || ev.target.closest('input,textarea,select,.chart,.sci-curve-box,.prof-pick,.ord-list')) return;
   sheetDrag = { def, panel, back: $('.sheet-backdrop', def.el), body: ev.target.closest('.sheet-body'), x: ev.touches[0].clientX, y: ev.touches[0].clientY, on: false, dy: 0, v: 0, t: ev.timeStamp };
 }, { passive: true });
 sheetHost.addEventListener('touchmove', ev => {

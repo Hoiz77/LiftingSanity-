@@ -183,6 +183,8 @@
 [data-style="y2k"] .wo-nav { background: var(--well); counter-reset: track; }
 [data-style="y2k"] .nav-ex { counter-increment: track; background: transparent; border-bottom: 1px dotted var(--line); font-family: var(--ui); }
 [data-style="y2k"] .nav-ex::before { content: counter(track, decimal-leading-zero) "."; font: 400 calc(18px * var(--fs, 1)) var(--lcd); color: var(--muted); min-width: 26px; }
+[data-style="y2k"] .nav-ex.add { counter-increment: none; }
+[data-style="y2k"] .nav-ex.add::before { content: none; }
 [data-style="y2k"] .nav-ex.cur { background: var(--cobalt); box-shadow: none; }
 [data-style="y2k"] .nav-ex.cur .nav-name, [data-style="y2k"] .nav-ex.cur::before { color: #fff; }
 [data-style="y2k"] .nav-name { color: var(--cyan); font-size: calc(13px * var(--fs, 1)); }
@@ -344,3 +346,4 @@
 [data-style="y2k"] .mchip { border-radius: 0; font-family: var(--ui); background: var(--well); box-shadow: inset 0 0 0 1px var(--line-2); }
 [data-style="y2k"] .mchip .dot { border-radius: 0; }
 [data-style="y2k"] .mchip small { font-family: var(--pixel); }
+[data-style="y2k"] :is(.ord-row, .ord-main, .ord-grip) { border-radius: 0; }
