@@ -593,7 +593,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -5985,10 +5985,12 @@ function bwAt(ts) {
   for (const e of log) { if (e.at <= ts) v = e.bw; else break; }
   return v;
 }
-const ladderAt = (id, b, ts) => RK.ladder(b, { ...state.body, bw: bwAt(ts) }, b.conf === 'rough' ? rankAdj(id) : 0);
-const CONF_W = { data: 1, est: 0.85, rough: 0.6 };
+const ladderAt = (id, b, ts) => RK.ladder(b, { ...state.body, bw: bwAt(ts) }, machRank(b) ? rankAdj(id) : 0);
+const CONF_W = { data: 1, est: 0.85, logs: 0.85, rough: 0.6 };
+// machines and cables: you can say how yours reads next to free weights (measured from logs or not)
+const machRank = b => b.conf === 'rough' || b.conf === 'logs';
 const rankAdj = id => (state.exPrefs[id] || {}).rankAdj || 0;
-const rankLadder = (id, b) => RK.ladder(b, state.body, b.conf === 'rough' ? rankAdj(id) : 0);
+const rankLadder = (id, b) => RK.ladder(b, state.body, machRank(b) ? rankAdj(id) : 0);
 // every ranked exercise you've done, best first: where you started (your best in your first two weeks of it) and
 // where you are (your best in the last six months, or your best ever if it's been longer). Saved workouts before
 // `upTo` only; worked out again only when your workouts or details change
@@ -6118,7 +6120,7 @@ function ranksSheet() {
   openSheet({
     cls: 'rank-sheet', label: T('Your ranks'),
     render: () => {
-      const rows = rankTable(), groups = [['data', T('From competition records')], ['est', T('Estimated from the big lifts')], ['rough', T('Rough: machines and cables')]];
+      const rows = rankTable(), groups = [['data', T('From competition records')], ['est', T('Estimated from the big lifts')], ['logs', T('From lifters’ logs: machines and cables')], ['rough', T('Rough: machines and cables')]];
       return `${sheetHead(T('Your ranks'))}<div class="sheet-body pad">
         <div class="rank-tiers">${RK.TIERS.map((t, i) => `<span>${emblem(i, 'sm')}<small>${tierName(i)}</small></span>`).join('')}</div>
         ${groups.map(([c, h]) => { const g = rows.filter(o => o.b.conf === c); return g.length ? `<h3 class="sub-h">${h}</h3><div class="rank-list">${g.map(rankRow).join('')}</div>` : ''; }).join('')}
@@ -6143,7 +6145,16 @@ function ranksSheet() {
 const rankRef = k => { const r = RK.REFS[k]; return !r ? '' : r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a>` : `<b lang="en">${esc(r.cite)}</b>`; };
 // the sources behind one exercise's standard: the meet records for the big three, the studies behind its ratio, and
 // for a machine, why machines are rough; a ratio no study gives is a rule of thumb
-const rankSrcOf = b => [...new Set([...(b.conf === 'data' ? ['opl', 'vandenhoek2024'] : []), ...(b.src || []), ...(b.conf === 'rough' ? ['cotterman2005', 'haugen2023'] : [])])];
+const rankSrcOf = b => [...new Set([...(b.conf === 'data' ? ['opl', 'vandenhoek2024'] : []), ...(b.src || []), ...(machRank(b) ? ['cotterman2005', 'haugen2023'] : [])])];
+// a standard that comes from what lifters log: how many lifts, what it's matched against, what that makes it for you,
+// and what's still a judgement (a variation scaled by a rule of thumb, a machine that reads its own way)
+function slHow(b, lift) {
+  const n = RK.SL[b.sl].n, p = Math.round(RK.share(b, state.body) * 100);
+  return (n ? T('From what lifters log: {n} lifts of this exercise on Strength Level, matched level for level against the same lifters’ {lift}. For you that comes to about {p}% of the {lift} standard.', { n: n.toLocaleString(LOC), lift, p })
+    : T('From what lifters log on Strength Level, matched level for level against the same lifters’ {lift}. For you that comes to about {p}% of the {lift} standard.', { lift, p }))
+    + (b.k ? ' ' + T('This variation is scaled from the standard one by a rule of thumb.') : '')
+    + (machRank(b) ? ' ' + T('Self-reported, and machines differ: say below how yours reads.') : ' ' + T('Self-reported, so less sure than competition records.'));
+}
 // in an exercise's details: its rank, the ladder for your bodyweight, and how it's worked out
 function rankBlock(id) {
   if (!rankOn()) return '';
@@ -6153,6 +6164,7 @@ function rankBlock(id) {
   const lift = { S: T('squat'), D: T('deadlift') }[b.ref] || T('bench press');
   const how = b.conf === 'data' ? T('From competition records: raw lifters of your sex and bodyweight.')
     : b.per === 'total' ? T('Estimated from the bench press standards, counting your bodyweight plus anything added.')
+    : b.sl ? slHow(b, lift)
     : b.conf === 'est' ? T('Estimated from the {lift} standards: this is usually about {p}% of it.', { lift, p: Math.round(b.r * 100) })
     : T('Rough: estimated from the {lift} standards at about {p}%, and machines differ.', { lift, p: Math.round(b.r * 100) });
   return `<section class="rank-ex">
@@ -6162,7 +6174,7 @@ function rankBlock(id) {
     <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
     ${(src => `<p class="rv-src rank-src-line">${src.length ? `<span class="basis study">${icon('flask')}${T('Studies')}</span>${src.map(rankRef).join('<span class="dot"> · </span>')}` : `<span class="basis rule">${T('Rule of thumb')}</span>${T('a typical ratio to the {lift}', { lift })}`}</p>`)(rankSrcOf(b))}
     ${o ? `<div class="row-btns left"><button class="btn sm" data-a="rankShare" data-id="${id}">${icon('share')}${T('Share your rank')}</button></div>` : ''}
-    ${b.conf === 'rough' ? `<div class="rank-adj"><p class="small">${T('Next to free weights, this machine reads:')}</p><div class="seg" role="group">${[[-1, TC('Light', 'machine')], [0, T('Typical')], [1, T('Heavy')]].map(([v, l]) => `<button class="${rankAdj(id) === v ? 'on' : ''}" data-a="rankAdj" data-v="${v}" aria-pressed="${rankAdj(id) === v}">${l}</button>`).join('')}</div>
+    ${machRank(b) ? `<div class="rank-adj"><p class="small">${T('Next to free weights, this machine reads:')}</p><div class="seg" role="group">${[[-1, TC('Light', 'machine')], [0, T('Typical')], [1, T('Heavy')]].map(([v, l]) => `<button class="${rankAdj(id) === v ? 'on' : ''}" data-a="rankAdj" data-v="${v}" aria-pressed="${rankAdj(id) === v}">${l}</button>`).join('')}</div>
       <p class="muted small">${T('Heavy: it shows bigger numbers than free weights would (long levers, light stacks), so its standards go up a quarter. Light: down a fifth.')}</p></div>` : ''}
   </section>`;
 }
@@ -6249,7 +6261,7 @@ function rankSetup() {
     render: () => `${sheetHead(T('Lift ranks'), `<button class="btn sm primary" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
       <div class="sheet-body pad">
         <div class="rank-hero">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => emblem(i, 'sm')).join('')}</div>
-        <p>${T('Each lift gets a rank, Wood to Olympian, from how much you lift for your bodyweight. The standards come from 659,000 raw powerlifting results; other exercises are estimated from them.')}</p>
+        <p>${T('Each lift gets a rank, Wood to Olympian, from how much you lift for your bodyweight. The standards come from 659,000 raw powerlifting results; other exercises are set against them, using what lifters log for 29 common ones and a typical ratio for the rest.')}</p>
         <div class="field"><span class="field-l">${T('Standards')}</span><div class="seg" role="group">${[['M', T('Men’s')], ['F', T('Women’s')]].map(([v, l]) => `<button class="${p.sex === v ? 'on' : ''}" data-a="sex" data-v="${v}" aria-pressed="${p.sex === v}">${l}</button>`).join('')}</div></div>
         <label class="field"><span class="field-l">${T('Bodyweight ({unit})', { unit: U() })}</span><input type="text" inputmode="decimal" data-f="bw" value="${shown}" placeholder="${lb ? '176' : '80'}" autocomplete="off"></label>
         <label class="field"><span class="field-l">${T('Age (optional)')}</span><input type="text" inputmode="numeric" data-f="age" value="${p.age || ''}" placeholder="—" autocomplete="off"></label>
@@ -6515,6 +6527,10 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 47, items: [
+    ['trophy', 'Ranks from what lifters really log', 'The standards for 29 common exercises (machine fly, chest press, pulldown, rows, leg press, leg extension, leg curls, curls, pushdowns, lateral raises, calf raises and more) now come from millions of lifts logged on Strength Level, matched level for level against the same lifters’ squat, bench press or deadlift. Calf raises and the hip machines get a rank too.'],
+    ['flask', 'Honest about it', 'The old rules of thumb were too easy on isolation machines, so some of your ranks will drop: a leg extension is about 76% of a squat, not 60%, and a machine lateral raise about 60% of a bench press, not 45%. Each exercise says where its standard comes from, and that logged lifts are self-reported.']
+  ] },
   { v: 46, items: [
     ['order', 'Move exercises around', 'In a workout, Reorder (at the end of the exercise strip, under the list and in the ⋯ menus) opens the order: drag an exercise by its handle or press and hold it, or tap one and then tap where it should go. A long press on an exercise in the strip picks it up.'],
     ['edit', 'Change the template as you go', 'Add, remove or replace an exercise in a workout that came from a template and it asks: just today, or in the template too? Yes changes the template there and then, with Undo. A new order can be kept in the template as well. Settings can turn the question off.'],

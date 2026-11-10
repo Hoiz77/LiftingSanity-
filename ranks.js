@@ -7,9 +7,12 @@
      Below that, Silver starts at 80% of Gold and Bronze at 60% (rules of thumb); anything less is Wood.
    - Age: from the same records, the median lifter at each age compared with ages 23 to 35 (masters and teens lift
      less). Used only if you give your age; the standards are lowered to match.
-   - Other exercises are ranked against the nearest of the three lifts by a typical ratio (an incline bench is about
-     82% of a flat one, a dumbbell press about 40% of the bench in each hand). Those are rules of thumb, marked
-     "estimated". Machines and cables are marked "rough": the same number reads differently on every machine.
+   - Twenty-nine common exercises (machine fly, chest press, pulldown, leg press, leg extension, curls, lateral raises…)
+     are set against the nearest of the three lifts from what lifters log on Strength Level: for each, the lift that
+     5%, 20%, 50%, 80% and 95% of its users beat, matched against the same users' squat, bench or deadlift. Machines
+     measured this way are marked "logs" (you can still say how yours reads); free-weight lifts "estimated".
+   - The rest are ranked by a typical ratio (an incline bench is about 82% of a flat one). Those are rules of thumb,
+     marked "estimated", and machines and cables without logged data "rough".
    - REFS and SOURCES: the studies and data behind all this, grouped by what they support, each with what it found;
      an exercise's own ratio names its studies in `src`.
    No app state is used here: basis(ex, pattern) needs { name, eq, k, uni }, and ladder() a profile { sex, bw, age }. */
@@ -132,6 +135,7 @@ window.LS_RANKS = (() => {
       ['saeterbakken2011', 'A dumbbell press max was 17% below the barbell’s, about 41% of it in each hand (the app uses 40%), and a Smith machine’s 3% below.'],
       ['saeterbakken2013', 'Shoulder press maxes seated and standing, with a barbell and dumbbells: standing with dumbbells, the least steady way, gave the lowest.'],
       ['kilgore', 'A press is about 60 to 67% of a bench press in these standards; the app uses 63%.'],
+      ['strengthlevel', 'Logged lifts for 29 common exercises (4.7 million dumbbell bench presses, 2.7 million leg presses, 2 million lat pulldowns, 488,000 machine flys…). Each is matched level for level against the same community’s squat, bench press or deadlift, and that is carried over to the competition standards. Self-reported, so a guide rather than a record.'],
       ['strengthlevel', 'The average shoulder press is about 65% of the average bench press here.'],
       ['swinton2011', 'Powerlifters lifted 8% more with a hex bar than a straight bar (265 against 245 kg): the app’s trap bar ratio.'],
       ['camara2016', 'Here the hex and straight bar maxes didn’t differ, so the trap bar ratio is an estimate.'],
@@ -141,6 +145,59 @@ window.LS_RANKS = (() => {
       ['haugen2023', 'Strength shows most on the kind of equipment you train with, so a machine’s number doesn’t carry over exactly.']]]
   ];
 
+  // ---------- what lifters log: Strength Level's community standards (1RM, kg) ----------
+  // For each exercise, the lift that 5%, 20%, 50%, 80% and 95% of the site's users beat (its Beginner, Novice,
+  // Intermediate, Advanced and Elite), men then women, read in November 2026; n: how many logged lifts they rest on,
+  // where the site says. They're self-reported and its users aren't everyone, so they aren't used as they stand:
+  // an exercise is set against the SAME community's squat, bench press or deadlift (ref), level for level, and that
+  // share is applied to the competition standards for your sex and bodyweight. So a machine fly "is 76% of the bench
+  // for a beginner and 96% for an elite lifter" comes from what people log, not from a guess. mach: a machine or
+  // cable, where the same number still reads differently from one model to the next.
+  const SL = {
+    B: { M: [49, 70, 96, 127, 160], F: [17, 31, 51, 74, 101] },
+    S: { M: [66, 95, 131, 173, 219], F: [32, 51, 76, 105, 137], n: 24988444 },
+    D: { M: [80, 113, 154, 202, 253], F: [41, 63, 91, 124, 160], n: 22978599 },
+    frontSquat: { ref: 'S', M: [54, 77, 105, 137, 172], F: [31, 45, 63, 83, 104] },
+    ohp: { ref: 'B', M: [29, 44, 62, 84, 107], F: [13, 21, 33, 46, 61] },
+    dbBench: { ref: 'B', M: [17, 26, 38, 53, 69], F: [7, 13, 20, 30, 40], n: 4734253 },
+    dbShoulder: { ref: 'B', M: [13, 21, 30, 42, 55], F: [6, 10, 15, 21, 28], n: 2100000 },
+    dbLateral: { ref: 'B', M: [4, 9, 16, 24, 34], F: [3, 6, 9, 13, 18] },
+    dbCurl: { ref: 'B', M: [7, 13, 21, 31, 42], F: [3, 8, 13, 21, 31] },
+    barCurl: { ref: 'B', M: [19, 30, 45, 62, 82], F: [8, 15, 24, 36, 50] },
+    rdl: { ref: 'D', M: [58, 87, 122, 164, 210], F: [31, 48, 68, 93, 120], n: 1151417 },
+    chestPress: { ref: 'B', mach: 1, M: [34, 56, 86, 121, 161], F: [11, 22, 37, 57, 79], n: 822882 },
+    machineFly: { ref: 'B', mach: 1, M: [37, 58, 85, 118, 154], F: [13, 24, 40, 59, 80], n: 487945 },
+    machineShoulder: { ref: 'B', mach: 1, M: [25, 45, 73, 108, 148], F: [8, 18, 31, 49, 70] },
+    machineLateral: { ref: 'B', mach: 1, M: [22, 37, 58, 84, 113], F: [9, 17, 28, 42, 58], n: 100000 },
+    cableLateral: { ref: 'B', mach: 1, M: [3, 8, 15, 26, 39], F: [2, 6, 11, 18, 26] },
+    reverseFly: { ref: 'B', mach: 1, M: [25, 42, 64, 90, 120], F: [11, 19, 30, 44, 59] },
+    latPulldown: { ref: 'B', mach: 1, M: [42, 60, 82, 107, 134], F: [23, 34, 47, 63, 80], n: 2011718 },
+    cableRow: { ref: 'B', mach: 1, M: [41, 60, 84, 112, 142], F: [22, 33, 48, 65, 84] },
+    pushdown: { ref: 'B', mach: 1, M: [19, 34, 54, 79, 107], F: [9, 18, 30, 45, 62] },
+    machineCurl: { ref: 'B', mach: 1, M: [22, 37, 55, 78, 103], F: [9, 17, 27, 40, 55], n: 237643 },
+    cableCurl: { ref: 'B', mach: 1, M: [17, 31, 49, 71, 97], F: [8, 15, 25, 38, 53] },
+    oneCableCurl: { ref: 'B', mach: 1, M: [6, 14, 25, 40, 57], F: [3, 7, 14, 23, 33] },
+    legPress: { ref: 'S', mach: 1, M: [96, 153, 227, 316, 414], F: [52, 94, 151, 222, 302], n: 2660000 },
+    hackSquat: { ref: 'S', mach: 1, M: [58, 99, 152, 217, 289], F: [26, 53, 92, 142, 200], n: 564866 },
+    legExt: { ref: 'S', mach: 1, M: [39, 65, 97, 138, 183], F: [20, 36, 60, 88, 120] },
+    seatedLegCurl: { ref: 'D', mach: 1, M: [35, 55, 80, 110, 143], F: [20, 32, 49, 69, 92], n: 457839 },
+    lyingLegCurl: { ref: 'D', mach: 1, M: [26, 43, 63, 89, 116], F: [15, 25, 37, 53, 70] },
+    calfRaise: { ref: 'S', mach: 1, M: [43, 82, 137, 205, 284], F: [22, 49, 89, 140, 200], n: 350435 },
+    seatedCalf: { ref: 'S', mach: 1, M: [28, 54, 91, 137, 190], F: [15, 35, 66, 106, 154] },
+    hipAbd: { ref: 'S', mach: 1, M: [34, 59, 92, 132, 178], F: [27, 46, 71, 102, 136] },
+    hipAdd: { ref: 'S', mach: 1, M: [38, 64, 99, 142, 190], F: [23, 42, 67, 98, 133] }
+  };
+  // what a lifter who does `v` kg on the reference lift does on this exercise, matching percentiles in that
+  // community: between its five levels in a straight line, and beyond them at the share the end level has
+  function slMap(key, sex, v) {
+    const e = SL[key], x = SL[e.ref][sex], y = e[sex];
+    if (v <= x[0]) return v * y[0] / x[0];
+    if (v >= x[4]) return v * y[4] / x[4];
+    let i = 0;
+    while (v > x[i + 1]) i++;
+    return y[i] + (y[i + 1] - y[i]) * (v - x[i]) / (x[i + 1] - x[i]);
+  }
+
   // ---------- which standard an exercise is measured against ----------
   // ref: S squat, B bench, D deadlift, pull (pull-ups: bodyweight + added) or dip (dips: the same); r: a share of
   // that lift; conf: data (the lift itself), est (a free-weight lift, by a typical ratio) or rough (machines, cables);
@@ -149,10 +206,18 @@ window.LS_RANKS = (() => {
   // src: the studies behind this exercise's own ratio (machines and the big three get theirs in the app)
   const B = (ref, r, conf, per = '', src) => ({ ref, r, conf, per, ...(src ? { src } : {}) });
   const NOT = why => ({ why });
+  // from what lifters log (SL): k scales it for a close variation (then it's an estimate again); conf: logs for a
+  // machine or cable measured this way, est for a free-weight lift, rough for a scaled machine
+  const L = (key, per = '', k = 1, more = []) => ({ ref: SL[key].ref, r: SL[key].M[2] / SL[SL[key].ref].M[2] * k, sl: key, ...(k !== 1 ? { k } : {}), conf: SL[key].mach ? (k === 1 ? 'logs' : 'rough') : 'est', per, src: ['strengthlevel', ...more] });
   function basis(ex, pattern) {
     const n = norm(ex.name), eq = ex.eq, k = ex.k;
     const one = !!ex.uni || /single|one[- ]arm|one[- ]leg|one hand|\bs\/a\b|\bsa\b|archer/.test(n);
     const machine = eq === 'machine' || eq === 'sled' || eq === 'smith', cable = eq === 'cable', db = eq === 'dumbbell', bar = eq === 'barbell' || eq === 'ezbar';
+    if (machine && !one && ['wr'].includes(k)) {
+      if (pattern === 'calf' || /calf raise/.test(n)) { if (!/donkey|leg press|squat|hack|smith/.test(n)) return L(/seated/.test(n) ? 'seatedCalf' : 'calfRaise'); }
+      else if (pattern === 'hipAbd' || /hip abduct/.test(n)) return L('hipAbd');
+      else if (pattern === 'hipAdd' || /hip adduct/.test(n)) return L('hipAdd');
+    }
     if (/\b(hip )?(adduct|abduct)|calf|calves|crunch|gripper|hand grip|wrist|neck|shrug|\babs?\b|oblique|twist/.test(n) || ['calf', 'crunch', 'legRaise', 'grip', 'shrug', 'hipAdd', 'hipAbd'].includes(pattern)) return NOT('machine');
     if (!['wr', 'bw', 'aw'].includes(k) || ['band', 'medball', 'other', 'suspension'].includes(eq)) return NOT('kind');
     if (/jump|plyo|speed|ball|bosu|swing|pass through|depth|clap|\bhold\b|turkish|get up|jerk|\bclean\b(?!-grip)|throw|\bwalk\b|farmer|with (bicep|tricep)|to (overhead|press)|finger|bowling|stork|lunge .*(curl|extension|press)|(curl|extension|press) .*(lunge|squat)|curl squat|negative|scapula|kipping|isometric|partial/.test(n)) return NOT('kind');
@@ -164,9 +229,9 @@ window.LS_RANKS = (() => {
     }
     if (/assist/.test(n)) return NOT('kind');
     // squats, lunges and leg presses
-    if (/leg press/.test(n)) return one ? B('S', 0.85, 'rough', 'side') : B('S', 1.7, 'rough');
-    if (pattern === 'legExt') return one ? B('S', 0.3, 'rough', 'side') : B('S', 0.6, 'rough');
-    if (/hack squat/.test(n)) return bar ? B('S', 0.7, 'est') : B('S', 1.15, 'rough');
+    if (/leg press/.test(n)) return one ? L('legPress', 'side', 0.5) : /horizontal|seated|vertical/.test(n) ? L('legPress', '', 0.9) : L('legPress');
+    if (pattern === 'legExt') return one ? L('legExt', 'side', 0.5) : L('legExt');
+    if (/hack squat/.test(n)) return bar ? B('S', 0.7, 'est') : L('hackSquat');
     if (/pendulum|belt squat/.test(n)) return B('S', 1.1, 'rough');
     if (/split squat|lunge|step-?up|bulgarian|single leg squat|one leg squat|pistol|lateral lunge|cossack/.test(n)) {
       if (db) return B('S', 0.26, 'est', 'hand');
@@ -176,7 +241,7 @@ window.LS_RANKS = (() => {
     }
     if (/goblet|sumo squat/.test(n) && (db || eq === 'kettlebell')) return B('S', 0.42, 'est');
     if (/squat/.test(n)) {
-      if (/front|clean-grip|frankenstein/.test(n)) return bar ? B('S', 0.82, 'est') : eq === 'smith' ? B('S', 0.85, 'rough') : NOT('kind');
+      if (/front|clean-grip|frankenstein/.test(n)) return bar ? L('frontSquat') : eq === 'smith' ? B('S', 0.85, 'rough') : NOT('kind');
       if (/zercher/.test(n)) return bar ? B('S', 0.8, 'est') : NOT('kind');
       if (/overhead/.test(n)) return bar ? B('S', 0.6, 'est') : NOT('kind');
       if (/safety bar/.test(n)) return B('S', 0.92, 'est');
@@ -189,7 +254,7 @@ window.LS_RANKS = (() => {
     // deadlifts, hinges, hip thrusts and leg curls
     if (/trap bar/.test(n)) return B('D', 1.08, 'est', '', ['swinton2011', 'camara2016']);
     if (/romanian|stiff[- ]leg|straight[- ]leg|\brdl\b/.test(n)) {
-      if (bar) return B('D', 0.72, 'est');
+      if (bar) return /romanian|\brdl\b/.test(n) ? L('rdl') : B('D', 0.75, 'est');
       if (eq === 'smith') return B('D', 0.75, 'rough');
       if (db) return one ? B('D', 0.2, 'rough', 'hand') : B('D', 0.32, 'est', 'hand');
       return NOT('kind');
@@ -208,7 +273,7 @@ window.LS_RANKS = (() => {
       if (machine) return B('D', 1, 'rough');
       return NOT('kind');
     }
-    if (pattern === 'legCurl') return machine ? (one ? B('D', 0.2, 'rough', 'side') : B('D', 0.4, 'rough')) : NOT('kind');
+    if (pattern === 'legCurl') { const key = /seated/.test(n) ? 'seatedLegCurl' : 'lyingLegCurl'; return machine ? (one ? L(key, 'side', 0.5) : L(key)) : NOT('kind'); }
     if (pattern === 'hinge') return NOT('kind');
     // presses
     if (/push.?up|svend|landmine chest|floor fly/.test(n)) return NOT('kind');
@@ -227,31 +292,32 @@ window.LS_RANKS = (() => {
         if (/paused/.test(n)) return B('B', 0.96, 'est');
         return B('B', 1, 'data');
       }
-      if (db) return B('B', /incline/.test(n) ? 0.36 : /decline/.test(n) ? 0.42 : /floor/.test(n) ? 0.38 : /squeeze|hammer|palm|reverse/.test(n) ? 0.35 : 0.4, 'est', 'hand', /incline/.test(n) ? ['saeterbakken2011', 'rodriguez2020'] : ['saeterbakken2011']);
+      if (db) return L('dbBench', 'hand', /incline/.test(n) ? 0.9 : /decline/.test(n) ? 1.05 : /floor/.test(n) ? 0.95 : /squeeze|hammer|palm|reverse/.test(n) ? 0.88 : 1, /incline/.test(n) ? ['saeterbakken2011', 'rodriguez2020'] : ['saeterbakken2011']);
       if (eq === 'smith') return B('B', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /close/.test(n) ? 0.9 : 1, 'rough', '', ['saeterbakken2011']);
-      if (machine || cable) return one ? B('B', 0.5, 'rough', 'side') : B('B', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /inner/.test(n) ? 0.8 : cable ? 0.9 : 1, 'rough');
+      if (machine || cable) return one ? L('chestPress', 'side', 0.5) : L('chestPress', '', /incline/.test(n) ? 0.85 : /decline/.test(n) ? 1.05 : /inner/.test(n) ? 0.8 : cable ? 0.9 : 1);
       return NOT('kind');
     }
+    if (/reverse fl|rear delt|rear deltoid|reverse pec deck/.test(n)) return machine && !one ? L('reverseFly') : NOT('kind');
     if (pattern === 'fly') {
       if (db) return B('B', 0.17, 'rough', 'hand');
       if (cable) return B('B', 0.17, 'rough', 'side');
-      if (machine) return one ? B('B', 0.42, 'rough', 'side') : B('B', 0.85, 'rough');
+      if (machine) return one ? L('machineFly', 'side', 0.5) : L('machineFly');
       return NOT('kind');
     }
     if (pattern === 'pressVertical') {
-      if (bar) return /push press/.test(n) ? B('B', 0.78, 'est') : /behind|bradford/.test(n) ? B('B', 0.58, 'est') : /z press/.test(n) ? B('B', 0.55, 'est') : /anti gravity/.test(n) ? NOT('kind') : B('B', /seated/.test(n) ? 0.66 : 0.63, 'est', '', ['kilgore', 'strengthlevel', 'saeterbakken2013']);
-      if (db) return /cuban|w-press|scott|alternate side/.test(n) ? NOT('kind') : B('B', /arnold/.test(n) ? 0.24 : 0.27, 'est', 'hand', ['saeterbakken2013']);
+      if (bar) return /push press/.test(n) ? B('B', 0.78, 'est') : /behind|bradford/.test(n) ? B('B', 0.58, 'est') : /z press/.test(n) ? B('B', 0.55, 'est') : /anti gravity/.test(n) ? NOT('kind') : L('ohp', '', /seated/.test(n) ? 1.04 : 1, ['kilgore', 'saeterbakken2013']);
+      if (db) return /cuban|w-press|scott|alternate side/.test(n) ? NOT('kind') : L('dbShoulder', 'hand', /arnold/.test(n) ? 0.9 : 1, ['saeterbakken2013']);
       if (eq === 'smith') return B('B', 0.66, 'rough');
-      if (machine) return one ? B('B', 0.35, 'rough', 'side') : B('B', 0.7, 'rough');
+      if (machine) return one ? L('machineShoulder', 'side', 0.5) : L('machineShoulder');
       if (eq === 'kettlebell') return B('B', 0.24, 'rough', 'hand');
       if (eq === 'landmine') return B('B', 0.4, 'rough', 'side');
       return NOT('kind');
     }
     if (pattern === 'lateral') {
       if (/y-raise|lu raise|to front|full can|landmine/.test(n)) return NOT('kind');
-      if (db) return B('B', 0.15, 'rough', 'hand');
-      if (cable) return B('B', 0.09, 'rough', 'side');
-      if (machine) return one ? B('B', 0.22, 'rough', 'side') : B('B', 0.45, 'rough');
+      if (db) return L('dbLateral', 'hand');
+      if (cable) return L('cableLateral', 'side');
+      if (machine) return one ? L('machineLateral', 'side', 0.5) : L('machineLateral');
       return NOT('kind');
     }
     // pulls
@@ -260,13 +326,13 @@ window.LS_RANKS = (() => {
       if (/t-?bar/.test(n)) return B('B', 0.9, 'rough');
       if (bar) return B('B', /pendlay/.test(n) ? 0.75 : 0.8, 'est');
       if (db) return one ? B('B', 0.45, 'est', 'hand') : B('B', 0.36, 'est', 'hand');
-      if (machine || cable) return one ? B('B', 0.43, 'rough', 'side') : B('B', eq === 'smith' ? 0.8 : 0.85, 'rough');
+      if (machine || cable) return one ? L('cableRow', 'side', 0.5) : eq === 'smith' ? B('B', 0.8, 'rough') : cable ? L('cableRow') : L('cableRow', '', 0.97);
       if (eq === 'kettlebell') return B('B', 0.4, 'rough', 'hand');
       return NOT('kind');
     }
     if (pattern === 'pullVertical') {
       if (/assist/.test(n)) return NOT('kind');
-      if (machine || cable) return one ? B('B', 0.43, 'rough', 'side') : B('B', 0.85, 'rough');
+      if (machine || cable) return one ? L('latPulldown', 'side', 0.5) : L('latPulldown');
       return NOT('kind');
     }
     if (pattern === 'pullover') {
@@ -280,15 +346,15 @@ window.LS_RANKS = (() => {
     if (/^curl/.test(pattern)) {
       const rev = /reverse|pronat/.test(n) ? 0.8 : 1;
       if (/drag|21|zottman|spider|bayesian|waiter|cross body/.test(n) && !db) return NOT('kind');
-      if (bar) return B('B', (/preacher|scott/.test(n) ? 0.38 : 0.45) * rev, 'est');
-      if (db) return B('B', (/hammer/.test(n) ? 0.22 : /concentration|incline|preacher|spider/.test(n) ? 0.17 : 0.2) * rev, 'est', 'hand');
-      if (cable) return one ? B('B', 0.2 * rev, 'rough', 'side') : B('B', 0.45 * rev, 'rough');
-      if (machine) return one ? B('B', 0.22 * rev, 'rough', 'side') : B('B', 0.45 * rev, 'rough');
+      if (bar) return L('barCurl', '', (/preacher|scott/.test(n) ? 0.85 : 1) * rev);
+      if (db) return L('dbCurl', 'hand', (/hammer/.test(n) ? 1.1 : /concentration|incline|preacher|spider/.test(n) ? 0.85 : 1) * rev);
+      if (cable) return one ? L('oneCableCurl', 'side', rev) : L('cableCurl', '', rev);
+      if (machine) return one ? L('machineCurl', 'side', 0.5 * rev) : L('machineCurl', '', rev);
       return NOT('kind');
     }
     if (pattern === 'triLying') return bar ? B('B', 0.38, 'est') : db ? B('B', 0.17, 'est', 'hand') : cable ? B('B', 0.38, 'rough') : NOT('kind');
     if (pattern === 'triOverhead') return db ? (one ? B('B', 0.15, 'est', 'hand') : B('B', 0.3, 'est')) : bar ? B('B', 0.33, 'est') : cable ? (one ? B('B', 0.2, 'rough', 'side') : B('B', 0.4, 'rough')) : machine ? B('B', 0.45, 'rough') : NOT('kind');
-    if (pattern === 'triPushdown') return one ? B('B', 0.22, 'rough', 'side') : B('B', 0.45, 'rough');
+    if (pattern === 'triPushdown') return one ? L('pushdown', 'side', 0.5) : L('pushdown');
     return NOT('kind');
   }
 
@@ -300,9 +366,16 @@ window.LS_RANKS = (() => {
     const cur = FITS[key].map(([a, e]) => a * Math.pow(bw, e));
     for (let i = 1; i < cur.length; i++) cur[i] = Math.max(cur[i], cur[i - 1] * 1.03);
     const body = b.ref === 'pull' ? (sex === 'F' ? 1.35 : 1.05) : b.ref === 'dip' ? (sex === 'F' ? 1.5 : 1.25) : 1;
-    const r = b.r * body * ageFactor(key, +p.age) * (adj > 0 ? 1.25 : adj < 0 ? 0.8 : 1);
-    return [0, 0.6 * cur[0], 0.8 * cur[0], ...cur].map(v => v * r);
+    const f = body * ageFactor(key, +p.age) * (adj > 0 ? 1.25 : adj < 0 ? 0.8 : 1);
+    const base = [0, 0.6 * cur[0], 0.8 * cur[0], ...cur];
+    if (!b.sl) return base.map(v => v * b.r * f);
+    // from lifters' logs: each rank's standard on the reference lift, carried over to this exercise
+    const out = base.map(v => slMap(b.sl, sex, v * body) * (b.k || 1) * f / body);
+    for (let i = 2; i < out.length; i++) out[i] = Math.max(out[i], out[i - 1] * 1.03);
+    return out;
   }
+  // an exercise's Gold standard as a share of its reference lift's, for a profile ("about 88% of the bench press")
+  const share = (b, p) => ladder(b, p)[3] / ladder({ ref: b.ref, r: 1 }, p)[3];
   // where a lift sits: its tier, how far to the next one (0 to 1), and a score (tier + that)
   function place(load, lad) {
     let t = 0;
@@ -416,5 +489,5 @@ window.LS_RANKS = (() => {
     return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible">${defs}${back}${crown}${body}${sym}${gloss}${shine}${g}${sparks}</svg>`;
   }
   function mixc(a, b, t) { const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, k) => Math.round(v * (1 - t) + B[k] * t).toString(16).padStart(2, '0')).join(''); }
-  return { TIERS, FITS, REFS, SOURCES, basis, ladder, place, ageFactor, emblem };
+  return { TIERS, FITS, REFS, SOURCES, SL, share, basis, ladder, place, ageFactor, emblem };
 })();

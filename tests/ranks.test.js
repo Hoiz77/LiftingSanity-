@@ -39,13 +39,19 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   r.ok(Math.abs(lad.b[2] / lad.b[3] - 0.8) < 1e-9 && Math.abs(lad.b[1] / lad.b[3] - 0.6) < 1e-9, 'Silver is 80% of Gold, Bronze 60%');
   r.ok(lad.f[3] > 40 && lad.f[3] < 48 && lad.heavy[3] > lad.b[3] && lad.heavy[3] / 110 < lad.b[3] / 80, 'women have their own standards, and heavier lifters need more but less per kilo of bodyweight', { f: Math.round(lad.f[3]), heavy: Math.round(lad.heavy[3]) });
   r.ok(lad.old[3] < lad.young[3] * 0.9, 'at 55 the standards are lower, as in the records', { old: Math.round(lad.old[3]), young: Math.round(lad.young[3]) });
-  const kinds = await t.ev(`['barbell-bench-press', 'incline-dumbbell-press', 'lever-seated-fly', 'standing-calf-raise', 'pull-up', 'push-up'].map(id => { const b = rankBasis(id); return b.why ? 'no:' + b.why : b.conf + ':' + b.ref + (b.per ? '/' + b.per : ''); })`);
-  r.ok(JSON.stringify(kinds) === JSON.stringify(['data:B', 'est:B/hand', 'rough:B', 'no:machine', 'est:pull/total', 'no:kind']), 'the bench from the data, a dumbbell press estimated per dumbbell, a machine rough, pull-ups with your bodyweight; calf raises and push-ups aren’t ranked', kinds);
+  // standards from what lifters log: an 80 kg man's machine fly Gold sits by the logged median (85 kg), the leg extension is
+  // about three quarters of the squat (the old rule of thumb said 60%), women get their own shares, and every ladder climbs
+  const logs = await t.ev(`(() => { const L = (name, eq, pat, p) => RK.ladder(RK.basis({ name, eq, k: 'wr' }, pat), p), m = { sex: 'M', bw: 80 }, f = { sex: 'F', bw: 60 };
+    const climbs = Object.keys(RK.SL).filter(k => RK.SL[k].ref).every(k => ['M', 'F'].every(sex => [50, 80, 120].every(bw => { const l = RK.ladder({ ref: RK.SL[k].ref, sl: k, r: 1 }, { sex, bw }); return l.every((v, i) => !i || v > l[i - 1]); })));
+    return { fly: L('Lever Seated Fly', 'machine', 'fly', m)[3], ext: L('Lever Leg Extension', 'machine', 'legExt', m)[3] / RK.ladder({ ref: 'S', r: 1 }, m)[3], flyF: L('Lever Seated Fly', 'machine', 'fly', f)[3] / RK.ladder({ ref: 'B', r: 1 }, f)[3], n: Object.keys(RK.SL).length - 3, climbs }; })()`);
+  r.ok(logs.fly > 80 && logs.fly < 88 && logs.ext > 0.7 && logs.ext < 0.8 && logs.flyF > 0.72 && logs.flyF < 0.84 && logs.n === 29 && logs.climbs, '29 common exercises take their standards from what lifters log: a machine fly’s Gold by the logged median, a leg extension about three quarters of the squat, women their own shares, every ladder climbing', logs);
+  const kinds = await t.ev(`['barbell-bench-press', 'incline-dumbbell-press', 'lever-seated-fly', 'standing-calf-raise', 'cable-crunch', 'pull-up', 'push-up'].map(id => { const b = rankBasis(id); return b.why ? 'no:' + b.why : b.conf + ':' + b.ref + (b.per ? '/' + b.per : ''); })`);
+  r.ok(JSON.stringify(kinds) === JSON.stringify(['data:B', 'est:B/hand', 'logs:B', 'logs:S', 'no:machine', 'est:pull/total', 'no:kind']), 'the bench from the data, a dumbbell press estimated per dumbbell, a machine fly and a calf raise from lifters’ logs, pull-ups with your bodyweight; crunches and push-ups aren’t ranked', kinds);
 
   // Progress: your rank, start to now, your lifts
   await t.tab('progress');
   const card = await p.evaluate(() => { const c = document.querySelector('.rank-card'); return c && { tier: c.querySelector('.rank-top-t b').textContent, maps: c.querySelectorAll('.rank-body svg').length, rows: [...c.querySelectorAll('.rank-row b')].map(b => b.textContent), emb: c.querySelectorAll('.rank-emb').length }; });
-  r.ok(card && card.maps === 4 && card.emb >= 3 && card.rows.includes('Barbell Bench Press') && !card.rows.some(n => /Calf/.test(n)), 'Progress shows your rank, your muscles from start to now, and your lifts (not the calf raise)', card);
+  r.ok(card && card.maps === 4 && card.emb >= 3 && card.rows.includes('Barbell Bench Press'), 'Progress shows your rank, your muscles from start to now, and your lifts', card);
   const rows = await t.ev(`rankTable().map(o => [o.id, RK.TIERS[o.now.tier].id, RK.TIERS[o.was.tier].id, Math.round(o.load)])`);
   const bench = rows.find(x => x[0] === 'barbell-bench-press');
   r.ok(bench && bench[3] === 105 && bench[1] === 'gold' && bench[2] === 'silver', 'the bench: best est. 1RM 105 kg is Gold now, Silver at the start (81.7 kg)', rows);
@@ -62,7 +68,7 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   const incSrc = await srcLine();
   r.ok(incline && incSrc && incSrc.links.includes('https://doi.org/10.3390/ijerph17197339'), 'an incline bench names the study that measured the bench press at each incline', { incline, incSrc });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
-  const rule = await t.ev(`(LIB.find(e => { const b = rankBasis(e.id); return !b.why && b.conf === 'est' && !b.src && /curl/i.test(e.name); }) || {}).id`);
+  const rule = await t.ev(`(LIB.find(e => { const b = rankBasis(e.id); return !b.why && b.conf === 'est' && !b.src; }) || {}).id`);
   await t.ev(`exerciseSheet(${JSON.stringify(rule)})`); await p.waitForTimeout(600);
   const ruleSrc = await srcLine();
   r.ok(rule && ruleSrc && /Rule of thumb/.test(ruleSrc.text) && !ruleSrc.links.length, 'a ratio no study gives says it’s a rule of thumb', { rule, ruleSrc });
@@ -70,7 +76,8 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   // a machine: rough, and you can say how it reads
   await t.ev(`exerciseSheet('lever-seated-fly')`); await p.waitForTimeout(600);
   const before = await t.ev(`rankTable().find(o => o.id === 'lever-seated-fly').lad[3]`);
-  r.ok(/Rough/.test(await t.text('#sheets .sheet-wrap.in .rank-ex')) && await p.evaluate(() => !!document.querySelector('.rank-adj')), 'a machine’s rank is marked rough, and asks how the machine reads');
+  const machHow = await t.text('#sheets .sheet-wrap.in .rank-ex');
+  r.ok(/From what lifters log: 487,945 lifts of this exercise on Strength Level/.test(machHow) && /about 8\d% of the bench press standard/.test(machHow) && /machines differ/.test(machHow) && await p.evaluate(() => !!document.querySelector('.rank-adj')), 'a machine fly’s rank says it comes from lifters’ logs (how many, and what share of the bench that makes it), and asks how the machine reads', machHow.slice(0, 400));
   const machSrc = await srcLine();
   r.ok(machSrc && machSrc.links.includes('https://doi.org/10.1519/14433.1') && machSrc.links.includes('https://doi.org/10.1186/s13102-023-00713-4'), 'and names the studies on why machine numbers differ from free weights', machSrc);
   await t.inSheet('[data-a="rankAdj"][data-v="1"]', 400);
@@ -78,7 +85,7 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   r.ok(Math.abs(after / before - 1.25) < 1e-6 && (await t.state()).exPrefs['lever-seated-fly'].rankAdj === 1, '“Heavy” raises its standards by a quarter, and is kept', { before, after });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
   await t.click('[data-a="rankAll"]', 600);
-  r.ok(await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet'); return s && s.querySelectorAll('.rank-tiers > span').length === 9 && /OpenPowerlifting/.test(s.textContent) && /Rough: machines/.test(s.textContent); }), 'All your ranks: the nine ranks, your lifts by how sure they are, and how ranks work (with the data’s source)');
+  r.ok(await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet'); return s && s.querySelectorAll('.rank-tiers > span').length === 9 && /OpenPowerlifting/.test(s.textContent) && /From lifters’ logs: machines/.test(s.textContent); }), 'All your ranks: the nine ranks, your lifts by how sure they are, and how ranks work (with the data’s source)');
   const sources = await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet .rank-src'); return s && { groups: [...s.querySelectorAll('summary span')].map(x => x.textContent), items: s.querySelectorAll('li').length, notes: [...s.querySelectorAll('li')].every(li => li.querySelector('.rs-t').textContent && li.querySelector('.rs-n').textContent), links: [...s.querySelectorAll('li a')].map(a => a.getAttribute('href')), open: s.querySelectorAll('details[open]').length }; });
   r.ok(sources && sources.groups.join('|') === 'Where the standards come from|Your bodyweight|Age|Women and men|Your estimated 1RM|Other exercises|Machines' && sources.items >= 35 && sources.notes && sources.links.length >= 28 && sources.links.every(u => /^https:\/\//.test(u)) && !sources.open, 'and its sources: 35+ studies and datasets in seven folded topics, each with its title, what it found and a link where there is one', sources && { ...sources, links: sources.links.length });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);

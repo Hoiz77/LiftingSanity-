@@ -10,10 +10,11 @@ const { open, report } = require('./lib');
   const rows = () => p.evaluate(() => [...document.querySelectorAll('.sheet-wrap.in .ord-row')].map(li => li.querySelector('.ord-txt b').textContent));
   const toastText = () => t.text('#toast.in');
   const toastAct = async () => { await p.evaluate(() => document.querySelector('#toast [data-a="toastAct"]').click()); await p.waitForTimeout(400); };
-  // a finger, as touch events on the page (press, hold, move in steps, lift)
+  // a finger, as touch events on the page (press, hold, move in steps, lift); plain events carrying the touch points,
+  // since not every engine lets a script build real ones
   const finger = (sel, i, dy, hold) => p.evaluate(async ([sel, i, dy, hold]) => {
     const el = document.querySelectorAll(sel)[i], b = el.getBoundingClientRect(), x = b.left + Math.min(120, b.width / 2), y = b.top + b.height / 2;
-    const fire = (type, yy) => { const pt = new Touch({ identifier: 1, target: el, clientX: x, clientY: yy }); el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [pt], changedTouches: [pt] })); };
+    const fire = (type, yy) => { const ev = new Event(type, { bubbles: true, cancelable: true }), pt = { identifier: 1, target: el, clientX: x, clientY: yy }; Object.defineProperty(ev, 'touches', { value: type === 'touchend' ? [] : [pt] }); Object.defineProperty(ev, 'changedTouches', { value: [pt] }); el.dispatchEvent(ev); };
     const wait = ms => new Promise(res => setTimeout(res, ms));
     fire('touchstart', y); await wait(hold);
     for (let k = 1; k <= 8 && dy; k++) { fire('touchmove', y + dy * k / 8); await wait(25); }
