@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -3632,6 +3632,49 @@ function cardWorkout(st) {
   if (st.muscles.length) h += ctext(c, 180, 414, st.muscles.slice(0, 3).map(([m, n]) => `${MUSCLES[m]} ${trimNum(n, 1)}`).join(' · '), { size: 11, weight: 600, fill: c.ink2, max: 312 });
   return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, glow(c.id + 'r', c.hot[1], 0.16)) };
 }
+// a five-point star
+function star5(cx, cy, r, k = 0.45) {
+  let d = '';
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * k : r; d += `${i ? 'L' : 'M'}${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)}`; }
+  return d + 'Z';
+}
+// a medal's edge: n scallops between two radii
+function scallop(cx, cy, r1, r2, n) {
+  let d = '';
+  for (let k = 0; k < n; k++) {
+    const a0 = (k / n) * Math.PI * 2, a1 = ((k + 0.5) / n) * Math.PI * 2, a2 = ((k + 1) / n) * Math.PI * 2, pt = (r, a) => `${(cx + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+    d += `${k ? '' : 'M' + pt(r2, a0)}Q${pt(r1 + (r1 - r2) * 0.9, a1)} ${pt(r2, a2)}`;
+  }
+  return d + 'Z';
+}
+// a laurel branch along a circle, from angle a0 to a1 (degrees, clockwise from the right): pairs of leaves leaning
+// out and in, getting smaller towards the tip
+function laurel(cx, cy, r, a0, a1, n, size = 1) {
+  let d = '';
+  for (let k = 0; k < n; k++) {
+    const t = k / (n - 1), deg = a0 + (a1 - a0) * t, a = deg * Math.PI / 180, sc = size * (1 - t * 0.35), dir = Math.sign(a1 - a0);
+    for (const [dr, tilt] of [[4.2 * sc, 32], [-3.6 * sc, -30]]) {
+      const x = cx + (r + dr) * Math.cos(a), y = cy + (r + dr) * Math.sin(a);
+      d += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(3 * sc).toFixed(1)}" ry="${(7.6 * sc).toFixed(1)}" transform="rotate(${(deg - dir * tilt).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+    }
+  }
+  return d;
+}
+// the medal at the top of the finish screen, in the mood's colours (--fin-c, --fin-c2): a scalloped coin with a
+// bevelled rim, fine engraved rays and a ring of dots, a laurel branch either side, and two ribbon tails
+function finCoin() {
+  const st = (o, c) => `<stop offset="${o}" style="stop-color:${c}"/>`;
+  const lines = Array.from({ length: 40 }, (_, k) => { const a = k * Math.PI / 20; return `M${(50 + 13 * Math.cos(a)).toFixed(1)} ${(50 + 13 * Math.sin(a)).toFixed(1)}L${(50 + 37.5 * Math.cos(a)).toFixed(1)} ${(50 + 37.5 * Math.sin(a)).toFixed(1)}`; }).join('');
+  return `<svg class="fin-coin" viewBox="0 0 100 100" aria-hidden="true"><defs>
+    <linearGradient id="fcm" x1="0" y1="0" x2="1" y2="1">${st(0, 'color-mix(in srgb, var(--fin-c2) 45%, #fff)')}${st(0.3, 'var(--fin-c2)')}${st(0.55, 'var(--fin-c)')}${st(0.8, 'color-mix(in srgb, var(--fin-c) 62%, #000)')}${st(1, 'var(--fin-c2)')}</linearGradient>
+    <radialGradient id="fcf" cx=".36" cy=".28" r=".85">${st(0, 'color-mix(in srgb, var(--fin-c2) 55%, #fff)')}${st(0.4, 'var(--fin-c2)')}${st(0.82, 'var(--fin-c)')}${st(1, 'color-mix(in srgb, var(--fin-c) 70%, #000)')}</radialGradient>
+    <linearGradient id="fcg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+    <path d="${scallop(50, 50, 49.2, 45.6, 30)}" fill="url(#fcm)"/><circle cx="50" cy="50" r="43.4" fill="url(#fcm)" transform="rotate(180 50 50)"/><circle cx="50" cy="50" r="39.6" fill="url(#fcf)"/>
+    <path d="${lines}" fill="none" stroke="#000" stroke-opacity=".09" stroke-width=".7"/><circle cx="50" cy="50" r="35" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="1.5" stroke-dasharray=".1 3.56" stroke-linecap="round"/>
+    <circle cx="50" cy="50" r="39.6" fill="none" stroke="#000" stroke-opacity=".22" stroke-width=".9"/><path d="M15 43A36 36 0 0 1 78 26A46 46 0 0 0 15 43Z" fill="url(#fcg)" opacity=".7"/></svg>`;
+}
+const finLaurel = () => `<svg class="fin-laurel" viewBox="0 0 200 140" aria-hidden="true"><g>${laurel(100, 62, 61, 116, 204, 8, 1.05)}${laurel(100, 62, 61, 64, -24, 8, 1.05)}</g></svg>`;
+const finRibbon = () => `<svg class="fin-ribbon" viewBox="0 0 80 56" aria-hidden="true"><path class="t" d="M27 0L10 52L25 43L35 56L44 6Z"/><path class="t" d="M53 0L70 52L55 43L45 56L36 6Z"/><path class="s" d="M27 0L35 56L44 6ZM53 0L45 56L36 6Z"/><path class="l" d="M22 14L16 34M58 14L64 34" /></svg>`;
 // a filled trophy on a 100-unit grid
 const TROPHY = (f, x, y, sc) => `<g transform="translate(${x} ${y}) scale(${sc})"><path d="M26 18H12v8c0 11 8 18 18 18M74 18h14v8c0 11-8 18-18 18" fill="none" stroke="${f}" stroke-width="7" stroke-linecap="round"/><path d="M24 8h52v26c0 16-12 30-26 30S24 50 24 34Z" fill="${f}"/><path d="M44 62h12v14H44Z" fill="${f}"/><path d="M30 80h40a4 4 0 0 1 4 4v8H26v-8a4 4 0 0 1 4-4Z" fill="${f}"/><path d="M36 16v16c0 6 3 11 8 14" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"/></g>`;
 function cardRecords(st) {
@@ -3717,16 +3760,28 @@ function cardMilestone(st) {
   const big = byCount ? String(st.n) : compact(st.mark), small = byCount ? (st.n === 1 ? T('First') : T('Workouts')) : U();
   c.tone = c.gold[1];
   let h = `<circle cx="180" cy="150" r="170" fill="url(#${c.id}r)"/>${rays(180, 150, 200, c.gold[1], 0.08)}`;
-  h += `<path d="M146 196L128 262L152 250L166 270L178 210Z" fill="${c.accent}"/><path d="M214 196L232 262L208 250L194 270L182 210Z" fill="${c.accent}" fill-opacity=".8"/>`;
-  h += `<circle cx="180" cy="150" r="74" fill="${g}"/><circle cx="180" cy="150" r="61" fill="${c.bg1}"/><circle cx="180" cy="150" r="55" fill="none" stroke="${g}" stroke-width="1.5" stroke-dasharray="2 5"/>`;
-  h += `<text x="180" y="${small ? 160 : 168}" font-size="${big.length > 3 ? 40 : 52}" font-weight="900" fill="${g}" text-anchor="middle">${esc(big)}</text>`;
-  h += ctext({ ...c, rtl: false }, 180, 184, small.toLocaleUpperCase(LOC), { size: 10, weight: 800, fill: c.gold[1], ls: 2, max: 96 });
+  // the medal: ribbon tails, a scalloped rim, two bevelled rings, an enamel face engraved with fine rays and a ring of
+  // dots, a laurel wreath (victory) rising from a banner, a star over the number, and light across it
+  const cx = 180, cy = 148, m = `url(#${c.id}m)`, dark = mixHex(c.accent, '#000000', 0.38), deep = mixHex(c.gold[2], '#000000', 0.45);
+  h += `<path d="M150 198L127 272L153 257L169 280L183 206Z" fill="${c.accent}"/><path d="M210 198L233 272L207 257L191 280L177 206Z" fill="${c.accent}"/><path d="M150 198L169 280L183 206ZM210 198L191 280L177 206Z" fill="${dark}" opacity=".55"/><path d="M143 222L134 251M217 222L226 251" fill="none" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2.4" stroke-linecap="round"/>`;
+  h += `<path d="${scallop(cx, cy, 81, 75.5, 32)}" fill="${m}" stroke="${deep}" stroke-width=".8"/><circle cx="${cx}" cy="${cy}" r="72" fill="${m}" transform="rotate(180 ${cx} ${cy})"/><circle cx="${cx}" cy="${cy}" r="66.5" fill="${m}"/><circle cx="${cx}" cy="${cy}" r="59" fill="url(#${c.id}e)" stroke="${deep}" stroke-width="1.2"/>`;
+  h += `<path d="${Array.from({ length: 56 }, (_, k) => { const a = k * Math.PI / 28; return `M${(cx + 22 * Math.cos(a)).toFixed(1)} ${(cy + 22 * Math.sin(a)).toFixed(1)}L${(cx + 57 * Math.cos(a)).toFixed(1)} ${(cy + 57 * Math.sin(a)).toFixed(1)}`; }).join('')}" fill="none" stroke="${c.gold[1]}" stroke-opacity=".1" stroke-width=".8"/>`;
+  h += `<circle cx="${cx}" cy="${cy}" r="54.5" fill="none" stroke="${c.gold[1]}" stroke-opacity=".7" stroke-width="1.7" stroke-dasharray=".1 4.95" stroke-linecap="round"/>`;
+  h += `<g fill="${g}" stroke="${deep}" stroke-width=".5">${laurel(cx, cy, 44, 128, 212, 7)}${laurel(cx, cy, 44, 52, -32, 7)}</g>`;
+  h += `<path d="${star5(cx, cy - 35, 7.5)}" fill="${g}" stroke="${deep}" stroke-width=".5"/>`;
+  const [bt, bs] = fitText(big, 58, big.length > 3 ? 36 : 46, 900, c.font, 22);
+  h += `<text x="${cx}" y="${cy + bs * 0.3}" font-size="${bs}" font-weight="900" fill="${g}" stroke="${deep}" stroke-width=".6" paint-order="stroke" text-anchor="middle">${esc(bt)}</text>`;
+  // the banner across the foot of the wreath
+  h += `<path d="M${cx - 52} ${cy + 27}L${cx - 62} ${cy + 22}L${cx - 58} ${cy + 33}L${cx - 62} ${cy + 44}L${cx - 52} ${cy + 41}ZM${cx + 52} ${cy + 27}L${cx + 62} ${cy + 22}L${cx + 58} ${cy + 33}L${cx + 62} ${cy + 44}L${cx + 52} ${cy + 41}Z" fill="${c.gold[2]}"/><rect x="${cx - 52}" y="${cy + 24}" width="104" height="18" rx="3" fill="${g}" stroke="${deep}" stroke-width=".6"/>`;
+  h += ctext({ ...c, rtl: false }, cx, cy + 37, small.toLocaleUpperCase(LOC), { size: 9.5, weight: 900, fill: '#2A1700', ls: 1.8, max: 96 });
+  h += `<path d="M${cx - 62} ${cy - 20}A66 66 0 0 1 ${cx + 44} ${cy - 49}A84 84 0 0 0 ${cx - 62} ${cy - 20}Z" fill="#FFFFFF" opacity=".14"/><path d="M${cx + 55} ${cy - 62}l2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#FFFFFF" opacity=".95"/><path d="M${cx - 68} ${cy + 30}l1.3 3.8 3.8 1.3-3.8 1.3-1.3 3.8-1.3-3.8-3.8-1.3 3.8-1.3Z" fill="#FFFFFF" opacity=".8"/>`;
   const title = byCount ? (st.n === 1 ? T('First workout done!') : TN(st.n, '{n} workout!', '{n} workouts!')) : T('{v} lifted!', { v: `${compact(st.mark)} ${U()}` });
   const sub = byCount ? (st.n === 1 ? T('The first of many.') : TN(st.n, 'That’s {n} time you showed up.', 'That’s {n} times you showed up.')) : T('In total, across all your workouts.');
   h += ctext(c, 180, 308, title, { size: 27, weight: 900, max: 312 });
   h += ctext(c, 180, 334, sub, { size: 13, weight: 600, fill: c.ink2, max: 312 });
   if (byCount && st.mark) h += ctext(c, 180, 372, T('And {v} lifted in total!', { v: `${compact(st.mark)} ${U()}` }), { size: 13.5, weight: 800, fill: c.gold[1], max: 312 });
-  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.3)) };
+  const metal = `<linearGradient id="${c.id}m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${mixHex(c.gold[0], '#FFFFFF', 0.4)}"/><stop offset=".3" stop-color="${c.gold[1]}"/><stop offset=".55" stop-color="${c.gold[2]}"/><stop offset=".78" stop-color="${mixHex(c.gold[2], '#000000', 0.3)}"/><stop offset="1" stop-color="${c.gold[0]}"/></linearGradient><radialGradient id="${c.id}e" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="${mixHex(c.bg1, c.gold[1], 0.2)}"/><stop offset=".6" stop-color="${mixHex(c.bg1, '#000000', 0.25)}"/><stop offset="1" stop-color="${mixHex(c.bg1, '#000000', 0.55)}"/></radialGradient>`;
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'g', c.gold) + glow(c.id + 'r', c.gold[1], 0.3) + metal) };
 }
 // an exercise's best working set: the heaviest, then the most reps, the longest, the farthest
 function bestSet(x) {
@@ -3969,7 +4024,7 @@ function finishScreen(id, mode = 'new') {
       <header class="fin-top"><button class="fin-btn" data-a="sheetClose" aria-label="${T('Close')}">${icon('x')}</button><button class="fin-btn" data-a="finShare" aria-label="${T('Share')}">${icon('share')}</button></header>
       <div class="sheet-body fin-body">
         <section class="fin-hero">
-          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span>${fresh ? `<span class="fin-halo"></span><span class="fin-wave"></span><span class="fin-wave w2"></span><span class="fin-flash"></span><span class="fin-streaks">${streaks}</span><span class="fin-sparks">${sparks}</span>` : ''}<svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${face}</span></div>
+          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span>${fresh ? `<span class="fin-halo"></span><span class="fin-wave"></span><span class="fin-wave w2"></span><span class="fin-flash"></span><span class="fin-streaks">${streaks}</span><span class="fin-sparks">${sparks}</span>` : ''}${finRibbon()}${finLaurel()}<svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${finCoin()}${face}</span></div>
           <h1 class="fin-title">${title.split(' ').map((wd, i) => `<span class="w" style="--i:${i}">${esc(wd)}</span>`).join(' ')}</h1>
           <p class="fin-sub">${esc(sub)}</p>
         </section>
@@ -6453,7 +6508,7 @@ function blockShow(prev, nb, undo) {
           ${gains.length ? `<p class="bs-h">${T('Biggest gains')}</p><ul class="bs-gains">${gains.map(g => `<li><span>${esc(getEx(g.id).name)}</span><small dir="ltr">${esc(fmtMetric('e1rm', g.first, 'wr'))} → <b>${esc(fmtMetric('e1rm', g.best, 'wr'))}</b></small><em dir="ltr">+${Math.round(g.g * 100)}%</em></li>`).join('')}</ul><p class="muted small">${T('Est. 1RM, first session to best.')}</p>` : ''}
         </section>` : ''}
         <section class="fin-hero bs-new">
-          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span><svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${icon('reset')}</span></div>
+          <div class="fin-medal" aria-hidden="true"><span class="fin-rays"></span>${finRibbon()}${finLaurel()}<svg class="fin-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" pathLength="100"/><circle class="arc" cx="60" cy="60" r="54" pathLength="100"/></svg><span class="fin-face">${finCoin()}${icon('reset')}</span></div>
           <h1 class="fin-title">${T('{name} starts now', { name: esc(blkName(nb)) }).split(' ').map((wd, i) => `<span class="w" style="--i:${i}">${wd}</span>`).join(' ')}</h1>
           <p class="fin-sub">${nb.why ? esc(T(BLOCK_WHY.find(w => w[0] === nb.why)[1])) + ' · ' : ''}${esc(fmtDate(nb.start))}</p>
           <ul class="bs-next">
@@ -6553,6 +6608,9 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 50, items: [
+    ['trophy', 'Medals worth earning', 'The medal at the end of a workout is a real one now: a scalloped coin with a bevelled rim and fine engraving, a laurel branch either side and ribbon tails below. The milestone card’s medal has an enamel face, a laurel wreath rising from a banner, a star over the number and light across it. The glow behind them is round again, all the way to the top of the screen.']
+  ] },
   { v: 49, items: [
     ['trophy', 'Ranks that mean something', 'Each rank has a symbol of its own now, telling the way up: a seedling, an anvil, a barbell, a sun, a summit, a diamond, a trophy, Atlas carrying the sky and a thunderbolt. Tap a rank under Your ranks to see what it stands for; an exercise’s rank says it too.']
   ] },

@@ -1358,18 +1358,33 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 /* the finish screen runs up under the status bar: the band that normally covers it steps aside */
 body:has(.sheet-wrap.finish.in)::before { opacity: 0; }
 body::before { transition: opacity .3s; }
-.fin-top { display: flex; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 0; }
+/* the buttons float over the scrolling part, which runs to the top: the medal's light isn't cut off in a straight line */
+.fin-top { position: absolute; z-index: 3; inset: 0 0 auto; display: flex; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 0; pointer-events: none; }
+.fin-top > * { pointer-events: auto; }
 .fin-btn { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .1); color: var(--ink); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .fin-btn .i { width: 20px; height: 20px; }
-.fin-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 18px; }
+.fin-body { flex: 1; min-height: 0; overflow-y: auto; padding-top: calc(50px + env(safe-area-inset-top, 0px)); padding-bottom: 18px; }
 .fin-hero { display: grid; justify-items: center; text-align: center; padding: 0 20px 14px; }
-.fin-medal { position: relative; width: 100px; height: 100px; display: grid; place-items: center; margin-bottom: 12px; }
+.fin-medal { position: relative; width: 100px; height: 100px; display: grid; place-items: center; margin-bottom: 30px; }
 .fin-rays { position: absolute; inset: -70%; border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, .14) 0deg 4deg, transparent 4deg 18deg); -webkit-mask: radial-gradient(closest-side, #000 25%, transparent 100%); mask: radial-gradient(closest-side, #000 25%, transparent 100%); opacity: 0; }
 .fin[data-mood="pr"] .fin-rays, .fin[data-mood="milestone"] .fin-rays { background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--gold) 20%, transparent) 0deg 4deg, transparent 4deg 18deg); }
 .fin-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
 .fin-ring circle { fill: none; stroke: rgba(255, 255, 255, .12); stroke-width: 6; }
 .fin-ring .arc { stroke: var(--fin-c2); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; filter: drop-shadow(0 0 5px var(--fin-c)); }
-.fin-face { position: relative; overflow: hidden; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 34% 28%, var(--fin-c2), var(--fin-c) 70%); box-shadow: 0 12px 34px -8px var(--fin-c), inset 0 2px 0 rgba(255, 255, 255, .4), inset 0 -4px 10px rgba(0, 0, 0, .18); }
+.fin-face { position: relative; overflow: hidden; width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; color: #fff; box-shadow: 0 14px 34px -8px var(--fin-c), 0 0 0 1px rgba(0, 0, 0, .25); }
+/* the medal: an engraved coin in the mood's colour, a laurel branch either side, ribbon tails below */
+.fin-coin { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fin-face > :not(.fin-coin) { position: relative; filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .35)); }
+.fin-laurel { position: absolute; left: 50%; top: 50%; width: 196%; transform: translate(-50%, -44%); pointer-events: none; fill: var(--fin-c2); opacity: .94; }
+.fin-ribbon { position: absolute; left: 50%; top: 72%; width: 62%; transform: translateX(-50%); pointer-events: none; }
+.fin-ribbon .t { fill: var(--fin-r); }
+.fin-ribbon .s { fill: #000; opacity: .28; }
+.fin-ribbon .l { fill: none; stroke: #fff; stroke-opacity: .4; stroke-width: 2; stroke-linecap: round; }
+.fin { --fin-r: var(--gold-2); }
+.fin[data-mood="pr"], .fin[data-mood="milestone"] { --fin-r: var(--accent); }
+.sheet-wrap.finish.in .fin-laurel, .sheet-wrap.finish.in .fin-ribbon { animation: laurelIn .7s .55s cubic-bezier(.2, .9, .25, 1) both; }
+@keyframes laurelIn { from { opacity: 0; scale: .55; } }
+.sheet-wrap.finish.in .fin[data-fresh] .fin-laurel, .sheet-wrap.finish.in .fin[data-fresh] .fin-ribbon { animation-delay: 1.05s; }
 .fin-face .i { width: 38px; height: 38px; stroke-width: 3; }
 .fin-face b { font: 900 calc(30px * var(--fs, 1))/1 var(--display); font-stretch: 110%; color: #1b1000; }
 .fin[data-mood="pr"] .fin-face, .fin[data-mood="milestone"] .fin-face { color: #2a1800; }
@@ -1377,7 +1392,7 @@ body::before { transition: opacity .3s; }
 /* each word in light that sweeps across it (padding so the light reaches the tails of letters) */
 .fin-title .w { display: inline-block; padding: .08em .03em .16em; margin: -.08em -.03em -.16em; background: linear-gradient(100deg, var(--ink) 20%, var(--fin-c2) 40%, var(--ink) 60%); background-size: 250% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; color: transparent; }
 .fin-sub { margin: 6px 0 0; color: var(--ink-2); font-size: calc(15px * var(--fs, 1)); font-weight: 500; }
-.fin-cards { --cw: min(80vw, 340px, max(220px, calc((100dvh - 360px) * .8))); display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px calc((100% - var(--cw)) / 2) 12px; scrollbar-width: none; overscroll-behavior-x: contain; outline: none; }
+.fin-cards { --cw: min(80vw, 340px, max(220px, calc((100dvh - 378px) * .8))); display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px calc((100% - var(--cw)) / 2) 12px; scrollbar-width: none; overscroll-behavior-x: contain; outline: none; }
 .fin-cards::-webkit-scrollbar { display: none; }
 .fin-card { position: relative; flex: 0 0 var(--cw); margin: 0; aspect-ratio: 4 / 5; scroll-snap-align: center; border-radius: calc(var(--cw) * .072); overflow: hidden; box-shadow: 0 26px 60px -24px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .03); }
 .fin-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .16) 50%, transparent 62%); transform: translateX(-110%); opacity: 0; }
@@ -1501,8 +1516,8 @@ body::before { transition: opacity .3s; }
   .fin-cards { --cw: min(340px, max(240px, calc((min(940px, 100dvh) - 400px) * .8))); }
 }
 @media (max-height: 700px) {
-  .fin-medal { width: 76px; height: 76px; margin-bottom: 8px; }
-  .fin-face { width: 56px; height: 56px; }
+  .fin-medal { width: 76px; height: 76px; margin-bottom: 22px; }
+  .fin-face { width: 59px; height: 59px; }
   .fin-face .i { width: 30px; height: 30px; }
   .fin-title { font-size: calc(28px * var(--fs, 1)); }
 }

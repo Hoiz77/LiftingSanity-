@@ -347,3 +347,4 @@
 [data-style="y2k"] .mchip .dot { border-radius: 0; }
 [data-style="y2k"] .mchip small { font-family: var(--pixel); }
 [data-style="y2k"] :is(.ord-row, .ord-main, .ord-grip) { border-radius: 0; }
+[data-style="y2k"] :is(.fin-coin, .fin-laurel, .fin-ribbon) { display: none; }
