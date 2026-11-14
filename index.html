@@ -1348,10 +1348,16 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .fin { --fin-c: var(--accent); --fin-c2: color-mix(in srgb, var(--accent) 55%, #fff); position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; isolation: isolate; background: var(--bg); color: var(--ink); }
 .fin[data-mood="pr"], .fin[data-mood="milestone"] { --fin-c: var(--gold-2); --fin-c2: var(--gold); }
 .fin-glow { position: absolute; z-index: -1; left: -30%; right: -30%; top: -25%; height: 85%; pointer-events: none;
-  background: radial-gradient(42% 40% at 32% 45%, color-mix(in srgb, var(--accent) 50%, transparent), transparent 70%), radial-gradient(38% 36% at 72% 35%, rgba(191, 90, 242, .36), transparent 70%), radial-gradient(34% 30% at 52% 72%, rgba(48, 209, 88, .2), transparent 70%);
+  /* light in your accent colour to either side, and a close halo behind the medal */
+  background: radial-gradient(26% 28% at 50% 55%, color-mix(in srgb, var(--fin-c) 46%, transparent), transparent 72%), radial-gradient(40% 40% at 27% 40%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 72%), radial-gradient(40% 38% at 75% 36%, color-mix(in oklab, var(--accent) 55%, #7a5cff 45%) 0%, transparent 0%), radial-gradient(40% 38% at 75% 36%, color-mix(in srgb, color-mix(in oklab, var(--accent) 60%, #7a5cff) 30%, transparent), transparent 72%);
   animation: glowDrift 14s ease-in-out infinite alternate; }
+/* a record or a milestone: the gold stays close around the medal (thinned out over a dark colour it turns olive), with
+   your accent colour as the light around it */
 .fin[data-mood="pr"] .fin-glow, .fin[data-mood="milestone"] .fin-glow {
-  background: radial-gradient(42% 40% at 34% 45%, color-mix(in srgb, var(--gold) 42%, transparent), transparent 70%), radial-gradient(38% 36% at 72% 35%, color-mix(in srgb, var(--gold-2) 38%, transparent), transparent 70%), radial-gradient(34% 30% at 50% 74%, rgba(255, 55, 95, .22), transparent 70%); }
+  background: radial-gradient(22% 24% at 50% 55%, color-mix(in srgb, var(--gold) 52%, transparent), color-mix(in srgb, var(--gold-2) 16%, transparent) 55%, transparent 74%), radial-gradient(40% 40% at 27% 40%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%), radial-gradient(40% 38% at 75% 36%, color-mix(in srgb, color-mix(in oklab, var(--accent) 60%, #7a5cff) 28%, transparent), transparent 72%); }
+/* the finish screen runs up under the status bar: the band that normally covers it steps aside */
+body:has(.sheet-wrap.finish.in)::before { opacity: 0; }
+body::before { transition: opacity .3s; }
 .fin-top { display: flex; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 0; }
 .fin-btn { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .1); color: var(--ink); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .fin-btn .i { width: 20px; height: 20px; }

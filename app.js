@@ -297,14 +297,16 @@ function rampFilter(id, stops) {
   return `<filter id="${id}" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feColorMatrix values="${LUM}"/><feComponentTransfer>${['R', 'G', 'B'].map((n, j) => `<feFunc${n} type="table" tableValues="${ch[j].join(' ')}"/>`).join('')}</feComponentTransfer></filter>`;
 }
 // a muscle in one colour: deep in the lines between muscles, the colour itself in the middle, near white where it catches the light
-const hitRamp = (c, src) => [[0, mixHex(c, '#000000', 0.86)], [BD_MID[src], c], [1, mixHex(c, '#FFFFFF', 0.72)]];
+// a worked muscle keeps its shape: the colour sits at the render's middle grey, and the shades either side of it are
+// pulled apart (deeper in the folds, lighter on the bellies), so the fibres and edges still read through the colour
+const hitRamp = (c, src) => { const m = BD_MID[src]; return [[0, mixHex(c, '#000000', 0.9)], [Math.max(0.05, m - 0.2), mixHex(c, '#000000', 0.5)], [m, c], [Math.min(0.95, m + 0.17), mixHex(c, '#FFFFFF', 0.36)], [1, mixHex(c, '#FFFFFF', 0.82)]]; };
 // a muscle plated in a rank's metal (its light, middle and dark shades)
 const metalRamp = (t, src) => [[0, mixHex(t.c[2], '#000000', 0.6)], [BD_MID[src] * 0.55, t.c[2]], [BD_MID[src], t.c[1]], [Math.min(0.92, BD_MID[src] + 0.24), t.c[0]], [1, '#FFFFFF']];
 // a muscle's outline, softened: the colour fades out at its edges instead of stopping at a hard line
 const softFilter = (id, sd) => `<filter id="${id}" filterUnits="userSpaceOnUse" x="-40" y="-40" width="${BD.w + 80}" height="${BD.h + 80}"><feGaussianBlur stdDeviation="${sd}"/></filter>`;
 const softMask = (id, inner, f) => `<mask id="${id}" maskUnits="userSpaceOnUse" x="-40" y="-40" width="${BD.w + 80}" height="${BD.h + 80}"><g fill="#FFFFFF" filter="url(#${f})">${inner}</g></mask>`;
 // a soft glow in the painted muscles' own colour, for the bigger pictures
-const glowFilter = (id, sd = 9) => `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sd}" result="b"/><feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .7 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+const glowFilter = (id, sd = 5) => `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${sd}" result="b"/><feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .5 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
 // how the pictures look: Clean shows the light render on a light tile, the main muscle red and the helpers blue; Y2K the
 // dark one, tinted navy, on navy, with its two neons
 let figLookNow = null;
@@ -320,7 +322,7 @@ function bodySprite() {
   let el = $('#bd-sprite');
   if (!el) { document.body.insertAdjacentHTML('afterbegin', '<svg id="bd-sprite" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"></svg>'); el = $('#bd-sprite'); }
   el.innerHTML = `<defs>${['front', 'back'].map(v => `<image id="bd-${v}" href="${bodyImg(v, L.src, sex)}" width="${BD.w}" height="${BD.h}"/>${Object.entries(BD[sex][v]).map(([k, d]) => `<path id="bm-${v}-${k}" d="${d}"/>`).join('')}`).join('')}
-    ${rampFilter('bd-base', L.base || [[0, '#3C3E45'], [BD_MID.light, '#A3A6AE'], [1, '#FFFFFF']])}${rampFilter('bd-hit', hitRamp(L.hit, L.src))}${rampFilter('bd-hit2', hitRamp(L.hit2, L.src))}${glowFilter('bd-glow')}${softFilter('bd-soft', 4)}
+    ${rampFilter('bd-base', L.base || [[0, '#2F3138'], [BD_MID.light - 0.2, '#7B7F89'], [BD_MID.light, '#A9ACB4'], [BD_MID.light + 0.2, '#DDDFE4'], [1, '#FFFFFF']])}${rampFilter('bd-hit', hitRamp(L.hit, L.src))}${rampFilter('bd-hit2', hitRamp(L.hit2, L.src))}${glowFilter('bd-glow')}${softFilter('bd-soft', 4)}
     <filter id="bd-edge" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.2"/></filter>
     <path id="bd-heart" d="M282 268c-15-11-28-21-28-34 0-9 7-15 15-15 6 0 10 3 13 8 3-5 7-8 13-8 8 0 15 6 15 15 0 13-13 23-28 34z"/></defs>`;
   // the key under an exercise's pictures uses the same two colours
@@ -364,7 +366,7 @@ function bodyMask(view, keys) {
 function figure(view, ex, crop, big, key) {
   const { main, help } = figMuscles(ex), P = BD[figSex()][view];
   const mk = main.filter(k => P[k]), hk = help.filter(k => P[k]);
-  const layer = (keys, two) => `<g${key ? ` data-m="${keys[0]}"` : ''} mask="url(#${bodyMask(view, keys)})"${two ? ' opacity=".8"' : ''}><use href="#bd-${view}" filter="url(#${two ? 'bd-hit2' : 'bd-hit'})"/></g>`;
+  const layer = (keys, two) => `<g${key ? ` data-m="${keys[0]}"` : ''} mask="url(#${bodyMask(view, keys)})"${two ? ' opacity=".92"' : ''}><use href="#bd-${view}" filter="url(#${two ? 'bd-hit2' : 'bd-hit'})"/></g>`;
   const rim = (keys, two) => `<g${key ? ` data-m="${keys[0]}"` : ''} fill="none" stroke="var(--bd-${two ? 'rim2' : 'rim'})" stroke-width="${two ? 1 : 1.5}" stroke-opacity="${two ? 0.7 : 0.95}" filter="url(#bd-edge)">${keys.map(k => `<use href="#bm-${view}-${k}" vector-effect="non-scaling-stroke"/>`).join('')}</g>`;
   const heart = ex.m === 'cardio' && view === 'front' ? `<use href="#bd-heart" fill="${(figLookNow || figLook()).hit}"${big ? ' filter="url(#bd-glow)"' : ''}/>` : '';
   const each = (keys, two) => key ? keys.map(k => layer([k], two)).join('') : layer(keys, two);
@@ -593,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -3513,7 +3515,7 @@ function cardCtx(k, label) {
     c.bodyRamp = [[0, mixHex(B, '#000000', 0.5)], [BD_MID.dark, mixHex(B, F, 0.5)], [1, mixHex(F, '#FFFFFF', 0.55)]];
   } else {
     const bg = dk['--bg'];
-    c = { bg1: bg || '#0A0A0E', bg2: dk['--panel'] ? mixHex(dk['--panel'], '#FFFFFF', 0.03) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: dk['--ink'] || '#F5F5F7', ink2: dk['--ink-2'] || '#A1A1AA', dim: dk['--muted'] || '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
+    c = { bg1: bg || '#0A0A0E', bg2: bg ? mixHex(bg, '#FFFFFF', 0.1) : '#1A1A22', line: 'rgba(255,255,255,.1)', ink: dk['--ink'] || '#F5F5F7', ink2: dk['--ink-2'] || '#A1A1AA', dim: dk['--muted'] || '#6B6B73', accent: colorOf('accent'), gold: [mixHex(g, '#FFFFFF', 0.6), g, mixHex(g, '#FF3B00', 0.35)], good: colorOf('good'), flame: ['#FFE680', '#FF9F0A', '#FF453A'], body: '#4A4A55', muscle: '#34343D', hot: ['#FFB340', '#FF375F'], font: CARD_FONT };
     c.bodyRamp = [[0, '#040406'], [BD_MID.dark, '#5C5F6A'], [1, '#C8CBD3']];
   }
   return Object.assign(c, { k, label, rtl: RTL, id: `cd${++cardSeq}` });
@@ -3547,11 +3549,18 @@ const cx_ = (c, x, w = 0) => c.rtl ? CARD_W - x - w : x;
 const grad = (id, cols, v = true) => `<linearGradient id="${id}" x1="0" y1="0" x2="${v ? 0 : 1}" y2="${v ? 1 : 0}">${cols.map((col, i) => `<stop offset="${i / (cols.length - 1)}" stop-color="${col}"/>`).join('')}</linearGradient>`;
 const glow = (id, col, op) => `<radialGradient id="${id}"><stop offset="0" stop-color="${col}" stop-opacity="${op}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient>`;
 // light rays from a point, for the records and milestone cards
-const rays = (x, y, r, col, op) => Array.from({ length: 16 }, (_, i) => `<path d="M${x} ${y}L${x + r * Math.cos((i * 22.5 - 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 - 3) * Math.PI / 180)}L${x + r * Math.cos((i * 22.5 + 3) * Math.PI / 180)} ${y + r * Math.sin((i * 22.5 + 3) * Math.PI / 180)}Z" fill="${col}" opacity="${op}"/>`).join('');
+let rayN = 0;
+function rays(x, y, r, col, op) {
+  const id = `ray${++rayN}`, wedge = (deg, half, len) => { const a = (deg - half) * Math.PI / 180, b = (deg + half) * Math.PI / 180; return `M${x} ${y}L${(x + len * Math.cos(a)).toFixed(1)} ${(y + len * Math.sin(a)).toFixed(1)}L${(x + len * Math.cos(b)).toFixed(1)} ${(y + len * Math.sin(b)).toFixed(1)}Z`; };
+  let d = '';
+  for (let i = 0; i < 24; i++) d += wedge(i * 15 - 90, i % 2 ? 1.1 : 2, i % 2 ? r * 0.78 : r);
+  return `<defs><radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${x}" cy="${y}" r="${r}"><stop offset="0" stop-color="${col}" stop-opacity="${Math.min(1, op * 3.2).toFixed(2)}"/><stop offset=".5" stop-color="${col}" stop-opacity="${(op * 1.4).toFixed(2)}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient></defs><path d="${d}" fill="url(#${id})"/>`;
+}
 function cardFrame(c, inner, defs = '') {
+  const tone = c.tone || c.accent;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CARD_W} ${CARD_H}" width="${CARD_W}" height="${CARD_H}" font-family="${c.font}" role="img" aria-label="${esc(c.label)}">
-<defs>${grad(c.id + 'bg', [c.bg2, c.bg1])}<filter id="${c.id}blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter>${defs}</defs><rect width="${CARD_W}" height="${CARD_H}" rx="26" fill="url(#${c.id}bg)"/>${inner}
-<rect x=".75" y=".75" width="${CARD_W - 1.5}" height="${CARD_H - 1.5}" rx="25.5" fill="none" stroke="${c.line}" stroke-width="1.5"/>${ctext({ ...c, rtl: false }, 180, 432, 'LIFTING SANITY', { size: 10.5, weight: 800, fill: c.dim, ls: 3.2 })}</svg>`;
+<defs>${grad(c.id + 'bg', [c.bg2, c.bg1, mixHex(c.bg1, '#000000', 0.28)])}<radialGradient id="${c.id}top" cx="50%" cy="0%" r="75%"><stop offset="0" stop-color="${tone}" stop-opacity=".2"/><stop offset=".55" stop-color="${tone}" stop-opacity=".05"/><stop offset="1" stop-color="${tone}" stop-opacity="0"/></radialGradient><linearGradient id="${c.id}edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".26"/><stop offset=".4" stop-color="#FFFFFF" stop-opacity=".07"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".04"/></linearGradient><clipPath id="${c.id}clip"><rect width="${CARD_W}" height="${CARD_H}" rx="26"/></clipPath><filter id="${c.id}blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter>${defs}</defs><g clip-path="url(#${c.id}clip)"><rect width="${CARD_W}" height="${CARD_H}" fill="url(#${c.id}bg)"/><rect width="${CARD_W}" height="${CARD_H}" fill="url(#${c.id}top)"/>${inner}</g>
+<rect x=".75" y=".75" width="${CARD_W - 1.5}" height="${CARD_H - 1.5}" rx="25.5" fill="none" stroke="${styleNow() === 'y2k' ? c.line : `url(#${c.id}edge)`}" stroke-width="1.5"/>${ctext({ ...c, rtl: false }, 180, 432, 'LIFTING SANITY', { size: 10.5, weight: 800, fill: c.dim, ls: 3.2 })}</svg>`;
 }
 /* ----- the body on the cards: the same render and outlines as the app's pictures (body.js). A card is shared as a
    picture drawn from its SVG, which can't look outside itself, so each card carries its own filters and outlines ----- */
@@ -3581,48 +3590,60 @@ function bodyArt(c, view, groups, x, y, h, box = BD_BOX, src = 'dark') {
   if (lit) defs += glowFilter(id + 'g', 10);
   return `<svg class="bd" x="${x}" y="${y}" width="${+(h * bw / bh).toFixed(1)}" height="${h}" viewBox="${box}" overflow="visible" aria-hidden="true"><defs>${defs}</defs>${out}</svg>`;
 }
-// the muscles worked in warm colours, deeper for more sets; the most-worked glow
+// the four steps of "how worked": from a soft tint of the body's own grey to the full colour. Each is a solid shade
+// of one hue, painted at full strength
+const heatCols = c => { const base = mixHex(c.bodyRamp[1][1], '#FFFFFF', 0.18); return [0.16, 0.4, 0.7, 1].map(t => mixHex(base, c.hot[1], t)); };
+// the muscles worked, in one colour that gets clearer with more sets; the most-worked glow
 function cardBody(c, view, heat, x, y, h, box) {
-  const lv = [[], [], [], []];
+  const lv = [[], [], [], []], cols = heatCols(c);
   for (const [k, t] of Object.entries(heat)) lv[t < 0.45 ? 0 : t < 0.65 ? 1 : t < 0.85 ? 2 : 3].push(k);
-  return bodyArt(c, view, lv.map((keys, i) => [hitRamp(mixHex(c.hot[0], c.hot[1], [0.2, 0.45, 0.75, 1][i]), 'dark'), keys, i >= 2, [0.45, 0.62, 0.82, 1][i]]), x, y, h, box);
+  return bodyArt(c, view, lv.map((keys, i) => [hitRamp(cols[i], 'dark'), keys, i === 3]), x, y, h, box);
 }
 function cardWorkout(st) {
   const c = cardCtx('workout', T('The workout')), { w } = st, unitTxt = ' ' + U();
   const v = Math.round(isLb() ? st.vol * KG_LB : st.vol), num = v.toLocaleString(LOC);
-  let h = ctext(c, 180, 46, `${T('Workout #{n}', { n: st.n })} · ${fmtShort(w.start)}`.toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
-  h += ctext(c, 180, 82, w.name, { size: 28, weight: 800, max: 312 });
-  h += ctext(c, 180, 112, T('Weight lifted').toLocaleUpperCase(LOC), { size: 10, weight: 700, fill: c.ink2, ls: 1.6, max: 300 });
-  const s = fitText(num + unitTxt, 300, 46, 900, c.font, 26)[1];
+  let h = ctext(c, 180, 42, `${T('Workout #{n}', { n: st.n })} · ${fmtShort(w.start)}`.toLocaleUpperCase(LOC), { size: 11.5, weight: 800, fill: c.accent, ls: 1.6, max: 300 });
+  h += ctext(c, 180, 75, w.name, { size: 26, weight: 800, max: 312 });
+  h += ctext(c, 180, 102, T('Weight lifted').toLocaleUpperCase(LOC), { size: 9.5, weight: 700, fill: c.ink2, ls: 1.6, max: 300 });
+  const s = fitText(num + unitTxt, 300, 44, 900, c.font, 26)[1];
   const numT = `<tspan data-count="${v}" data-fmt="int">${esc(num)}</tspan>`, unitT = `<tspan font-size="${Math.round(s * 0.5)}" font-weight="700" fill="${c.ink2}">${esc(unitTxt)}</tspan>`;
-  h += `<text x="180" y="156" font-size="${s}" font-weight="900" fill="${c.ink}" text-anchor="middle">${c.rtl && /[\u0600-\u06ff]/.test(unitTxt) ? `<tspan font-size="${Math.round(s * 0.5)}" font-weight="700" fill="${c.ink2}">${esc(U())} </tspan>${numT}` : numT + unitT}</text>`;
+  h += `<text x="180" y="143" font-size="${s}" font-weight="900" fill="${c.ink}" text-anchor="middle">${c.rtl && /[؀-ۿ]/.test(unitTxt) ? `<tspan font-size="${Math.round(s * 0.5)}" font-weight="700" fill="${c.ink2}">${esc(U())} </tspan>${numT}` : numT + unitT}</text>`;
+  // "as heavy as…" on a pill of its own
   const heavy = heavyAs(st.vol);
-  if (heavy) h += ctext(c, 180, 180, heavy, { size: 12.5, weight: 700, fill: c.gold[1], max: 300 });
+  if (heavy) {
+    const [t, fs] = fitText(heavy, 276, 12, 700, c.font, 9), wd = textW(t, fs, 700, c.font) + 24;
+    h += `<rect x="${180 - wd / 2}" y="154" width="${wd}" height="24" rx="12" fill="${c.gold[1]}" fill-opacity=".14"/>` + ctext(c, 180, 170.5, t, { size: fs, weight: 700, fill: c.gold[1] });
+  }
+  // the numbers, each on its own tile
   const stats = [[fmtDuration(st.dur), T('Time'), `data-count="${st.dur}" data-fmt="dur"`], [st.sets, T('Working sets'), `data-count="${st.sets}" data-fmt="num"`]];
   if (st.reps) stats.push([st.reps, T('Reps'), `data-count="${st.reps}" data-fmt="int"`]);
   if (st.prs.length) stats.push([st.prs.length, T('Records'), '', c.gold[1]]);
-  const cw = 312 / stats.length;
+  const cw = 316 / stats.length;
   stats.forEach(([val, label, attrs, fill], i) => {
-    const x = 24 + cw * (i + 0.5);
-    h += `<text x="${c.rtl ? CARD_W - x : x}" y="222" font-size="${fitText(String(val), cw - 8, 21, 800, c.font, 14)[1]}" font-weight="800" fill="${fill || c.ink}" text-anchor="middle"><tspan ${attrs}>${esc(bidi(c, String(val)))}</tspan></text>`;
-    h += ctext(c, x, 239, label.toLocaleUpperCase(LOC), { size: 9, weight: 700, fill: c.ink2, ls: 1, max: cw - 6 });
+    const x = 22 + cw * (i + 0.5);
+    h += `<rect x="${cx_(c, 22 + cw * i + 3, cw - 6)}" y="188" width="${cw - 6}" height="48" rx="13" fill="${fill || '#FFFFFF'}" fill-opacity="${fill ? 0.12 : 0.055}"/>`;
+    h += `<text x="${c.rtl ? CARD_W - x : x}" y="210" font-size="${fitText(String(val), cw - 16, 19, 800, c.font, 13)[1]}" font-weight="800" fill="${fill || c.ink}" text-anchor="middle"><tspan ${attrs}>${esc(bidi(c, String(val)))}</tspan></text>`;
+    h += ctext(c, x, 226, label.toLocaleUpperCase(LOC), { size: 8.5, weight: 700, fill: c.ink2, ls: 0.8, max: cw - 14 });
   });
-  // the muscles worked, front and back
+  // the muscles worked, front and back, standing in their own light
   const heat = bodyHeat(st.muscles);
-  h += cardBody(c, 'front', heat, 96, 250, 154) + cardBody(c, 'back', heat, 184, 250, 154);
+  h += `<ellipse cx="180" cy="322" rx="150" ry="92" fill="url(#${c.id}r)"/><ellipse cx="180" cy="398" rx="96" ry="7" fill="#000000" fill-opacity=".28" filter="url(#${c.id}blur)"/>`;
+  h += cardBody(c, 'front', heat, 96, 246, 154) + cardBody(c, 'back', heat, 184, 246, 154);
   if (st.muscles.length) h += ctext(c, 180, 414, st.muscles.slice(0, 3).map(([m, n]) => `${MUSCLES[m]} ${trimNum(n, 1)}`).join(' · '), { size: 11, weight: 600, fill: c.ink2, max: 312 });
-  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h) };
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, glow(c.id + 'r', c.hot[1], 0.16)) };
 }
 // a filled trophy on a 100-unit grid
 const TROPHY = (f, x, y, sc) => `<g transform="translate(${x} ${y}) scale(${sc})"><path d="M26 18H12v8c0 11 8 18 18 18M74 18h14v8c0 11-8 18-18 18" fill="none" stroke="${f}" stroke-width="7" stroke-linecap="round"/><path d="M24 8h52v26c0 16-12 30-26 30S24 50 24 34Z" fill="${f}"/><path d="M44 62h12v14H44Z" fill="${f}"/><path d="M30 80h40a4 4 0 0 1 4 4v8H26v-8a4 4 0 0 1 4-4Z" fill="${f}"/><path d="M36 16v16c0 6 3 11 8 14" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"/></g>`;
 function cardRecords(st) {
   const c = cardCtx('records', T('New records')), n = st.prs.length, g = `url(#${c.id}g)`;
+  c.tone = c.gold[1];
   let h = `<circle cx="180" cy="96" r="170" fill="url(#${c.id}r)"/>${rays(180, 96, 190, c.gold[1], 0.07)}`;
   h += TROPHY(g, 140, 46, 0.8);
   h += `<text x="180" y="190" font-size="50" font-weight="900" fill="${g}" text-anchor="middle">${n}</text>`;
   h += ctext(c, 180, 214, TN(n, 'New record', 'New records').toLocaleUpperCase(LOC), { size: 12, weight: 800, fill: c.gold[1], ls: 2.4, max: 300 });
   st.prs.slice(0, 4).forEach((p, i) => {
     const y = 250 + i * 40, k = getEx(p.exId).k, plus = gainPlus(p, k);
+    h += `<rect x="16" y="${y - 17}" width="328" height="37" rx="13" fill="#FFFFFF" fill-opacity=".05"/>`;
     h += ctext(c, 28, y, getEx(p.exId).name, { size: 14.5, weight: 700, anchor: 'start', max: plus ? 196 : 300 });
     h += ctext(c, 28, y + 17, `${recKind(p.kind)} · ${gainNow(p, k)}`, { size: 11.5, weight: 600, fill: c.ink2, anchor: 'start', max: plus ? 196 : 300 });
     if (plus) {
@@ -3694,6 +3715,7 @@ function cardCompare(st) {
 function cardMilestone(st) {
   const c = cardCtx('milestone', T('Milestone')), g = `url(#${c.id}g)`, byCount = !!st.count;
   const big = byCount ? String(st.n) : compact(st.mark), small = byCount ? (st.n === 1 ? T('First') : T('Workouts')) : U();
+  c.tone = c.gold[1];
   let h = `<circle cx="180" cy="150" r="170" fill="url(#${c.id}r)"/>${rays(180, 150, 200, c.gold[1], 0.08)}`;
   h += `<path d="M146 196L128 262L152 250L166 270L178 210Z" fill="${c.accent}"/><path d="M214 196L232 262L208 250L194 270L182 210Z" fill="${c.accent}" fill-opacity=".8"/>`;
   h += `<circle cx="180" cy="150" r="74" fill="${g}"/><circle cx="180" cy="150" r="61" fill="${c.bg1}"/><circle cx="180" cy="150" r="55" fill="none" stroke="${g}" stroke-width="1.5" stroke-dasharray="2 5"/>`;
@@ -3751,7 +3773,7 @@ function cardMuscles(st) {
   h += `<rect x="${cx_(c, 110, 140)}" y="378" width="140" height="7" rx="3.5" fill="url(#${c.id}h)"/>`;
   h += ctext(c, 102, 385, T('fewer sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'end', max: 80 }) + ctext(c, 258, 385, T('more sets'), { size: 9.5, weight: 700, fill: c.dim, anchor: 'start', max: 80 });
   if (n) h += ctext(c, 180, 410, st.muscles.slice(0, 4).map(([m, k]) => `${MUSCLES[m]} ${trimNum(k, 1)}`).join(' · '), { size: 11.5, weight: 700, max: 312 });
-  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'h', c.hot, false) + glow(c.id + 'r', c.hot[1], 0.16)) };
+  return { k: c.k, label: c.label, bg: c.bg1, svg: cardFrame(c, h, grad(c.id + 'h', heatCols(c), false) + glow(c.id + 'r', c.hot[1], 0.16)) };
 }
 // the exercises with some history, as small charts of the best set each time (est. 1RM, reps, time or distance)
 function progressRows(st) {
@@ -6527,6 +6549,10 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 48, items: [
+    ['flame', 'A better-looking finish', 'The end of a workout is cleaner: light in your own accent colour with gold close around the medal, running right up under the status bar. The cards follow your background colour, with finer rays and a glassy edge, the workout’s numbers sit on tiles, and each record has a row of its own.'],
+    ['dumbbell', 'The body, redrawn', 'On the cards the muscles you worked are one colour that gets clearer with more sets, in place of the see-through orange that turned brown. Everywhere, a highlighted muscle keeps its shape and fibres under the colour, and its glow stays close instead of fogging out past the body.']
+  ] },
   { v: 47, items: [
     ['trophy', 'Ranks from what lifters really log', 'The standards for 29 common exercises (machine fly, chest press, pulldown, rows, leg press, leg extension, leg curls, curls, pushdowns, lateral raises, calf raises and more) now come from millions of lifts logged on Strength Level, matched level for level against the same lifters’ squat, bench press or deadlift. Calf raises and the hip machines get a rank too.'],
     ['flask', 'Honest about it', 'The old rules of thumb were too easy on isolation machines, so some of your ranks will drop: a leg extension is about 76% of a squat, not 60%, and a machine lateral raise about 60% of a bench press, not 45%. Each exercise says where its standard comes from, and that logged lifts are self-reported.']
