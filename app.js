@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -5981,6 +5981,8 @@ function exerciseSheet(exId) {
 const RK = window.LS_RANKS;
 const rankOn = () => !!(RK && state.settings.ranks && state.body && state.body.bw > 0);
 const tierName = i => T(RK.TIERS[i].name);
+// what a rank's symbol is and what it stands for: "Anvil: strength being forged"
+const tierMean = i => T('{symbol}: {meaning}', { symbol: T(RK.TIERS[i].sym), meaning: T(RK.TIERS[i].mean) });
 const tierColor = i => RK.TIERS[i].c[1];
 let embSeq = 0;
 // at list sizes (xs) the emblem leaves out its glow, rays and sparkles
@@ -6139,12 +6141,14 @@ function ranksSection() {
 }
 // every rank, grouped by how sure it is, and how they work
 function ranksSheet() {
+  const st = { pick: null };
   openSheet({
     cls: 'rank-sheet', label: T('Your ranks'),
     render: () => {
       const rows = rankTable(), groups = [['data', T('From competition records')], ['est', T('Estimated from the big lifts')], ['logs', T('From lifters’ logs: machines and cables')], ['rough', T('Rough: machines and cables')]];
       return `${sheetHead(T('Your ranks'))}<div class="sheet-body pad">
-        <div class="rank-tiers">${RK.TIERS.map((t, i) => `<span>${emblem(i, 'sm')}<small>${tierName(i)}</small></span>`).join('')}</div>
+        <div class="rank-tiers" role="group" aria-label="${T('The nine ranks')}">${RK.TIERS.map((t, i) => `<button class="${st.pick === i ? 'on' : ''}" data-a="tier" data-i="${i}" aria-pressed="${st.pick === i}">${emblem(i, 'sm')}<small>${tierName(i)}</small></button>`).join('')}</div>
+        <p class="rank-mean" role="status">${st.pick == null ? T('Tap a rank to see what it stands for.') : `<b style="color:${tierColor(st.pick)}">${tierName(st.pick)}</b> · ${tierMean(st.pick)}`}</p>
         ${groups.map(([c, h]) => { const g = rows.filter(o => o.b.conf === c); return g.length ? `<h3 class="sub-h">${h}</h3><div class="rank-list">${g.map(rankRow).join('')}</div>` : ''; }).join('')}
         ${(ups => ups.length ? `<h3 class="sub-h">${T('Rank-ups')}</h3><div class="rank-ups">${ups.slice(0, 30).map(u => `<button class="rank-up-row" data-a="openEx" data-id="${u.id}">${emblem(u.to, 'sm')}<span class="rank-up-t"><b>${esc(getEx(u.id).name)}</b><small>${tierName(u.from)} → <span style="color:${tierColor(u.to)}">${tierName(u.to)}</span></small></span><small class="rank-up-d">${esc(fmtShort(u.at))}</small></button>`).join('')}</div>` : '')(rankUpHistory())}
         <h3 class="sub-h">${T('How ranks work')}</h3>
@@ -6160,7 +6164,7 @@ function ranksSheet() {
         <div class="rank-src">${RK.SOURCES.map(([h, items]) => `<details><summary><span>${T(h)}</span><small>${items.length}</small></summary><ul>${items.map(([k, note]) => `<li>${rankRef(k)}<span class="rs-t" lang="en">${esc(RK.REFS[k].title)}</span><span class="rs-n">${esc(T(note))}</span></li>`).join('')}</ul></details>`).join('')}</div>
         <div class="row-btns left"><button class="btn" data-a="details">${T('Your details')}</button></div></div>`;
     },
-    actions: { details: () => rankSetup() }
+    actions: { details: () => rankSetup(), tier: (b, d) => { const i = +b.dataset.i; st.pick = st.pick === i ? null : i; haptic(); refreshSheet(d); } }
   });
 }
 // a source behind the ranks: a link where there's one to give
@@ -6190,7 +6194,7 @@ function rankBlock(id) {
     : b.conf === 'est' ? T('Estimated from the {lift} standards: this is usually about {p}% of it.', { lift, p: Math.round(b.r * 100) })
     : T('Rough: estimated from the {lift} standards at about {p}%, and machines differ.', { lift, p: Math.round(b.r * 100) });
   return `<section class="rank-ex">
-    <div class="rank-ex-top">${emblem(Math.max(0, cur), cur < 0 ? 'md dim' : 'md')}<div><span class="eyebrow">${T('Rank')}</span><b ${cur >= 0 ? `style="color:${tierColor(cur)}"` : ''}>${cur >= 0 ? tierName(cur) + (b.conf === 'rough' ? ' ≈' : '') : T('Not ranked yet')}</b>
+    <div class="rank-ex-top">${emblem(Math.max(0, cur), cur < 0 ? 'md dim' : 'md')}<div><span class="eyebrow">${T('Rank')}</span><b ${cur >= 0 ? `style="color:${tierColor(cur)}"` : ''}>${cur >= 0 ? tierName(cur) + (b.conf === 'rough' ? ' ≈' : '') : T('Not ranked yet')}</b>${cur >= 0 ? `<small class="rank-ex-mean">${tierMean(cur)}</small>` : ''}
       <small>${o ? `${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${b.per ? ' ' + perText(b) : ''} · ${esc(rankNext(o))}` : T('Log a set to get a rank.')}</small></div></div>
     <ol class="rank-ladder">${lad.map((v, i) => `<li class="${i === cur ? 'on' : ''}" style="--tc:${tierColor(i)}">${emblem(i, 'xs')}<span class="rl-n">${tierName(i)}</span><b dir="ltr">${i ? fmtW(v, 0) + '+' : '—'}</b></li>`).reverse().join('')}</ol>
     <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
@@ -6549,6 +6553,9 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 49, items: [
+    ['trophy', 'Ranks that mean something', 'Each rank has a symbol of its own now, telling the way up: a seedling, an anvil, a barbell, a sun, a summit, a diamond, a trophy, Atlas carrying the sky and a thunderbolt. Tap a rank under Your ranks to see what it stands for; an exercise’s rank says it too.']
+  ] },
   { v: 48, items: [
     ['flame', 'A better-looking finish', 'The end of a workout is cleaner: light in your own accent colour with gold close around the medal, running right up under the status bar. The cards follow your background colour, with finer rays and a glassy edge, the workout’s numbers sit on tiles, and each record has a row of its own.'],
     ['dumbbell', 'The body, redrawn', 'On the cards the muscles you worked are one colour that gets clearer with more sets, in place of the see-through orange that turned brown. Everywhere, a highlighted muscle keeps its shape and fibres under the colour, and its glow stays close instead of fogging out past the body.']

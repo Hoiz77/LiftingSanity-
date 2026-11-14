@@ -18,15 +18,15 @@
    No app state is used here: basis(ex, pattern) needs { name, eq, k, uni }, and ladder() a profile { sex, bw, age }. */
 window.LS_RANKS = (() => {
   const TIERS = [
-    { id: 'wood', name: 'Wood', c: ['#C7A982', '#7E5B3A', '#3F2A18'], ink: '#F3E3CC', glow: '#9C7650' },
-    { id: 'bronze', name: 'Bronze', c: ['#FFCFA3', '#E07B34', '#7A3510'], ink: '#FFF3E8', glow: '#F08A40' },
-    { id: 'silver', name: 'Silver', c: ['#FFFFFF', '#B9C3CE', '#5F6B78'], ink: '#FFFFFF', glow: '#C9D6E3' },
-    { id: 'gold', name: 'Gold', c: ['#FFF6B8', '#F5BE16', '#946100'], ink: '#FFFBEA', glow: '#FFC93C' },
-    { id: 'platinum', name: 'Platinum', c: ['#E9FFFB', '#5ED6C6', '#156E68'], ink: '#F2FFFD', glow: '#5EE0CF' },
-    { id: 'diamond', name: 'Diamond', c: ['#E8F8FF', '#5AB8FF', '#1A44B8'], ink: '#F3FBFF', glow: '#61B8FF' },
-    { id: 'champion', name: 'Champion', c: ['#FFD3E0', '#FF3D6E', '#7D0A33'], ink: '#FFF0F4', glow: '#FF4F7E' },
-    { id: 'titan', name: 'Titan', c: ['#EBDDFF', '#9A5BFF', '#3A138C'], ink: '#F7F0FF', glow: '#A970FF' },
-    { id: 'olympian', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
+    { id: 'wood', sym: 'Seedling', mean: 'everyone starts here', name: 'Wood', c: ['#C7A982', '#7E5B3A', '#3F2A18'], ink: '#F3E3CC', glow: '#9C7650' },
+    { id: 'bronze', sym: 'Anvil', mean: 'strength being forged', name: 'Bronze', c: ['#FFCFA3', '#E07B34', '#7A3510'], ink: '#FFF3E8', glow: '#F08A40' },
+    { id: 'silver', sym: 'Barbell', mean: 'at home under the bar', name: 'Silver', c: ['#FFFFFF', '#B9C3CE', '#5F6B78'], ink: '#FFFFFF', glow: '#C9D6E3' },
+    { id: 'gold', sym: 'Sun', mean: 'strong enough to compete', name: 'Gold', c: ['#FFF6B8', '#F5BE16', '#946100'], ink: '#FFFBEA', glow: '#FFC93C' },
+    { id: 'platinum', sym: 'Summit', mean: 'mid-pack among competitors', name: 'Platinum', c: ['#E9FFFB', '#5ED6C6', '#156E68'], ink: '#F2FFFD', glow: '#5EE0CF' },
+    { id: 'diamond', sym: 'Diamond', mean: 'ahead of most competitors', name: 'Diamond', c: ['#E8F8FF', '#5AB8FF', '#1A44B8'], ink: '#F3FBFF', glow: '#61B8FF' },
+    { id: 'champion', sym: 'Trophy', mean: 'top 15% of competitors', name: 'Champion', c: ['#FFD3E0', '#FF3D6E', '#7D0A33'], ink: '#FFF0F4', glow: '#FF4F7E' },
+    { id: 'titan', sym: 'Atlas', mean: 'top 5% of competitors', name: 'Titan', c: ['#EBDDFF', '#9A5BFF', '#3A138C'], ink: '#F7F0FF', glow: '#A970FF' },
+    { id: 'olympian', sym: 'Thunderbolt', mean: 'top 1% of competitors', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
   ];
   // [a, b] for a × bodyweight^b, at the 15th, 40th, 65th, 85th, 95th and 99th percentiles (kg)
   const FITS = {
@@ -410,16 +410,21 @@ window.LS_RANKS = (() => {
   const CENTRE = [[60, 66], [60, 66], [60, 66], [60, 66], [60, 66], [60, 62], [60, 66], [60, 66], [60, 66]];
   // the symbols, as before but redrawn a little finer
   function chev(y, w = 22, h = 11, t = 9) { return `M${60 - w} ${y}L60 ${y + h}L${60 + w} ${y}L${60 + w} ${y + t}L60 ${y + h + t}L${60 - w} ${y + t}Z`; }
+  // What each rank stands for, on the way up: a seedling (everyone starts by growing), an anvil (strength being forged),
+  // a barbell (at home under the bar), a sun (it shows), a summit (the peak in sight), a diamond (made under pressure),
+  // a trophy (you'd place), Atlas with the sky on his shoulders (carrying what few can) and a thunderbolt (the top of
+  // Olympus). {d} is the rank's dark shade, for lines cut into a symbol
+  const sun = (cx, cy) => { let d = ''; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6 - Math.PI / 2, r1 = k % 2 ? 23.5 : 29, w = 0.17; d += `M${f1(cx + 16.5 * Math.cos(a - w))} ${f1(cy + 16.5 * Math.sin(a - w))}L${f1(cx + r1 * Math.cos(a))} ${f1(cy + r1 * Math.sin(a))}L${f1(cx + 16.5 * Math.cos(a + w))} ${f1(cy + 16.5 * Math.sin(a + w))}Z`; } return d; };
   const SYM = [
-    `<circle cx="60" cy="66" r="20" fill="none" stroke-width="3.4"/><circle cx="60" cy="66" r="12" fill="none" stroke-width="2.8"/><circle cx="60" cy="66" r="5"/>`,
-    `<path d="${chev(55, 25, 14, 11)}"/>`,
-    `<path d="${chev(48)}"/><path d="${chev(66)}"/>`,
-    `<path d="${star(60, 47, 13)}"/><path d="${chev(64, 21, 10, 8)}"/><path d="${chev(79, 21, 10, 8)}"/>`,
-    `<circle cx="60" cy="66" r="22" fill="none" stroke-width="3.6"/><path d="${star(60, 66, 15.5)}"/>`,
+    `<g fill="none" stroke-width="1.5" opacity=".38"><circle cx="60" cy="68" r="28"/><circle cx="60" cy="68" r="20"/></g><path d="M58.2 97L58.2 64.5Q60 62.5 61.8 64.5L61.8 97Z"/><path d="M60 75C46 76 37 67 35 52C49 51 58 60 60 75Z"/><path d="M60 65C61 50 70 42 84 41C85 55 76 64 60 65Z"/><path d="M45 98Q60 89 75 98Z"/>`,
+    `<path d="M27 56L40 50L86 50L86 60C76 60 70 64 69 71L69 77L81 87L81 94L39 94L39 87L51 77L51 71C50 65 42 62 27 60Z"/><path d="M39 87L81 87" fill="none" stroke="{d}" stroke-opacity=".45" stroke-width="1.4"/><path d="${glint(73, 38, 7.5)}"/><path d="${glint(58, 41, 3.6)}"/>`,
+    `<rect x="27" y="63.5" width="66" height="5" rx="2.2"/><rect x="39" y="45" width="9" height="42" rx="3.2"/><rect x="72" y="45" width="9" height="42" rx="3.2"/><rect x="31" y="52" width="6.5" height="28" rx="2.6"/><rect x="82.5" y="52" width="6.5" height="28" rx="2.6"/><path d="M43.5 49L43.5 83M76.5 49L76.5 83" fill="none" stroke="{d}" stroke-opacity=".35" stroke-width="1.6"/>`,
+    `<circle cx="60" cy="66" r="12.5"/><path d="${sun(60, 66)}"/><circle cx="60" cy="66" r="7.5" fill="none" stroke="{d}" stroke-opacity=".35" stroke-width="1.4"/>`,
+    `<path d="M31 93L52 57L61 71L70 49L90 93Z"/><path d="M70 49L63.5 64L69 60.5L72.5 66.5L76.6 61Z" fill="{d}" stroke="none" opacity=".4"/><path d="M52 57L47.5 66L52 63.5L55.2 67.4L56.6 64Z" fill="{d}" stroke="none" opacity=".4"/><path d="${star(86, 42, 6.8)}"/>`,
     `<path d="M39 55L48 42L72 42L81 55L60 90Z"/><path d="M39 55L81 55M48 42L55 55L60 90M72 42L65 55L60 90M55 55L60 42L65 55" fill="none" stroke="#1A44B8" stroke-opacity=".45" stroke-width="1.4"/>`,
-    `<path d="M44 46L76 46L75 60C74 72 68 78 60 79C52 78 46 72 45 60Z"/><path d="M44 50C34 50 33 64 46 67M76 50C86 50 87 64 74 67" fill="none" stroke-width="3.4"/><path d="M56 79L64 79L65 87L55 87Z"/><rect x="47" y="87" width="26" height="7" rx="2"/>`,
-    `<path d="M40 88C38 67 46 53 60 53C74 53 82 67 80 88L68 88L68 75L52 75L52 88Z"/><path d="M44 59C33 55 29 44 31 33C36 42 43 46 50 51Z"/><path d="M76 59C87 55 91 44 89 33C84 42 77 46 70 51Z"/>`,
-    `<path d="M60 36C71 46 73 55 66 63C68 55 64 51 60 47C58 53 51 55 54 63C47 57 49 46 60 36Z"/><path d="M49 65L71 65L66 75L54 75Z"/><path d="M55 77L65 77L62 100L58 100Z"/>`
+    `<path d="M44 46L76 46L75 60C74 72 68 78 60 79C52 78 46 72 45 60Z"/><path d="M44 50C34 50 33 64 46 67M76 50C86 50 87 64 74 67" fill="none" stroke-width="3.4"/><path d="M56 79L64 79L65 87L55 87Z"/><rect x="47" y="87" width="26" height="7" rx="2"/><path d="${star(60, 60, 6.5)}" fill="{d}" stroke="none" opacity=".5"/>`,
+    `<circle cx="60" cy="51" r="15.5"/><g fill="none" stroke="{d}" stroke-opacity=".5" stroke-width="1.3"><ellipse cx="60" cy="51" rx="6.6" ry="15.5"/><path d="M44.5 51L75.5 51M47 43.4L73 43.4M47 58.6L73 58.6"/></g><path d="M36 97C35 83 40 75 47 71L41 60L47.5 56.5L55 69L65 69L72.5 56.5L79 60L73 71C80 75 85 83 84 97L73 97C73 89 70 83 66 81L54 81C50 83 47 89 47 97Z"/>`,
+    `<path d="M69 31L41 71L57 71L49 102L81 60L64 60L74 31Z"/>`
   ];
   // facet lines on the diamond's face and its symbol
   const FACETS = `<path d="M21 18L60 34L99 18M14 56L60 34L106 56M60 34L60 132" fill="none" stroke-width="1"/>`;
@@ -481,7 +486,7 @@ window.LS_RANKS = (() => {
     // rivets on the lower tiers
     if (i <= 2) body += `<g fill="url(#${u}rim)" stroke="${mixc(lo, '#000000', 0.4)}" stroke-width=".6">${[[29, 27], [91, 27], [60, 117]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6"/><circle cx="${f1(x - 0.8)}" cy="${f1(y - 0.8)}" r=".9" fill="#FFFFFF" stroke="none" opacity=".8"/>`).join('')}</g>`;
     // the symbol, embossed
-    const sym = `<g fill="url(#${u}sym)" stroke="url(#${u}sym)" stroke-linejoin="round" filter="url(#${u}emb)">${SYM[i]}</g>`;
+    const sym = `<g fill="url(#${u}sym)" stroke="url(#${u}sym)" stroke-linejoin="round" filter="url(#${u}emb)">${SYM[i].replace(/\{d\}/g, mixc(lo, '#000000', 0.25))}</g>`;
     const gloss = `<path d="M28 26L60 15L92 26L92 46C76 55 44 55 28 46Z" fill="url(#${u}gloss)" opacity=".45" clip-path="url(#${u}cl)"/>`;
     const g = GEM[i] ? gem(u, ...GEM[i]) : '';
     const sparks = !small && i >= 5 ? `<g fill="#FFFFFF">${[[18, 14, 5], [103, 12, 4], [108, 100, 4.4], [12, 96, 3.4]].map(([x, y, r]) => `<path d="${glint(x, y, r)}"/>`).join('')}</g>` : '';

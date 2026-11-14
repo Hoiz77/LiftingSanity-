@@ -85,7 +85,16 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   r.ok(Math.abs(after / before - 1.25) < 1e-6 && (await t.state()).exPrefs['lever-seated-fly'].rankAdj === 1, '“Heavy” raises its standards by a quarter, and is kept', { before, after });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
   await t.click('[data-a="rankAll"]', 600);
-  r.ok(await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet'); return s && s.querySelectorAll('.rank-tiers > span').length === 9 && /OpenPowerlifting/.test(s.textContent) && /From lifters’ logs: machines/.test(s.textContent); }), 'All your ranks: the nine ranks, your lifts by how sure they are, and how ranks work (with the data’s source)');
+  r.ok(await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet'); return s && s.querySelectorAll('.rank-tiers > button').length === 9 && /OpenPowerlifting/.test(s.textContent) && /From lifters’ logs: machines/.test(s.textContent); }), 'All your ranks: the nine ranks, your lifts by how sure they are, and how ranks work (with the data’s source)');
+  // each rank stands for something: tap one and it says what (a second tap puts it away)
+  const tapHint = await t.text('#sheets .sheet-wrap.in .rank-mean');
+  await t.inSheet('.rank-tiers [data-i="1"]', 300);
+  const mean1 = await t.text('#sheets .sheet-wrap.in .rank-mean');
+  await t.inSheet('.rank-tiers [data-i="8"]', 300);
+  const mean8 = await t.text('#sheets .sheet-wrap.in .rank-mean');
+  await t.inSheet('.rank-tiers [data-i="8"]', 300);
+  const syms = await t.ev('RK.TIERS.map(t => t.sym).join()');
+  r.ok(/Tap a rank/.test(tapHint) && /Bronze · Anvil: strength being forged/.test(mean1) && /Olympian · Thunderbolt: top 1% of competitors/.test(mean8) && /Tap a rank/.test(await t.text('#sheets .sheet-wrap.in .rank-mean')) && syms === 'Seedling,Anvil,Barbell,Sun,Summit,Diamond,Trophy,Atlas,Thunderbolt', 'each rank has a symbol that stands for something: tap one and it says what', { tapHint, mean1, mean8, syms });
   const sources = await p.evaluate(() => { const s = document.querySelector('#sheets .sheet-wrap.in.rank-sheet .rank-src'); return s && { groups: [...s.querySelectorAll('summary span')].map(x => x.textContent), items: s.querySelectorAll('li').length, notes: [...s.querySelectorAll('li')].every(li => li.querySelector('.rs-t').textContent && li.querySelector('.rs-n').textContent), links: [...s.querySelectorAll('li a')].map(a => a.getAttribute('href')), open: s.querySelectorAll('details[open]').length }; });
   r.ok(sources && sources.groups.join('|') === 'Where the standards come from|Your bodyweight|Age|Women and men|Your estimated 1RM|Other exercises|Machines' && sources.items >= 35 && sources.notes && sources.links.length >= 28 && sources.links.every(u => /^https:\/\//.test(u)) && !sources.open, 'and its sources: 35+ studies and datasets in seven folded topics, each with its title, what it found and a link where there is one', sources && { ...sources, links: sources.links.length });
   await t.ev('closeAllSheets()'); await p.waitForTimeout(400);
