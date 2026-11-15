@@ -18,15 +18,15 @@
    No app state is used here: basis(ex, pattern) needs { name, eq, k, uni }, and ladder() a profile { sex, bw, age }. */
 window.LS_RANKS = (() => {
   const TIERS = [
-    { id: 'wood', sym: 'Seedling', mean: 'everyone starts here', name: 'Wood', c: ['#C7A982', '#7E5B3A', '#3F2A18'], ink: '#F3E3CC', glow: '#9C7650' },
-    { id: 'bronze', sym: 'Anvil', mean: 'strength being forged', name: 'Bronze', c: ['#FFCFA3', '#E07B34', '#7A3510'], ink: '#FFF3E8', glow: '#F08A40' },
-    { id: 'silver', sym: 'Barbell', mean: 'at home under the bar', name: 'Silver', c: ['#FFFFFF', '#B9C3CE', '#5F6B78'], ink: '#FFFFFF', glow: '#C9D6E3' },
-    { id: 'gold', sym: 'Sun', mean: 'strong enough to compete', name: 'Gold', c: ['#FFF6B8', '#F5BE16', '#946100'], ink: '#FFFBEA', glow: '#FFC93C' },
-    { id: 'platinum', sym: 'Summit', mean: 'mid-pack among competitors', name: 'Platinum', c: ['#E9FFFB', '#5ED6C6', '#156E68'], ink: '#F2FFFD', glow: '#5EE0CF' },
-    { id: 'diamond', sym: 'Diamond', mean: 'ahead of most competitors', name: 'Diamond', c: ['#E8F8FF', '#5AB8FF', '#1A44B8'], ink: '#F3FBFF', glow: '#61B8FF' },
-    { id: 'champion', sym: 'Trophy', mean: 'top 15% of competitors', name: 'Champion', c: ['#FFD3E0', '#FF3D6E', '#7D0A33'], ink: '#FFF0F4', glow: '#FF4F7E' },
-    { id: 'titan', sym: 'Atlas', mean: 'top 5% of competitors', name: 'Titan', c: ['#EBDDFF', '#9A5BFF', '#3A138C'], ink: '#F7F0FF', glow: '#A970FF' },
-    { id: 'olympian', sym: 'Thunderbolt', mean: 'top 1% of competitors', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
+    { id: 'wood', sym: 'Plaque', mean: 'everyone starts here', name: 'Wood', c: ['#C7A982', '#7E5B3A', '#3F2A18'], ink: '#F3E3CC', glow: '#9C7650' },
+    { id: 'bronze', sym: 'Two chevrons', mean: 'strength being forged', name: 'Bronze', c: ['#FFCFA3', '#E07B34', '#7A3510'], ink: '#FFF3E8', glow: '#F08A40' },
+    { id: 'silver', sym: 'Three chevrons', mean: 'at home under the bar', name: 'Silver', c: ['#FFFFFF', '#B9C3CE', '#5F6B78'], ink: '#FFFFFF', glow: '#C9D6E3' },
+    { id: 'gold', sym: 'First star', mean: 'strong enough to compete', name: 'Gold', c: ['#FFF6B8', '#F5BE16', '#946100'], ink: '#FFFBEA', glow: '#FFC93C' },
+    { id: 'platinum', sym: 'Wings', mean: 'mid-pack among competitors', name: 'Platinum', c: ['#E9FFFB', '#5ED6C6', '#156E68'], ink: '#F2FFFD', glow: '#5EE0CF' },
+    { id: 'diamond', sym: 'Brilliant cut', mean: 'ahead of most competitors', name: 'Diamond', c: ['#E8F8FF', '#5AB8FF', '#1A44B8'], ink: '#F3FBFF', glow: '#61B8FF' },
+    { id: 'champion', sym: 'Crown', mean: 'top 15% of competitors', name: 'Champion', c: ['#FFD3E0', '#FF3D6E', '#7D0A33'], ink: '#FFF0F4', glow: '#FF4F7E' },
+    { id: 'titan', sym: 'Horns', mean: 'top 5% of competitors', name: 'Titan', c: ['#EBDDFF', '#9A5BFF', '#3A138C'], ink: '#F7F0FF', glow: '#A970FF' },
+    { id: 'olympian', sym: 'Sun and laurel', mean: 'top 1% of competitors', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
   ];
   // [a, b] for a × bodyweight^b, at the 15th, 40th, 65th, 85th, 95th and 99th percentiles (kg)
   const FITS = {
@@ -384,9 +384,6 @@ window.LS_RANKS = (() => {
     return { tier: t, frac, score: t + (t === 8 ? 0 : frac), next: t < 8 ? lad[t + 1] : null };
   }
 
-  // ---------- the emblems: each rank has its own shape, a bevelled metal rim, a brushed face, an embossed symbol, and from
-  // Gold up a gem and a glow; the top ranks get wings, crystals, a laurel and rays. `small` leaves out what turns to noise
-  // at list sizes ----------
   const f1 = v => +v.toFixed(1);
   function star(cx, cy, r, k = 0.45, n = 5) {
     let d = '';
@@ -396,102 +393,89 @@ window.LS_RANKS = (() => {
   // a four-point glint
   const glint = (x, y, r) => `M${x} ${y - r}Q${x + r * 0.16} ${y - r * 0.16} ${x + r} ${y}Q${x + r * 0.16} ${y + r * 0.16} ${x} ${y + r}Q${x - r * 0.16} ${y + r * 0.16} ${x - r} ${y}Q${x - r * 0.16} ${y - r * 0.16} ${x} ${y - r}Z`;
   // the silhouettes, one per tier, on a 120 × 134 face centred at x = 60
-  const FRAME = [
-    'M60 9Q84 10 99 21L99 61C99 90 83 111 60 126C37 111 21 90 21 61L21 21Q36 10 60 9Z', // wood: a rounded board
-    'M60 7L100 20L100 61C100 92 83 113 60 128C37 113 20 92 20 61L20 20Z', // bronze: the heater shield
-    'M60 6L90 15L101 26L101 61C101 92 84 113 60 128C36 113 19 92 19 61L19 26L30 15Z', // silver: notched shoulders
-    'M60 0L69 10L101 20L101 61C101 92 84 114 60 129C36 114 19 92 19 61L19 20L51 10Z', // gold: a crest at the top
-    'M60 4L98 16L108 10L103 28L102 61C102 93 84 114 60 129C36 114 18 93 18 61L17 28L12 10L22 16Z', // platinum: flared shoulders
-    'M60 2L99 18L106 56L60 132L14 56L21 18Z', // diamond: a cut gem
-    'M60 7L100 20L100 61C100 92 83 113 60 128C37 113 20 92 20 61L20 20Z', // champion: the shield, crowned
-    'M60 4L84 10L104 6L100 26L102 62C101 92 84 114 60 130C36 114 19 92 18 62L20 26L16 6L36 10Z', // titan: spiked
-    'M60 10A56 56 0 1 1 59.9 10Z' // olympian: a medallion
+  // ---------- the emblems: faceted crests. Flat planes of metal lit from the upper left (no gloss, no gradients on a
+  // face), a cut gem at the heart, and a silhouette that climbs with the rank: a plain plaque, then chevrons (the
+  // working ranks), stars (the precious ones), then wings, a crown, horns, and at the top a sun and laurels ----------
+  const P = pts => pts.map(([x, y]) => `${f1(x)} ${f1(y)}`).join('L');
+  const poly = (pts, fill, extra = '') => `<path d="M${P(pts)}Z" fill="${fill}"${extra}/>`;
+  const mirror = pts => pts.map(([x, y]) => [120 - x, y]);
+  // the right half of each body, top centre to bottom tip; [half-width scale, gem's height, gem's size, gem's sides]
+  const BODY = [
+    [[60, 26], [80, 26], [90, 36], [90, 84], [80, 96], [60, 102]],
+    [[60, 17], [91, 25], [93, 63], [84, 97], [60, 119]],
+    [[60, 13], [83, 18], [96, 29], [96, 65], [85, 100], [60, 122]],
+    [[60, 9], [70, 18], [97, 25], [97, 66], [86, 102], [60, 125]],
+    [[60, 9], [71, 17], [95, 23], [98, 41], [95, 68], [84, 103], [60, 127]],
+    [[60, 6], [90, 24], [99, 54], [60, 132]],
+    [[60, 17], [93, 25], [95, 65], [84, 101], [60, 125]],
+    [[60, 14], [79, 20], [97, 15], [96, 37], [99, 65], [86, 103], [60, 129]],
+    [[60, 15], [89, 23], [97, 46], [93, 75], [80, 103], [60, 123]]
   ];
-  const CENTRE = [[60, 66], [60, 66], [60, 66], [60, 66], [60, 66], [60, 62], [60, 66], [60, 66], [60, 66]];
-  // the symbols, as before but redrawn a little finer
-  function chev(y, w = 22, h = 11, t = 9) { return `M${60 - w} ${y}L60 ${y + h}L${60 + w} ${y}L${60 + w} ${y + t}L60 ${y + h + t}L${60 - w} ${y + t}Z`; }
-  // What each rank stands for, on the way up: a seedling (everyone starts by growing), an anvil (strength being forged),
-  // a barbell (at home under the bar), a sun (it shows), a summit (the peak in sight), a diamond (made under pressure),
-  // a trophy (you'd place), Atlas with the sky on his shoulders (carrying what few can) and a thunderbolt (the top of
-  // Olympus). {d} is the rank's dark shade, for lines cut into a symbol
-  const sun = (cx, cy) => { let d = ''; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6 - Math.PI / 2, r1 = k % 2 ? 23.5 : 29, w = 0.17; d += `M${f1(cx + 16.5 * Math.cos(a - w))} ${f1(cy + 16.5 * Math.sin(a - w))}L${f1(cx + r1 * Math.cos(a))} ${f1(cy + r1 * Math.sin(a))}L${f1(cx + 16.5 * Math.cos(a + w))} ${f1(cy + 16.5 * Math.sin(a + w))}Z`; } return d; };
-  const SYM = [
-    `<g fill="none" stroke-width="1.5" opacity=".38"><circle cx="60" cy="68" r="28"/><circle cx="60" cy="68" r="20"/></g><path d="M58.2 97L58.2 64.5Q60 62.5 61.8 64.5L61.8 97Z"/><path d="M60 75C46 76 37 67 35 52C49 51 58 60 60 75Z"/><path d="M60 65C61 50 70 42 84 41C85 55 76 64 60 65Z"/><path d="M45 98Q60 89 75 98Z"/>`,
-    `<path d="M27 56L40 50L86 50L86 60C76 60 70 64 69 71L69 77L81 87L81 94L39 94L39 87L51 77L51 71C50 65 42 62 27 60Z"/><path d="M39 87L81 87" fill="none" stroke="{d}" stroke-opacity=".45" stroke-width="1.4"/><path d="${glint(73, 38, 7.5)}"/><path d="${glint(58, 41, 3.6)}"/>`,
-    `<rect x="27" y="63.5" width="66" height="5" rx="2.2"/><rect x="39" y="45" width="9" height="42" rx="3.2"/><rect x="72" y="45" width="9" height="42" rx="3.2"/><rect x="31" y="52" width="6.5" height="28" rx="2.6"/><rect x="82.5" y="52" width="6.5" height="28" rx="2.6"/><path d="M43.5 49L43.5 83M76.5 49L76.5 83" fill="none" stroke="{d}" stroke-opacity=".35" stroke-width="1.6"/>`,
-    `<circle cx="60" cy="66" r="12.5"/><path d="${sun(60, 66)}"/><circle cx="60" cy="66" r="7.5" fill="none" stroke="{d}" stroke-opacity=".35" stroke-width="1.4"/>`,
-    `<path d="M31 93L52 57L61 71L70 49L90 93Z"/><path d="M70 49L63.5 64L69 60.5L72.5 66.5L76.6 61Z" fill="{d}" stroke="none" opacity=".4"/><path d="M52 57L47.5 66L52 63.5L55.2 67.4L56.6 64Z" fill="{d}" stroke="none" opacity=".4"/><path d="${star(86, 42, 6.8)}"/>`,
-    `<path d="M39 55L48 42L72 42L81 55L60 90Z"/><path d="M39 55L81 55M48 42L55 55L60 90M72 42L65 55L60 90M55 55L60 42L65 55" fill="none" stroke="#1A44B8" stroke-opacity=".45" stroke-width="1.4"/>`,
-    `<path d="M44 46L76 46L75 60C74 72 68 78 60 79C52 78 46 72 45 60Z"/><path d="M44 50C34 50 33 64 46 67M76 50C86 50 87 64 74 67" fill="none" stroke-width="3.4"/><path d="M56 79L64 79L65 87L55 87Z"/><rect x="47" y="87" width="26" height="7" rx="2"/><path d="${star(60, 60, 6.5)}" fill="{d}" stroke="none" opacity=".5"/>`,
-    `<circle cx="60" cy="51" r="15.5"/><g fill="none" stroke="{d}" stroke-opacity=".5" stroke-width="1.3"><ellipse cx="60" cy="51" rx="6.6" ry="15.5"/><path d="M44.5 51L75.5 51M47 43.4L73 43.4M47 58.6L73 58.6"/></g><path d="M36 97C35 83 40 75 47 71L41 60L47.5 56.5L55 69L65 69L72.5 56.5L79 60L73 71C80 75 85 83 84 97L73 97C73 89 70 83 66 81L54 81C50 83 47 89 47 97Z"/>`,
-    `<path d="M69 31L41 71L57 71L49 102L81 60L64 60L74 31Z"/>`
-  ];
-  // facet lines on the diamond's face and its symbol
-  const FACETS = `<path d="M21 18L60 34L99 18M14 56L60 34L106 56M60 34L60 132" fill="none" stroke-width="1"/>`;
-  // gems: [x, y, r, colour]
-  const GEM = { 3: [60, 9, 5.2, '#E8204F'], 4: [60, 12, 5, '#F2FFFC'], 5: [60, 20, 5.5, '#7FD0FF'], 6: [60, 23, 5.5, '#FF2459'], 7: [60, 18, 6, '#B076FF'], 8: [60, 22, 6.5, '#FFF3B0'] };
-  function gem(u, x, y, r, c) {
-    return `<g><path d="M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z" fill="url(#${u}gm)" stroke="#00000066" stroke-width=".8"/>
-      <path d="M${x} ${y - r}L${x + r} ${y}L${x} ${y}Z" fill="#FFFFFF" opacity=".45"/><path d="M${x - r} ${y}L${x} ${y + r}L${x} ${y}Z" fill="#000000" opacity=".22"/>
-      <circle cx="${f1(x - r * 0.3)}" cy="${f1(y - r * 0.35)}" r="${f1(r * 0.22)}" fill="#FFFFFF"/></g>`;
+  const SHAPE = [[1, 60, 12, 4], [1, 58, 14, 3], [1, 57, 15, 4], [1, 57, 16, 5], [0.84, 59, 16, 6], [0.9, 57, 20, 8], [0.78, 60, 16, 5], [0.76, 62, 18, 6], [0.72, 64, 18, 8]];
+  // a cut stone: flat facets around a table, each as light as it faces the light
+  function gemCut(x, y, r, n, base, rot = -90) {
+    let out = '';
+    const pt = (k, rr) => { const a = (rot + k * 360 / n) * Math.PI / 180; return [x + rr * Math.cos(a), y + rr * Math.sin(a)]; };
+    for (let k = 0; k < n; k++) {
+      const mid = (rot + (k + 0.5) * 360 / n) * Math.PI / 180, lit = 0.5 + 0.5 * Math.cos(mid + Math.PI * 0.75);
+      out += poly([pt(k, r), pt(k + 1, r), pt(k + 1, r * 0.52), pt(k, r * 0.52)], lit > 0.5 ? mixc(base, '#FFFFFF', (lit - 0.5) * 1.1) : mixc(base, '#000000', (0.5 - lit) * 1.2));
+    }
+    out += poly(Array.from({ length: n }, (_, k) => pt(k, r * 0.52)), mixc(base, '#FFFFFF', 0.5));
+    return out + `<path d="M${P(Array.from({ length: n }, (_, k) => pt(k, r)))}Z" fill="none" stroke="${mixc(base, '#000000', 0.6)}" stroke-width=".9" stroke-linejoin="round"/><path d="${glint(f1(x - r * 0.2), f1(y - r * 0.24), f1(r * 0.3))}" fill="#FFFFFF"/>`;
   }
-  // fx: a sweep of light across it, for the rank-up screen
   function emblem(i, uid, label, small, fx) {
-    const t = TIERS[i], [hi, mid, lo] = t.c, u = 're' + uid, F = FRAME[i], [cx, cy] = CENTRE[i];
-    const inset = (s) => `translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`;
-    const defs = `<defs>
-      <linearGradient id="${u}rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".28" stop-color="${mid}"/><stop offset=".5" stop-color="${lo}"/><stop offset=".72" stop-color="${mid}"/><stop offset="1" stop-color="${hi}"/></linearGradient>
-      <linearGradient id="${u}bev" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".85"/><stop offset=".45" stop-color="#FFFFFF" stop-opacity=".08"/><stop offset="1" stop-color="#000000" stop-opacity=".35"/></linearGradient>
-      <radialGradient id="${u}face" cx=".5" cy=".28" r=".85"><stop offset="0" stop-color="${mid}"/><stop offset=".55" stop-color="${mixc(mid, lo, 0.55)}"/><stop offset="1" stop-color="${mixc(lo, '#000000', 0.35)}"/></radialGradient>
-      <linearGradient id="${u}sym" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".5" stop-color="${t.ink}"/><stop offset="1" stop-color="${mixc(hi, mid, 0.35)}"/></linearGradient>
-      <linearGradient id="${u}gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".6"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
-      <radialGradient id="${u}aura" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${t.glow}" stop-opacity=".8"/><stop offset=".6" stop-color="${t.glow}" stop-opacity=".22"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
-      <radialGradient id="${u}ray" cx="60" cy="66" r="92" gradientUnits="userSpaceOnUse"><stop offset=".3" stop-color="#FFF8D6"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
-      <linearGradient id="${u}wing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient>
-      <radialGradient id="${u}gm" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="${(GEM[i] || [])[3] || hi}"/><stop offset="1" stop-color="${mixc((GEM[i] || [])[3] || lo, '#000000', 0.5)}"/></radialGradient>
-      <clipPath id="${u}cl"><path d="${F}" transform="${inset(0.84)}"/></clipPath>${fx ? `<clipPath id="${u}fr"><path d="${F}"/></clipPath><linearGradient id="${u}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".9"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>` : ''}
-      <filter id="${u}emb" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.1" flood-color="#000" flood-opacity=".55"/></filter>
-    </defs>`;
-    let back = '';
-    if (!small && i >= 3) back += `<circle cx="60" cy="66" r="${62 + i * 3}" fill="url(#${u}aura)"/>`;
-    if (!small && i === 8) back += `<g>${Array.from({ length: 20 }, (_, k) => { const a = k * Math.PI / 10, w = k % 2 ? 0.045 : 0.085, r = k % 2 ? 78 : 94; return `<path d="M60 66L${f1(60 + r * Math.cos(a - w))} ${f1(66 + r * Math.sin(a - w))}L${f1(60 + r * Math.cos(a + w))} ${f1(66 + r * Math.sin(a + w))}Z" fill="url(#${u}ray)"/>`; }).join('')}</g>`;
-    // wings for Champion, Titan (bigger) and Olympian (spread behind the medallion)
-    if (i === 6 || i === 7 || (i === 8 && !small)) {
-      const s = i === 7 ? 1.18 : i === 8 ? 1.1 : 1, wy = i === 8 ? 66 : 50;
-      const feather = (k, side) => { const y = wy - 22 + k * 12, len = 30 - k * 4.5, x0 = side < 0 ? 26 : 94; return `<path d="M${x0} ${y + 8}C${x0 + side * len * 0.5} ${y + 6} ${x0 + side * len} ${y - 2} ${x0 + side * (len + 4)} ${y - 10}C${x0 + side * (len - 6)} ${y - 4} ${x0 + side * len * 0.4} ${y} ${x0} ${y}Z"/>`; };
-      let w = '';
-      for (let k = 0; k < 4; k++) w += feather(k, -1) + feather(k, 1);
-      back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width="1" stroke-linejoin="round" transform="translate(60 ${wy}) scale(${s}) translate(-60 ${-wy})">${w}</g>`;
-    }
-    // crystal shards behind Platinum and Diamond
-    if (!small && (i === 4 || i === 5)) back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width=".8" opacity=".9"><path d="M22 40L6 20L18 46Z"/><path d="M98 40L114 20L102 46Z"/><path d="M24 74L4 70L22 82Z"/><path d="M96 74L116 70L98 82Z"/></g>`;
-    // the laurel around the Olympian medallion
+    const t = TIERS[i], [hi, mid, lo] = t.c, u = 're' + uid, deep = mixc(lo, '#000000', 0.5), [sx, gy, gr, gn] = SHAPE[i];
+    const R = BODY[i].map(([x, y]) => [60 + (x - 60) * sx, y]), L = mirror(R), top = R[0], tip = R[R.length - 1], cy = (top[1] + tip[1]) / 2;
+    const full = [...R, ...L.slice(1, -1).reverse()], inset = (pts, s) => pts.map(([x, y]) => [60 + (x - 60) * s, cy + (y - cy) * s]);
+    const dFull = `M${P(full)}Z`;
+    let back = '', body = '', front = '';
+    if (!small && i >= 3) back += `<circle cx="60" cy="66" r="${60 + i * 3}" fill="url(#${u}aura)"/>`;
+    // Olympian's sun: a ring of rays behind everything
     if (i === 8) {
-      const leaf = (x, y, a) => `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="3.2" ry="7.4" transform="rotate(${f1(a)} ${f1(x)} ${f1(y)})"/>`;
-      let l = '';
-      for (let k = 0; k < 8; k++) { const deg = 100 + k * 18, a = deg * Math.PI / 180, x = 60 + 63 * Math.cos(a), y = 70 + 63 * Math.sin(a), r = deg - 90 + 32; l += leaf(x, y, r) + leaf(120 - x, y, -r); }
-      back += `<g fill="url(#${u}wing)" stroke="${lo}" stroke-width=".9">${l}</g>`;
+      let rays = '';
+      for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, w = 0.085, r1 = k % 2 ? 60 : 68; rays += `M${f1(60 + 44 * Math.cos(a - w))} ${f1(66 + 44 * Math.sin(a - w))}L${f1(60 + r1 * Math.cos(a))} ${f1(66 + r1 * Math.sin(a))}L${f1(60 + 44 * Math.cos(a + w))} ${f1(66 + 44 * Math.sin(a + w))}Z`; }
+      back += `<path d="${rays}" fill="${hi}" stroke="${lo}" stroke-width=".6" stroke-linejoin="round"/><circle cx="60" cy="66" r="47" fill="${mid}" stroke="${deep}" stroke-width="1.2"/><circle cx="60" cy="66" r="42.5" fill="${mixc(lo, '#000000', 0.25)}"/>`;
     }
-    // the crown on Champion's shield
-    const crown = i === 6 ? `<g fill="url(#${u}rim)" stroke="${lo}" stroke-width="1"><path d="M38 20L36 4L48 13L60 0L72 13L84 4L82 20Z"/></g>` : '';
-    // the rim, its bevel, the face, its brushed lines, a shadow inside the rim
-    let body = `<path d="${F}" fill="url(#${u}rim)" stroke="${mixc(lo, '#000000', 0.4)}" stroke-width="1.6" stroke-linejoin="round"/>
-      <path d="${F}" fill="none" stroke="url(#${u}bev)" stroke-width="2.4" transform="${inset(0.955)}" stroke-linejoin="round"/>
-      <path d="${F}" fill="url(#${u}face)" transform="${inset(0.84)}"/>`;
-    if (!small) body += `<g clip-path="url(#${u}cl)" stroke="#FFFFFF" stroke-opacity=".07" stroke-width="1">${Array.from({ length: 16 }, (_, k) => `<path d="M${-20 + k * 10} 0L${20 + k * 10} 140"/>`).join('')}</g>`;
-    body += `<path d="${F}" fill="none" stroke="#000000" stroke-opacity=".35" stroke-width="3" transform="${inset(0.84)}" clip-path="url(#${u}cl)"/>
-      <path d="${F}" fill="none" stroke="${hi}" stroke-opacity=".7" stroke-width="1" transform="${inset(0.84)}"/>`;
-    if (i === 5) body += `<g stroke="${hi}" stroke-opacity=".35" clip-path="url(#${u}cl)">${FACETS}</g>`;
-    if (i === 0) body += `<g fill="none" stroke="${lo}" stroke-opacity=".5" stroke-width="1.2" clip-path="url(#${u}cl)"><path d="M36 30C44 40 40 60 37 80C35 92 40 102 46 110"/><path d="M84 30C76 44 82 62 84 78C86 92 80 104 74 110"/><path d="M50 18C53 28 51 38 53 46"/></g>`;
-    // rivets on the lower tiers
-    if (i <= 2) body += `<g fill="url(#${u}rim)" stroke="${mixc(lo, '#000000', 0.4)}" stroke-width=".6">${[[29, 27], [91, 27], [60, 117]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6"/><circle cx="${f1(x - 0.8)}" cy="${f1(y - 0.8)}" r=".9" fill="#FFFFFF" stroke="none" opacity=".8"/>`).join('')}</g>`;
-    // the symbol, embossed
-    const sym = `<g fill="url(#${u}sym)" stroke="url(#${u}sym)" stroke-linejoin="round" filter="url(#${u}emb)">${SYM[i].replace(/\{d\}/g, mixc(lo, '#000000', 0.25))}</g>`;
-    const gloss = `<path d="M28 26L60 15L92 26L92 46C76 55 44 55 28 46Z" fill="url(#${u}gloss)" opacity=".45" clip-path="url(#${u}cl)"/>`;
-    const g = GEM[i] ? gem(u, ...GEM[i]) : '';
-    const sparks = !small && i >= 5 ? `<g fill="#FFFFFF">${[[18, 14, 5], [103, 12, 4], [108, 100, 4.4], [12, 96, 3.4]].map(([x, y, r]) => `<path d="${glint(x, y, r)}"/>`).join('')}</g>` : '';
+    // wings: feathers swept up and back from the shoulders, longest at the top, each folded along its spine (lit above,
+    // in shade below). Diamond's are straight shards of crystal
+    const WING = { 4: [3, 36, -58, 21, 9], 5: [3, 33, -46, 26, 7.5], 6: [4, 47, -62, 18, 11], 7: [5, 51, -64, 16, 11.5] }[i];
+    if (WING) {
+      const [n, len, a0, step, w] = WING, dx = 27 * sx + 3, y0 = top[1] + 24, crystal = i === 5;
+      for (let k = n - 1; k >= 0; k--) {
+        const a = (a0 + k * step) * Math.PI / 180, l = len * (1 - k * 0.14), ry = y0 + k * 9, tx = dx + l * Math.cos(a), ty = ry + l * Math.sin(a);
+        const c1 = [dx + l * 0.55 * Math.cos(a - (crystal ? 0 : 0.42)), ry + l * 0.55 * Math.sin(a - (crystal ? 0 : 0.42)) - w * 0.35], c2 = [dx + l * 0.5 * Math.cos(a + (crystal ? 0 : 0.3)), ry + l * 0.5 * Math.sin(a + (crystal ? 0 : 0.3)) + w * 0.3];
+        for (const sgn of [1, -1]) {
+          const X = v => f1(60 + sgn * v);
+          back += `<path d="M${X(dx - 4)} ${f1(ry - w * 0.7)}Q${X(c1[0])} ${f1(c1[1])} ${X(tx)} ${f1(ty)}Q${X(c2[0])} ${f1(c2[1])} ${X(dx - 4)} ${f1(ry + w * 0.7)}Z" fill="${lo}" stroke="${deep}" stroke-width="1.1" stroke-linejoin="round"/><path d="M${X(dx - 4)} ${f1(ry - w * 0.7)}Q${X(c1[0])} ${f1(c1[1])} ${X(tx)} ${f1(ty)}L${X(dx - 4)} ${f1(ry + 0.5)}Z" fill="${sgn > 0 ? mixc(hi, mid, 0.45) : hi}"/>`;
+        }
+      }
+    }
+    // horns (Titan) and crowns (Champion, Olympian) rise from the top
+    if (i === 7) for (const f of [q => q, mirror]) back += poly(f([[74, 22], [99, -3], [92, 14], [90, 30]]), lo, ` stroke="${deep}" stroke-width="1.1" stroke-linejoin="round"`) + poly(f([[74, 22], [99, -3], [84, 23]]), hi);
+    if (i === 6 || i === 8) {
+      const c = i === 8 ? [[36, 24], [33, 6], [45, 14], [52, 1], [60, 12], [68, 1], [75, 14], [87, 6], [84, 24]] : [[41, 25], [38, 8], [50, 16], [60, 1], [70, 16], [82, 8], [79, 25]];
+      back += poly(c, mid, ` stroke="${deep}" stroke-width="1.1" stroke-linejoin="round"`) + poly(c.filter(([x]) => x <= 60).concat([[60, 25]]), hi) + c.filter((_, k) => k % 2 === 1).map(([x, y]) => `<circle cx="${x}" cy="${f1(y - 1)}" r="2.3" fill="${t.glow}" stroke="${deep}" stroke-width=".7"/>`).join('');
+    }
+    // the body: an edge of dark metal, a lit half and a shaded half, a roof facet, then a sunk panel
+    const roof = [top, R[1], [60, R[1][1] + 13], L[1]];
+    body += `<path d="${dFull}" fill="${deep}" stroke="${deep}" stroke-width="2.6" stroke-linejoin="round"/>` + poly([...L], mid) + poly([...R], lo) + poly(roof, hi) + poly([top, R[1], [60, R[1][1] + 13]], mixc(hi, mid, 0.6));
+    const inR = inset(R, 0.74), inL = inset(L, 0.74), panel = mixc(lo, '#000000', 0.5);
+    body += poly([...inR, ...inL.slice(1, -1).reverse()], panel, ` stroke="${deep}" stroke-width="1.2" stroke-linejoin="round"`) + poly([...inR], mixc(panel, '#000000', 0.3));
+    body += `<path d="M${P(inR)}" fill="none" stroke="${hi}" stroke-opacity=".55" stroke-width=".9" stroke-linejoin="round"/><path d="M${P(inset(L, 0.9))}" fill="none" stroke="#FFFFFF" stroke-opacity=".5" stroke-width=".8" stroke-linejoin="round"/>`;
+    body += `<path d="M${P([...inset(R, 0.6), ...inset(L, 0.6).slice(1, -1).reverse()])}Z" fill="none" stroke="${hi}" stroke-opacity=".2" stroke-width=".8" stroke-linejoin="round"/>`;
+    if (i === 0) body += `<path d="M44 40C47 56 43 74 46 92M74 38C71 54 76 70 73 90" fill="none" stroke="${hi}" stroke-opacity=".25" stroke-width="1.1"/>`;
+    if (i === 5) body += `<path d="M${P([inR[0], [60, gy + 4], inR[2]])}M${P([inL[1], [60, gy + 4], inL[2]])}M${P([[60, gy + 4], inR[3]])}" fill="none" stroke="${hi}" stroke-opacity=".3" stroke-width=".9"/>`;
+    // the marks under the gem: chevrons for the working ranks, stars for the precious ones
+    const marks = i <= 2 ? i + 1 : i <= 5 ? i - 2 : 0, my = gy + gr + 9;
+    if (i <= 2) for (let k = 0; k < marks; k++) { const y = my + k * 7.5 - (marks - 1) * 1.5, w = 11 - k * 1.2; front += `<path d="M${f1(60 - w)} ${f1(y)}L60 ${f1(y + 5)}L${f1(60 + w)} ${f1(y)}" fill="none" stroke="${t.ink}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`; }
+    else for (let k = 0; k < marks; k++) front += `<path d="${star(60 + (k - (marks - 1) / 2) * 12, my + 3 + Math.abs(k - (marks - 1) / 2) * -2.5, 5)}" fill="${t.ink}" stroke="${deep}" stroke-width=".5"/>`;
+    // the laurel on Olympian's sun, either side of the crest
+    if (i === 8) { let l = ''; for (let k = 0; k < 6; k++) { const deg = 98 + k * 15, a = deg * Math.PI / 180, x = 60 + 36 * Math.cos(a), y = 66 + 36 * Math.sin(a), rot = deg - 62; l += `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="2.6" ry="6" transform="rotate(${f1(rot)} ${f1(x)} ${f1(y)})"/><ellipse cx="${f1(120 - x)}" cy="${f1(y)}" rx="2.6" ry="6" transform="rotate(${f1(-rot)} ${f1(120 - x)} ${f1(y)})"/>`; } back += `<g fill="${mixc(hi, mid, 0.6)}" stroke="${deep}" stroke-width=".6">${l}</g>`; }
+    front += gemCut(60, gy - (i >= 6 ? 2 : 0), gr, gn, i <= 2 ? mid : t.glow, i === 1 ? -90 : i === 2 || i === 0 ? 45 : -90);
+    const sparks = !small && i >= 5 ? `<g fill="#FFFFFF">${[[16, 16, 4.6], [105, 10, 3.8], [110, 104, 4.2], [10, 98, 3.2]].map(([x, y, r]) => `<path d="${glint(x, y, r)}"/>`).join('')}</g>` : '';
+    const defs = `<defs><radialGradient id="${u}aura" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${t.glow}" stop-opacity=".75"/><stop offset=".6" stop-color="${t.glow}" stop-opacity=".2"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>${fx ? `<clipPath id="${u}fr"><path d="${dFull}"/></clipPath><linearGradient id="${u}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".9"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>` : ''}</defs>`;
     const shine = fx ? `<g clip-path="url(#${u}fr)"><rect class="emb-shine" x="-40" y="-10" width="34" height="160" fill="url(#${u}sh)"/></g>` : '';
-    return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible">${defs}${back}${crown}${body}${sym}${gloss}${shine}${g}${sparks}</svg>`;
+    return `<svg class="rank-emb" viewBox="-6 -6 132 146" role="img" aria-label="${label || t.name}" overflow="visible" data-shape="${i}">${defs}${back}${body}${front}${shine}${sparks}</svg>`;
   }
   function mixc(a, b, t) { const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, k) => Math.round(v * (1 - t) + B[k] * t).toString(16).padStart(2, '0')).join(''); }
   return { TIERS, FITS, REFS, SOURCES, SL, share, basis, ladder, place, ageFactor, emblem };

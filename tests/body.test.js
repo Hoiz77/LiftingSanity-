@@ -66,9 +66,9 @@ const { open, report } = require('./lib');
   const card = await t.ev(`(async () => { const c = cardCtx('muscles', 'x'), svg = cardFrame(c, cardBody(c, 'front', { chest: 1, frontdelts: .5 }, 40, 80, 280)); const out = await inlineArt(svg); return { masks: (svg.match(/<mask /g) || []).length, inlined: /data-body="1" href="data:image\\/webp;base64,/.test(out), left: /data-body="1" href="art\\//.test(out) }; })()`);
   r.ok(card.masks >= 2 && card.inlined && !card.left, 'a card carries the body picture inside it, so sharing it as a picture keeps the body', card);
 
-  // the emblems: nine shapes, gems from Gold up, list-sized ones without the glow
-  const em = await t.ev(`(() => { const shapes = RK.TIERS.map((x, i) => (RK.emblem(i, 'q' + i, '').match(/<path d="([^"]+)" fill="url\\(#req\\d+rim\\)"/) || [])[1]); return { distinct: new Set(shapes.filter(Boolean)).size, gems: RK.TIERS.map((x, i) => RK.emblem(i, 'g' + i, '').includes('gm)')), small: RK.emblem(8, 's', '', true).includes('aura)'), big: RK.emblem(8, 'b', '').includes('aura)') }; })()`);
-  r.ok(em.distinct >= 8 && em.gems.slice(3).every(Boolean) && !em.gems[0] && !em.small && em.big, 'the emblems: each rank its own shape, a gem from Gold up, and no glow at list sizes', em);
+  // the emblems: nine crests that grow with the rank, list-sized ones without the glow
+  const em = await t.ev(`(() => { const E = i => RK.emblem(i, 'q' + i, ''), body = s => (s.match(/<path d="([^"]+)" fill="[^"]+" stroke="[^"]+" stroke-width="2.6"/) || [])[1]; return { distinct: new Set(RK.TIERS.map((x, i) => body(E(i)))).size, parts: RK.TIERS.map((x, i) => (E(i).match(/<path|<circle|<ellipse/g) || []).length), wings: RK.TIERS.map((x, i) => (E(i).match(/Q/g) || []).length > 20), small: RK.emblem(8, 's', '', true).includes('aura)'), big: RK.emblem(8, 'b', '').includes('aura)') }; })()`);
+  r.ok(em.distinct === 9 && em.parts[8] > em.parts[4] && em.parts[4] > em.parts[0] && !em.wings[3] && em.wings[4] && em.wings[6] && em.wings[7] && !em.small && em.big, 'the emblems: each rank its own crest, more to it the higher it is (wings from Platinum), and no glow at list sizes', em);
 
   // the rank-up screen: the old emblem, the new one, rings of light, sparks and a sweep of light
   await t.ev(`rankTakeover([3, 4], getEx('barbell-bench-press'))`); await p.waitForTimeout(200);

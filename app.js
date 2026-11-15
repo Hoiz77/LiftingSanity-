@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -6186,8 +6186,9 @@ function ranksSection() {
   if (!rows.length) return `<section class="card rank-card rank-empty">${emblem(0, 'md dim')}<div><b>${T('Lift ranks')}</b><p class="muted">${T('Log a set of a ranked exercise (a squat, press, row, pulldown, curl…) and its rank shows here.')}</p></div></section>`;
   const all = overallRank(rows), was = overallRank(rows, 'was');
   return `<section class="card rank-card">
-    <button class="rank-top" data-a="rankAll">${emblem(all.tier, 'lg')}<span class="rank-top-t"><span class="eyebrow">${T('Your rank')}</span><b style="color:${tierColor(all.tier)}">${tierName(all.tier)}</b>
-      <span class="rank-bar big" style="--tc:${tierColor(Math.min(8, all.tier + 1))}"><i style="width:${Math.round(all.frac * 100)}%"></i></span>
+    <button class="rank-top" data-a="rankAll" style="--tc:${tierColor(all.tier)}">${emblem(all.tier, 'xl')}<span class="rank-top-t"><span class="eyebrow">${T('Your rank')}</span><b>${tierName(all.tier)}</b>
+      <span class="rank-means">${tierMean(all.tier)}</span>
+      <span class="rank-track" role="img" aria-label="${T('Rank {n} of 9', { n: all.tier + 1 })}">${RK.TIERS.map((t, k) => `<i class="${k < all.tier ? 'on' : k === all.tier ? 'cur' : ''}" style="--c:${tierColor(k)};--p:${k === all.tier ? Math.max(8, Math.round(all.frac * 100)) : 0}%"></i>`).join('')}</span>
       <small>${all.tier < 8 ? T('{p}% of the way to {tier}', { p: Math.round(all.frac * 100), tier: tierName(all.tier + 1) }) : T('The top rank')} · ${TN(rows.length, 'from {n} lift', 'from {n} lifts')}</small></span></button>
     <div class="rank-maps"><figure>${rankBody(muscleRanks(rows, 'was'))}<figcaption>${TC('Start', 'rank')} · ${was ? tierName(was.tier) : '—'}</figcaption></figure><span class="rank-arrow">${icon(RTL ? 'left' : 'right')}</span><figure>${rankBody(muscleRanks(rows))}<figcaption>${T('Now')} · ${tierName(all.tier)}</figcaption></figure></div>
     <div class="rank-list">${rows.slice(0, 4).map(rankRow).join('')}</div>
@@ -6202,7 +6203,7 @@ function ranksSheet() {
     render: () => {
       const rows = rankTable(), groups = [['data', T('From competition records')], ['est', T('Estimated from the big lifts')], ['logs', T('From lifters’ logs: machines and cables')], ['rough', T('Rough: machines and cables')]];
       return `${sheetHead(T('Your ranks'))}<div class="sheet-body pad">
-        <div class="rank-tiers" role="group" aria-label="${T('The nine ranks')}">${RK.TIERS.map((t, i) => `<button class="${st.pick === i ? 'on' : ''}" data-a="tier" data-i="${i}" aria-pressed="${st.pick === i}">${emblem(i, 'sm')}<small>${tierName(i)}</small></button>`).join('')}</div>
+        <div class="rank-tiers" role="group" aria-label="${T('The nine ranks')}">${RK.TIERS.map((t, i) => `<button class="${st.pick === i ? 'on' : ''}" data-a="tier" data-i="${i}" aria-pressed="${st.pick === i}" style="--tc:${tierColor(i)}">${emblem(i, 'tier')}<small>${tierName(i)}</small></button>`).join('')}</div>
         <p class="rank-mean" role="status">${st.pick == null ? T('Tap a rank to see what it stands for.') : `<b style="color:${tierColor(st.pick)}">${tierName(st.pick)}</b> · ${tierMean(st.pick)}`}</p>
         ${groups.map(([c, h]) => { const g = rows.filter(o => o.b.conf === c); return g.length ? `<h3 class="sub-h">${h}</h3><div class="rank-list">${g.map(rankRow).join('')}</div>` : ''; }).join('')}
         ${(ups => ups.length ? `<h3 class="sub-h">${T('Rank-ups')}</h3><div class="rank-ups">${ups.slice(0, 30).map(u => `<button class="rank-up-row" data-a="openEx" data-id="${u.id}">${emblem(u.to, 'sm')}<span class="rank-up-t"><b>${esc(getEx(u.id).name)}</b><small>${tierName(u.from)} → <span style="color:${tierColor(u.to)}">${tierName(u.to)}</span></small></span><small class="rank-up-d">${esc(fmtShort(u.at))}</small></button>`).join('')}</div>` : '')(rankUpHistory())}
@@ -6249,7 +6250,7 @@ function rankBlock(id) {
     : b.conf === 'est' ? T('Estimated from the {lift} standards: this is usually about {p}% of it.', { lift, p: Math.round(b.r * 100) })
     : T('Rough: estimated from the {lift} standards at about {p}%, and machines differ.', { lift, p: Math.round(b.r * 100) });
   return `<section class="rank-ex">
-    <div class="rank-ex-top">${emblem(Math.max(0, cur), cur < 0 ? 'md dim' : 'md')}<div><span class="eyebrow">${T('Rank')}</span><b ${cur >= 0 ? `style="color:${tierColor(cur)}"` : ''}>${cur >= 0 ? tierName(cur) + (b.conf === 'rough' ? ' ≈' : '') : T('Not ranked yet')}</b>${cur >= 0 ? `<small class="rank-ex-mean">${tierMean(cur)}</small>` : ''}
+    <div class="rank-ex-top" style="--tc:${cur >= 0 ? tierColor(cur) : 'var(--muted)'}">${emblem(Math.max(0, cur), cur < 0 ? 'lg dim' : 'lg')}<div><span class="eyebrow">${T('Rank')}</span><b ${cur >= 0 ? `style="color:${tierColor(cur)}"` : ''}>${cur >= 0 ? tierName(cur) + (b.conf === 'rough' ? ' ≈' : '') : T('Not ranked yet')}</b>${cur >= 0 ? `<small class="rank-ex-mean">${tierMean(cur)}</small>` : ''}
       <small>${o ? `${T('est. 1RM {w}', { w: fmtW(o.load, 1) })}${b.per ? ' ' + perText(b) : ''} · ${esc(rankNext(o))}` : T('Log a set to get a rank.')}</small></div></div>
     <ol class="rank-ladder">${lad.map((v, i) => `<li class="${i === cur ? 'on' : ''}" style="--tc:${tierColor(i)}">${emblem(i, 'xs')}<span class="rl-n">${tierName(i)}</span><b dir="ltr">${i ? fmtW(v, 0) + '+' : '—'}</b></li>`).reverse().join('')}</ol>
     <p class="muted small">${how}${b.per ? ' ' + T('Weights are {per}.', { per: perText(b) }) : ''}</p>
@@ -6608,6 +6609,9 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 51, items: [
+    ['trophy', 'Ranks, redesigned', 'Every rank has a new crest: flat planes of metal with a cut gem at its heart, and a shape that climbs with the rank, from a plain plaque through chevrons and stars to wings, a crown, horns and, at the top, a sun and laurels. Your rank on Progress shows the crest in its own light, what it stands for and the nine steps of the climb; Your ranks and each exercise’s rank follow the same look.']
+  ] },
   { v: 50, items: [
     ['trophy', 'Medals worth earning', 'The medal at the end of a workout is a real one now: a scalloped coin with a bevelled rim and fine engraving, a laurel branch either side and ribbon tails below. The milestone card’s medal has an enamel face, a laurel wreath rising from a banner, a star over the number and light across it. The glow behind them is round again, all the way to the top of the screen.']
   ] },

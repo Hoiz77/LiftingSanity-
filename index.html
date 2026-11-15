@@ -1641,9 +1641,11 @@ body::before { transition: opacity .3s; }
 .rank-e { display: inline-grid; flex: 0 0 auto; width: 34px; height: 38px; }
 .rank-e > svg, .exd .rank-e > svg { width: 100%; height: 100%; max-width: none; overflow: visible; display: block; }
 .rank-e.xs { width: 22px; height: 24px; }
-.rank-e.sm { width: 34px; height: 38px; }
+.rank-e.sm { width: 40px; height: 44px; }
 .rank-e.md { width: 58px; height: 64px; }
 .rank-e.lg { width: 86px; height: 96px; }
+.rank-e.xl { width: 128px; height: 142px; }
+.rank-e.tier { width: 50px; height: 55px; }
 .rank-e.dim { filter: grayscale(1) opacity(.45); }
 .rank-promo { display: flex; gap: 14px; align-items: flex-start; }
 .rank-promo-e { display: flex; flex: 0 0 auto; margin-top: 2px; }
@@ -1653,10 +1655,20 @@ body::before { transition: opacity .3s; }
 .rank-empty { display: flex; gap: 14px; align-items: center; }
 .rank-empty p { margin: 4px 0 0; font-size: calc(14px * var(--fs, 1)); }
 .rank-card { display: grid; gap: 14px; overflow: hidden; }
-.rank-top { display: flex; align-items: center; gap: 16px; text-align: start; width: 100%; }
-.rank-top-t { display: grid; gap: 4px; flex: 1; min-width: 0; }
-.rank-top-t > b { font: 900 calc(30px * var(--fs, 1))/1.05 var(--display); font-stretch: 108%; letter-spacing: -.01em; text-transform: uppercase; }
+/* your rank: the crest in its own light, its name in its colour, what it stands for, and the nine steps of the climb */
+.rank-top { position: relative; display: grid; justify-items: center; gap: 2px; width: 100%; padding: 20px 14px 16px; border-radius: 22px; text-align: center; overflow: hidden;
+  background: radial-gradient(110% 80% at 50% 0%, color-mix(in srgb, var(--tc) 30%, transparent), transparent 72%), var(--panel-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 28%, transparent); }
+.rank-top .rank-e { filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--tc) 45%, transparent)); margin-bottom: 6px; }
+.rank-top-t { display: grid; justify-items: center; gap: 3px; width: 100%; min-width: 0; }
+.rank-top-t > b { font: 900 calc(36px * var(--fs, 1))/1.02 var(--display); font-stretch: 112%; letter-spacing: -.01em; text-transform: uppercase; color: var(--tc); text-shadow: 0 0 26px color-mix(in srgb, var(--tc) 45%, transparent); }
 .rank-top-t small { color: var(--ink-2); font-size: calc(13px * var(--fs, 1)); }
+.rank-means { color: var(--ink); font: 600 calc(14px * var(--fs, 1))/1.3 var(--ui); }
+.rank-track { display: flex; gap: 4px; width: min(100%, 300px); margin: 12px 0 6px; }
+.rank-track i { position: relative; flex: 1; height: 8px; border-radius: 4px; background: var(--panel-3); overflow: hidden; }
+.rank-track i.on { background: var(--c); }
+.rank-track i.cur { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c) 65%, transparent); }
+.rank-track i.cur::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p); border-radius: inherit; background: var(--c); }
+[dir="rtl"] .rank-track i.cur::after { inset: 0 0 0 auto; }
 .rank-bar { display: block; height: 6px; border-radius: 99px; background: var(--panel-3); overflow: hidden; }
 .rank-bar.big { height: 9px; }
 .rank-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 55%, transparent), var(--tc)); }
@@ -1675,8 +1687,9 @@ body::before { transition: opacity .3s; }
 .rank-n small span { font-weight: 800; }
 .rank-n .rank-to { color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
 .rank-tiers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 2px; margin-bottom: 6px; }
-.rank-tiers > button { display: grid; justify-items: center; gap: 3px; width: 64px; padding: 6px 0 5px; border-radius: 14px; transition: background-color .15s; }
-.rank-tiers > button.on { background: var(--panel-2); }
+.rank-tiers > button { display: grid; justify-items: center; gap: 4px; width: 68px; padding: 8px 0 6px; border-radius: 16px; transition: background-color .15s, box-shadow .15s; }
+.rank-tiers > button.on { background: color-mix(in srgb, var(--tc) 16%, var(--panel-2)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tc) 55%, transparent); }
+.rank-tiers > button.on small { color: var(--tc); }
 .rank-mean { margin: 4px 0 14px; min-height: 2.6em; text-align: center; color: var(--ink-2); font-size: calc(14px * var(--fs, 1)); line-height: 1.3; }
 .rank-mean b { font-weight: 800; }
 .rank-ex-mean { display: block; margin-top: 2px; color: var(--muted); font-size: calc(12.5px * var(--fs, 1)); font-weight: 500; }
@@ -1700,9 +1713,11 @@ body::before { transition: opacity .3s; }
 .rank-src-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
 .rank-src-line a { color: var(--accent); }
 .rank-ex { display: grid; gap: 12px; padding: 16px; border-radius: 22px; background: var(--panel); box-shadow: var(--hi); margin: 14px 0; }
-.rank-ex-top { display: flex; align-items: center; gap: 14px; }
+.rank-ex-top { display: flex; align-items: center; gap: 16px; margin: -4px -4px 0; padding: 14px; border-radius: 18px; background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tc) 26%, transparent), transparent 70%), var(--panel-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 24%, transparent); }
+.rank-ex-top .rank-e:not(.dim) { filter: drop-shadow(0 8px 16px color-mix(in srgb, var(--tc) 40%, transparent)); }
+[dir="rtl"] .rank-ex-top { background: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--tc) 26%, transparent), transparent 70%), var(--panel-2); }
 .rank-ex-top > div { display: grid; gap: 2px; }
-.rank-ex-top b { font: 900 calc(24px * var(--fs, 1)) var(--display); text-transform: uppercase; font-stretch: 108%; }
+.rank-ex-top b { font: 900 calc(28px * var(--fs, 1))/1.05 var(--display); text-transform: uppercase; font-stretch: 110%; text-shadow: 0 0 22px color-mix(in srgb, var(--tc) 40%, transparent); }
 .rank-ex-top small { color: var(--ink-2); font-size: calc(13px * var(--fs, 1)); }
 .rank-ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .rank-ladder li { display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-radius: 12px; color: var(--ink-2); font-size: calc(14px * var(--fs, 1)); }
