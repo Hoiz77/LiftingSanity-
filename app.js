@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -6609,6 +6609,9 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 53, items: [
+    ['trophy', 'Truly Olympian', 'The top rank is Greek now: a round hoplite shield with a Greek key running round its rim, the temple of Olympus in relief (a thunderbolt in its pediment), an olive wreath like the one victors wore at the ancient Games, tied with a ribbon, and a glory of rays behind. Platinum’s crest is level and symmetrical, its summit centred under a star.']
+  ] },
   { v: 52, items: [
     ['trophy', 'Crests with depth and meaning', 'The rank crests are solid now: thick metal with bevelled edges, rivets and engraving, and a sunken panel with a symbol cast in relief, telling the way up: a seedling, an anvil, a barbell, a flame, a summit, a diamond, a trophy, Atlas carrying the sky and a thunderbolt. From Gold up a cut gem sits in the frame; wings have layered feathers, and each crest casts a shadow.']
   ] },

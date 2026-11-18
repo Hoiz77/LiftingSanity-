@@ -26,7 +26,7 @@ window.LS_RANKS = (() => {
     { id: 'diamond', sym: 'Diamond', mean: 'made under pressure, ahead of most competitors', name: 'Diamond', c: ['#E8F8FF', '#5AB8FF', '#1A44B8'], ink: '#F3FBFF', glow: '#61B8FF' },
     { id: 'champion', sym: 'Trophy', mean: 'you’d place, top 15% of competitors', name: 'Champion', c: ['#FFD3E0', '#FF3D6E', '#7D0A33'], ink: '#FFF0F4', glow: '#FF4F7E' },
     { id: 'titan', sym: 'Atlas', mean: 'carrying what few can, top 5% of competitors', name: 'Titan', c: ['#EBDDFF', '#9A5BFF', '#3A138C'], ink: '#F7F0FF', glow: '#A970FF' },
-    { id: 'olympian', sym: 'Thunderbolt', mean: 'on Olympus, top 1% of competitors', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
+    { id: 'olympian', sym: 'Temple of Olympus', mean: 'among the gods, top 1% of competitors', name: 'Olympian', c: ['#FFFFFF', '#FFE27A', '#E08A00'], ink: '#FFFFFF', glow: '#FFD84D' }
   ];
   // [a, b] for a × bodyweight^b, at the 15th, 40th, 65th, 85th, 95th and 99th percentiles (kg)
   const FITS = {
@@ -405,18 +405,19 @@ window.LS_RANKS = (() => {
     [[60, 17], [91, 25], [93, 63], [84, 97], [60, 119]],
     [[60, 13], [83, 18], [96, 29], [96, 65], [85, 100], [60, 122]],
     [[60, 9], [70, 18], [97, 25], [97, 66], [86, 102], [60, 125]],
-    [[60, 9], [71, 17], [95, 23], [98, 41], [95, 68], [84, 103], [60, 127]],
+    [[60, 9], [80, 14], [97, 20], [96, 64], [85, 101], [60, 126]],
     [[60, 6], [90, 24], [99, 54], [60, 132]],
     [[60, 17], [93, 25], [95, 65], [84, 101], [60, 125]],
     [[60, 14], [79, 20], [97, 15], [96, 37], [99, 65], [86, 103], [60, 129]],
-    [[60, 15], [89, 23], [97, 46], [93, 75], [80, 103], [60, 123]]
+    // Olympian: a round hoplite shield (an aspis)
+    Array.from({ length: 25 }, (_, k) => { const a = (-90 + k * 7.5) * Math.PI / 180; return [60 + 44 * Math.cos(a), 66 + 44 * Math.sin(a)]; })
   ];
   // [half-width scale, the symbol's centre height, the symbol's size, the sides of the gem on the frame]
-  const SHAPE = [[1, 64, 0.64, 0], [1, 67, 0.7, 0], [1, 66, 0.72, 0], [1, 70, 0.7, 5], [0.84, 70, 0.64, 6], [0.9, 62, 0.62, 8], [0.78, 71, 0.64, 5], [0.76, 72, 0.65, 6], [0.72, 70, 0.64, 8]];
+  const SHAPE = [[1, 64, 0.64, 0], [1, 67, 0.7, 0], [1, 66, 0.72, 0], [1, 70, 0.7, 5], [0.86, 65, 0.62, 6], [0.9, 62, 0.62, 8], [0.78, 71, 0.64, 5], [0.76, 72, 0.65, 6], [1, 66, 0.66, 8]];
   // What each rank stands for, cast in relief on its crest, on the way up: a seedling (everyone starts by growing),
   // an anvil (strength being forged), a barbell (at home under the bar), a flame (the fire's lit), a summit (the peak in
   // sight), a diamond (made under pressure), a trophy (you'd place), Atlas with the sky on his shoulders (carrying what
-  // few can) and a thunderbolt (the top of Olympus). Drawn on a 120 x 134 grid around (60, 66): [the solid shapes,
+  // few can) and the temple of Olympus, the home of the gods. Drawn on a 120 x 134 grid around (60, 66): [the solid shapes,
   // lines cut into them]; {d} is the rank's dark shade
   const SYMBOLS = [
     [`<path d="M58.2 98L58.2 66Q60 63.5 61.8 66L61.8 98Z"/><path d="M60 77C45 78 35 68 33 52C48 51 58 61 60 77Z"/><path d="M60 67C61 51 71 42 86 41C87 56 77 66 60 67Z"/><path d="M42 100Q60 89 78 100Z"/>`,
@@ -427,16 +428,16 @@ window.LS_RANKS = (() => {
      `<path d="M43 48L43 84M77 48L77 84" fill="none" stroke="{d}" stroke-opacity=".4" stroke-width="1.8"/>`],
     [`<path d="M60 32C63 45 75 52 80 64C86 79 78 95 60 99C42 95 34 80 40 66C43 58 49 55 51 46C56 53 55 60 57 64C58 53 55 43 60 32Z"/>`,
      `<path d="M60 61C64 69 71 74 70 84C69 91 64 95 60 95C54 95 49 90 50 83C51 76 56 74 57 69C59 72 60 75 61 78C62 72 61 67 60 61Z" fill="{d}" stroke="none" opacity=".42"/>`],
-    [`<path d="M28 95L51 56L61 71L71 47L93 95Z"/><path d="${star(87, 38, 7.2)}"/>`,
-     `<path d="M71 47L64 63L70 59.5L73.5 66L78 60Z" fill="{d}" stroke="none" opacity=".4"/><path d="M51 56L46 66L51 63L54.5 67.5L56.2 64.3Z" fill="{d}" stroke="none" opacity=".4"/><path d="M61 71L66 82M51 56L45 70" fill="none" stroke="{d}" stroke-opacity=".35" stroke-width="1.2"/>`],
+    [`<path d="M26 96L42 66L50 76L60 47L70 76L78 66L94 96Z"/><path d="${star(60, 33, 7.5)}"/>`,
+     `<path d="M60 47L70 76L66 96L60 96Z" fill="{d}" stroke="none" opacity=".32"/><path d="M54 61L57 64.5L60 61L63 64.5L66 61M38.5 72L41 74.5L43.5 72L46 75M74 75L76.5 72L79 74.5L81.5 72" fill="none" stroke="{d}" stroke-opacity=".55" stroke-width="1.4" stroke-linejoin="round"/>`],
     [`<path d="M36 55L46 40L74 40L84 55L60 94Z"/>`,
      `<path d="M36 55L84 55M46 40L54 55L60 94M74 40L66 55L60 94M54 55L60 40L66 55" fill="none" stroke="{d}" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>`],
     [`<path d="M42 42L78 42L77 58C76 72 69 79 60 80C51 79 44 72 43 58Z"/><path d="M42 47C31 47 30 63 45 67M78 47C89 47 90 63 75 67" fill="none" stroke-width="4"/><path d="M55.5 80L64.5 80L65.5 89L54.5 89Z"/><rect x="45" y="89" width="30" height="8" rx="2.2"/>`,
      `<path d="${star(60, 58, 7.2)}" fill="{d}" stroke="none" opacity=".5"/><path d="M46 46L74 46" fill="none" stroke="{d}" stroke-opacity=".4" stroke-width="1.3"/>`],
     [`<circle cx="60" cy="49" r="17"/><path d="M34 99C33 84 38 75 46 71L39 59L46 55L54 68L66 68L74 55L81 59L74 71C82 75 87 84 86 99L74 99C74 90 71 84 66 82L54 82C49 84 46 90 46 99Z"/>`,
      `<g fill="none" stroke="{d}" stroke-opacity=".5" stroke-width="1.4"><ellipse cx="60" cy="49" rx="7.2" ry="17"/><path d="M43 49L77 49M45.5 41L74.5 41M45.5 57L74.5 57"/></g>`],
-    [`<path d="M70 28L40 71L57 71L48 104L83 59L65 59L76 28Z"/>`,
-     `<path d="M72 31L52 69M63 61L52 98" fill="none" stroke="{d}" stroke-opacity=".38" stroke-width="1.4" stroke-linecap="round"/>`]
+    [`<path d="M60 29L96 49L24 49Z"/><rect x="22" y="50.5" width="76" height="4.6" rx=".8"/><rect x="25.5" y="56.3" width="69" height="3.8" rx=".6"/>${[34, 51.3, 68.7, 86].map(x => `<rect x="${x - 5}" y="61.2" width="10" height="3" rx=".6"/><rect x="${x - 3.5}" y="64.2" width="7" height="25" rx=".8"/><rect x="${x - 5}" y="89.2" width="10" height="2.6" rx=".6"/>`).join('')}<rect x="23" y="92.6" width="74" height="4" rx=".7"/><rect x="18" y="97.6" width="84" height="4.4" rx=".8"/>`,
+     `<path d="M60 34.5L87 48.5L33 48.5Z" fill="none" stroke="{d}" stroke-opacity=".5" stroke-width="1.1" stroke-linejoin="round"/><path d="M62.2 36.8L56 43.8L59.6 43.8L57.4 48L64.3 41.2L60.7 41.2L63 36.8Z" fill="{d}" opacity=".7"/><path d="${[34, 51.3, 68.7, 86].map(x => `M${x - 1.6} 65.5V88M${x + 1.6} 65.5V88`).join('')}M22 55.3H98M25.5 60.3H94.5" fill="none" stroke="{d}" stroke-opacity=".45" stroke-width=".8"/>`]
   ];
 
   // a brilliant-cut stone in a metal setting: a bezel, two rings of facets (each as light as it faces the light, the
@@ -481,11 +482,11 @@ window.LS_RANKS = (() => {
     const edge = ` stroke="${deep}" stroke-width="1.1" stroke-linejoin="round"`;
     let back = '', body = '', front = '';
     if (!small && i >= 3) back += `<circle cx="60" cy="66" r="${60 + i * 3}" fill="url(#${u}aura)"/>`;
-    // Olympian's sun: rays, a bevelled ring and a dark well behind the crest
+    // Olympian: a glory of rays behind the shield
     if (i === 8) {
       let rays = '';
-      for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, w = 0.085, r1 = k % 2 ? 60 : 68; rays += `M${f1(60 + 44 * Math.cos(a - w))} ${f1(66 + 44 * Math.sin(a - w))}L${f1(60 + r1 * Math.cos(a))} ${f1(66 + r1 * Math.sin(a))}L${f1(60 + 44 * Math.cos(a + w))} ${f1(66 + 44 * Math.sin(a + w))}Z`; }
-      back += `<path d="${rays}" fill="url(#${u}wf)" stroke="${lo}" stroke-width=".7" stroke-linejoin="round"/><circle cx="60" cy="69.5" r="48" fill="${pit}"/><circle cx="60" cy="66" r="48" fill="url(#${u}L)" stroke="${deep}" stroke-width="1.2"/><circle cx="60" cy="66" r="45.6" fill="none" stroke="url(#${u}bev)" stroke-width="1.8"/><circle cx="60" cy="66" r="42" fill="url(#${u}pan)" stroke="${deep}" stroke-width="1"/><circle cx="60" cy="66" r="40.4" fill="none" stroke="${hi}" stroke-opacity=".35" stroke-width=".7" stroke-dasharray=".1 3.2" stroke-linecap="round"/>`;
+      for (let k = 0; k < 32; k++) { const a = k * Math.PI / 16, w = k % 2 ? 0.05 : 0.075, r1 = k % 4 === 0 ? 70 : k % 2 ? 58 : 64; rays += `M${f1(60 + 46 * Math.cos(a - w))} ${f1(66 + 46 * Math.sin(a - w))}L${f1(60 + r1 * Math.cos(a))} ${f1(66 + r1 * Math.sin(a))}L${f1(60 + 46 * Math.cos(a + w))} ${f1(66 + 46 * Math.sin(a + w))}Z`; }
+      back += `<path d="${rays}" fill="url(#${u}wf)" stroke="${lo}" stroke-width=".6" stroke-linejoin="round"/>`;
     }
     // wings: feathers swept up and back from the shoulders, longest at the top; each casts a shadow on the one below,
     // is lit above its spine and in shade below, and carries a quill. Diamond's are straight shards of crystal
@@ -505,8 +506,8 @@ window.LS_RANKS = (() => {
     }
     // horns (Titan): curved, ridged
     if (i === 7) for (const sgn of [1, -1]) { const X = v => f1(60 + sgn * v); back += `<path d="M${X(13)} 23Q${X(30)} 16 ${X(40)} -5Q${X(41)} 16 ${X(31)} 31Z" fill="url(#${u}wd)"${edge}/><path d="M${X(13)} 23Q${X(30)} 16 ${X(40)} -5Q${X(33)} 12 ${X(22)} 27Z" fill="url(#${u}wf)"/><path d="M${X(22)} 19L${X(27)} 28M${X(29)} 13L${X(34)} 22M${X(35)} 5L${X(38)} 12" fill="none" stroke="${deep}" stroke-opacity=".7" stroke-width="1"/>`; }
-    // crowns (Champion, Olympian): a band of points with a gem on each, lit on the left
-    if (i === 6 || i === 8) {
+    // Champion's crown: a band of points with a gem on each, lit on the left
+    if (i === 6) {
       const c = i === 8 ? [[36, 24], [33, 6], [45, 14], [52, 1], [60, 12], [68, 1], [75, 14], [87, 6], [84, 24]] : [[41, 25], [38, 8], [50, 16], [60, 1], [70, 16], [82, 8], [79, 25]];
       back += poly(c.map(([x, y]) => [x, y + 2.5]), pit) + poly(c, `url(#${u}R)`, edge) + poly(c.filter(([x]) => x <= 60).concat([[60, c[0][1]]]), `url(#${u}L)`) + `<path d="M${P(c.slice(1, -1))}" fill="none" stroke="#FFFFFF" stroke-opacity=".7" stroke-width=".8" stroke-linejoin="round"/><path d="M${c[0][0] + 1} ${c[0][1] - 4}H${c[c.length - 1][0] - 1}" stroke="${deep}" stroke-opacity=".6" stroke-width="1"/>`;
       back += c.filter((_, k) => k % 2 === 1).map(([x, y]) => `<circle cx="${x}" cy="${f1(y - 1)}" r="2.6" fill="${t.glow}" stroke="${deep}" stroke-width=".8"/><circle cx="${f1(x - 0.8)}" cy="${f1(y - 1.9)}" r=".9" fill="#FFFFFF"/>`).join('');
@@ -515,11 +516,18 @@ window.LS_RANKS = (() => {
     // all round, rivets and an engraved line on the frame, then a sunk panel with the rim's shadow inside it
     const roof = [top, R[1], [60, R[1][1] + 13], L[1]];
     body += `<path d="${dFull}" transform="translate(0 4.2)" fill="${pit}" stroke="${pit}" stroke-width="2.6" stroke-linejoin="round"/><path d="${dFull}" fill="${deep}" stroke="${deep}" stroke-width="2.6" stroke-linejoin="round"/>`;
-    body += poly([...L], `url(#${u}L)`) + poly([...R], `url(#${u}R)`) + poly(roof, `url(#${u}rf)`) + poly([top, R[1], [60, R[1][1] + 13]], mixc(hi, mid, 0.5));
-    body += `<path d="M60 ${f1(R[1][1] + 13)}L60 ${f1(tip[1])}" stroke="#FFFFFF" stroke-opacity=".3" stroke-width=".9"/><path d="M${P(ring(0.95))}Z" fill="none" stroke="url(#${u}bev)" stroke-width="2.2" stroke-linejoin="round"/>`;
+    body += poly([...L], `url(#${u}L)`) + poly([...R], `url(#${u}R)`) + (i === 8 ? `<ellipse cx="48" cy="46" rx="30" ry="22" fill="#FFFFFF" opacity=".16" clip-path="url(#${u}cb)"/>` : poly(roof, `url(#${u}rf)`) + poly([top, R[1], [60, R[1][1] + 13]], mixc(hi, mid, 0.5)));
+    body += `${i === 8 ? '' : `<path d="M60 ${f1(R[1][1] + 13)}L60 ${f1(tip[1])}" stroke="#FFFFFF" stroke-opacity=".3" stroke-width=".9"/>`}<path d="M${P(ring(0.95))}Z" fill="none" stroke="url(#${u}bev)" stroke-width="2.2" stroke-linejoin="round"/>`;
     if (!small) {
       body += `<path d="M${P(ring(0.855))}Z" fill="none" stroke="${deep}" stroke-opacity=".55" stroke-width=".9" stroke-linejoin="round"/><path d="M${P(ring(0.835))}Z" fill="none" stroke="#FFFFFF" stroke-opacity=".22" stroke-width=".7" stroke-linejoin="round"/>`;
-      const rv = inset([R[1], R[R.length - 2]], 0.87);
+      // Olympian's rim: a Greek key running all the way round, cut in (a dark line with a lit edge below it)
+      if (i === 8) {
+        const N = 18, r2 = 40.2, r1 = 34.6, at = (u, v) => { const a = (-90 + u * 360 / N) * Math.PI / 180, r = r2 - v * (r2 - r1); return `${f1(60 + r * Math.cos(a))} ${f1(66 + r * Math.sin(a))}`; };
+        let d = '';
+        for (let k = 0; k < N; k++) d += `M${at(k, 1)}L${at(k, 0)}L${at(k + 0.78, 0)}L${at(k + 0.78, 0.75)}L${at(k + 0.3, 0.75)}L${at(k + 0.3, 0.38)}L${at(k + 0.54, 0.38)}M${at(k, 1)}L${at(k + 1, 1)}`;
+        body += `<path d="${d}" transform="translate(.35 .5)" fill="none" stroke="#FFFFFF" stroke-opacity=".35" stroke-width=".9" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${deep}" stroke-opacity=".8" stroke-width=".9" stroke-linejoin="round"/>`;
+      }
+      const rv = i === 8 ? [] : inset([R[1], R[R.length - 2]], 0.87);
       body += [...rv, ...mirror(rv)].map(([x, y]) => `<circle cx="${f1(x)}" cy="${f1(y + 0.6)}" r="2.1" fill="${pit}"/><circle cx="${f1(x)}" cy="${f1(y)}" r="1.9" fill="url(#${u}L)" stroke="${deep}" stroke-width=".6"/><circle cx="${f1(x - 0.6)}" cy="${f1(y - 0.6)}" r=".6" fill="#FFFFFF"/>`).join('');
     }
     body += poly(ring(0.74), `url(#${u}pan)`, ` stroke="${deep}" stroke-width="1.3" stroke-linejoin="round"`);
@@ -536,8 +544,27 @@ window.LS_RANKS = (() => {
     front += `<g transform="${tr}" fill="${deep}" stroke="${deep}" stroke-width="${small ? 3.2 : 2.6}" stroke-linejoin="round">${base}</g>`;
     front += `<g${small ? '' : ` filter="url(#${u}rel)"`}><g transform="${tr}" fill="url(#${u}sg)" stroke="url(#${u}sg)" stroke-width=".6" stroke-linejoin="round">${base}</g></g>`;
     if (!small) front += `<g transform="${tr}">${lines.replace(/\{d\}/g, deep)}</g>`;
-    // the laurel on Olympian's sun, either side of the crest
-    if (i === 8) { let l = ''; for (let k = 0; k < 6; k++) { const deg = 98 + k * 15, a = deg * Math.PI / 180, x = 60 + 36 * Math.cos(a), y = 66 + 36 * Math.sin(a), rot = deg - 62; for (const sgn of [1, -1]) { const xx = f1(sgn > 0 ? x : 120 - x); l += `<ellipse cx="${xx}" cy="${f1(y)}" rx="2.7" ry="6.2" transform="rotate(${f1(sgn * rot)} ${xx} ${f1(y)})"/>`; } } back += `<g fill="url(#${u}wf)" stroke="${deep}" stroke-width=".6">${l}</g>`; }
+    // Olympian's olive wreath, the crown of a victor at the ancient Games: two branches round the shield, with olives,
+    // tied at the foot with a ribbon
+    if (i === 8) {
+      let stem = '', leaves = '', olives = '';
+      for (const sgn of [1, -1]) {
+        const X = x => f1(sgn > 0 ? x : 120 - x), r = 50;
+        stem += `M${X(60 + r * Math.cos(84 * Math.PI / 180))} ${f1(66 + r * Math.sin(84 * Math.PI / 180))}A${r} ${r} 0 0 0 ${X(60 + r * Math.cos(-44 * Math.PI / 180))} ${f1(66 + r * Math.sin(-44 * Math.PI / 180))}`;
+        for (let k = 0; k < 9; k++) {
+          const th = (80 - k * 14.5) * Math.PI / 180, sx_ = 60 + r * Math.cos(th), sy = 66 + r * Math.sin(th), tx = Math.sin(th), ty = -Math.cos(th), sc = 1 - k * 0.045;
+          for (const side of [1, -1]) {
+            const cx = sx_ + tx * 3.4 * sc + Math.cos(th) * side * 3.6 * sc, cyy = sy + ty * 3.4 * sc + Math.sin(th) * side * 3.6 * sc;
+            const ang = Math.atan2(ty, tx) * 180 / Math.PI - 90 + side * 30;
+            leaves += `<ellipse cx="${X(cx)}" cy="${f1(cyy)}" rx="${f1(2.3 * sc)}" ry="${f1(6.6 * sc)}" transform="rotate(${f1(sgn > 0 ? ang : -ang)} ${X(cx)} ${f1(cyy)})"/>`;
+          }
+          if (k % 3 === 1) olives += `<circle cx="${X(sx_ + Math.cos(th) * 6.5)}" cy="${f1(sy + Math.sin(th) * 6.5)}" r="1.9"/>`;
+        }
+      }
+      back += `<path d="${stem}" fill="none" stroke="${deep}" stroke-width="2.4" stroke-linecap="round"/><path d="${stem}" fill="none" stroke="${mid}" stroke-width="1.2" stroke-linecap="round"/>`;
+      back += `<g fill="url(#${u}R)" stroke="${deep}" stroke-width=".6">${leaves}</g><g fill="${mixc(mid, lo, 0.5)}" stroke="${deep}" stroke-width=".5">${olives}</g>`;
+      back += `<path d="M60 113L49 127L53 128L57 123L60 128L63 123L67 128L71 127Z" fill="url(#${u}R)" stroke="${deep}" stroke-width=".8" stroke-linejoin="round"/><ellipse cx="60" cy="114.5" rx="5" ry="3.4" fill="url(#${u}L)" stroke="${deep}" stroke-width=".8"/>`;
+    }
     // from Gold up, a cut gem set in the frame above the panel
     if (gn) front += gemCut(u, 60, top[1] + (i === 5 ? 12 : 10.5), i === 5 ? 6.6 : 6, gn, gem, -90, t.c, small);
     const sparks = !small && i >= 5 ? `<g fill="#FFFFFF">${[[16, 16, 4.6], [105, 10, 3.8], [110, 104, 4.2], [10, 98, 3.2]].map(([x, y, r]) => `<path d="${glint(x, y, r)}"/>`).join('')}</g>` : '';

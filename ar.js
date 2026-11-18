@@ -1691,6 +1691,7 @@ window.LS_AR = {
 "zero": "قالب · لم يُنفَّذ بعد"
 },
 "Templates": "القوالب",
+"Temple of Olympus": "معبد الأولمب",
 "Tension through the range": "الشد على امتداد الحركة",
 "Tested in research. Tap a source to read the study.": "مُختبَر في الأبحاث. اضغط على المصدر لقراءة الدراسة.",
 "Text": "النص",
@@ -1786,6 +1787,7 @@ window.LS_AR = {
 "The stretch counts for 2 points here, not 3: in the only direct test, incline curls didn’t grow the biceps significantly.": "الإطالة تُحسب هنا بنقطتين لا ثلاث: في الاختبار المباشر الوحيد، لم يُنمِّ الكيرل المائل البايسبس نموًا يُعتدّ به.",
 "The studies and data behind the ranks, by what they support, each with what it found.": "الدراسات والبيانات التي تقوم عليها الرتب، مصنّفة بحسب ما تدعمه، ومع كلٍّ منها ما وجدته.",
 "The top rank": "أعلى رتبة",
+"The top rank is Greek now: a round hoplite shield with a Greek key running round its rim, the temple of Olympus in relief (a thunderbolt in its pediment), an olive wreath like the one victors wore at the ancient Games, tied with a ribbon, and a glory of rays behind. Platinum’s crest is level and symmetrical, its summit centred under a star.": "صارت الرتبة العليا إغريقية: درع إغريقي مستدير يدور حول حافته نقش المفتاح الإغريقي، ومعبد الأولمب بارزًا في وسطه (وفي جبهته صاعقة)، وإكليل زيتون كالذي توّج به الفائزون في الألعاب القديمة معقود بشريط، وهالة من الأشعة خلفه. وصار شعار البلاتيني متوازنًا ومتناظرًا، وقمته في الوسط تحت نجمة.",
 "The week on Train counts your workouts against what your split plans, with a bar that fills and a badge when you reach it.": "يعدّ الأسبوع في قسم التدريب حصصك مقابل ما يخططه برنامجك، مع شريط يمتلئ وشارة عند بلوغ الهدف.",
 "The whole body every session, with a rest day in between.": "الجسم كامل في كل حصة، مع يوم راحة بين الحصص.",
 "The workout": "الحصة",
@@ -1862,6 +1864,7 @@ window.LS_AR = {
 "Triceps, mostly the lateral and medial heads; the long head is shortened at the shoulder.": "الترايسبس، وخاصة الرأسين الجانبي والإنسي؛ والرأس الطويل يكون مقصّرًا عند الكتف.",
 "Triceps: the lateral and medial heads do most of the work; the long head works too but is not stretched with the arm down.": "الترايسبس: الرأسان الجانبي والإنسي يقومان بمعظم العمل؛ والرأس الطويل يعمل أيضًا لكنه غير مُطال والذراع للأسفل.",
 "Trophy": "كأس",
+"Truly Olympian": "أولمبي حقًا",
 "Trunk flexion": "ثني الجذع",
 "Turn on": "تفعيل",
 "Turn ranks off": "إيقاف الرتب",
@@ -2129,6 +2132,7 @@ window.LS_AR = {
 "zero": "نحو {n} دقيقة"
 },
 "ahead of most competitors": "متقدم على معظم المتنافسين",
+"among the gods, top 1% of competitors": "بين الآلهة، ضمن أفضل 1% من المتنافسين",
 "any": "أي عدد",
 "at home under the bar": "صرت تألف البار",
 "bench press": "ضغط الصدر",
