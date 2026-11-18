@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -6041,7 +6041,7 @@ const tierMean = i => T('{symbol}: {meaning}', { symbol: T(RK.TIERS[i].sym), mea
 const tierColor = i => RK.TIERS[i].c[1];
 let embSeq = 0;
 // at list sizes (xs) the emblem leaves out its glow, rays and sparkles
-const emblem = (i, cls = '') => `<span class="rank-e ${cls}">${RK.emblem(i, 'e' + (++embSeq), tierName(i), /\bxs\b/.test(cls))}</span>`;
+const emblem = (i, cls = '') => `<span class="rank-e ${cls}">${RK.emblem(i, 'e' + (++embSeq), tierName(i), /\b(xs|sm)\b/.test(cls))}</span>`;
 const basisMemo = new Map();
 function rankBasis(id) {
   const ex = getEx(id), key = `${id}|${ex.name}|${ex.eq}|${ex.k}|${ex.uni}`;
@@ -6609,6 +6609,9 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 52, items: [
+    ['trophy', 'Crests with depth and meaning', 'The rank crests are solid now: thick metal with bevelled edges, rivets and engraving, and a sunken panel with a symbol cast in relief, telling the way up: a seedling, an anvil, a barbell, a flame, a summit, a diamond, a trophy, Atlas carrying the sky and a thunderbolt. From Gold up a cut gem sits in the frame; wings have layered feathers, and each crest casts a shadow.']
+  ] },
   { v: 51, items: [
     ['trophy', 'Ranks, redesigned', 'Every rank has a new crest: flat planes of metal with a cut gem at its heart, and a shape that climbs with the rank, from a plain plaque through chevrons and stars to wings, a crown, horns and, at the top, a sun and laurels. Your rank on Progress shows the crest in its own light, what it stands for and the nine steps of the climb; Your ranks and each exercise’s rank follow the same look.']
   ] },
