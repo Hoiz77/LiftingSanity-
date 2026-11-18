@@ -136,7 +136,12 @@ function trimNum(v, d = 2) { const f = 10 ** d; return String(Math.round(v * f) 
 const latinDigits = str => String(str).replace(/[\u0660-\u0669]/g, d => d.charCodeAt(0) - 0x660).replace(/[\u06F0-\u06F9]/g, d => d.charCodeAt(0) - 0x6F0).replace(/\u066B/g, '.').replace(/\u066C/g, '');
 function parseNum(str) {
   if (str == null || String(str).trim() === '') return null;
-  const v = parseFloat(latinDigits(str).replace(',', '.'));
+  // 62,5 is 62.5; with both marks the last one is the decimal point (1,000.5 or 1.000,5); 1,000 is a thousand
+  let s = latinDigits(str).trim();
+  if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+  else s = s.replace(',', '.');
+  const v = parseFloat(s);
   return isFinite(v) ? v : null;
 }
 // units, effort scales and side letters as shown: in Arabic when Arabic terms are chosen; what's saved never changes
@@ -595,7 +600,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1281,7 +1286,7 @@ function setPRs(x, s, rec, k) {
       if (e1rm(s.w, r) > rec.e1rm + 1e-6) out.push('Est. 1RM');
       if (s.w > rec.w + 1e-6) out.push('Heaviest');
     }
-  } else if (k === 'bw' || k === 'aw') { if (r > rec.reps) out.push('Most reps'); }
+  } else if (k === 'bw' || k === 'aw') { if (r > rec.reps) out.push('Most reps'); if (k === 'bw' && r > 0 && s.w > rec.w + 1e-6) out.push('Heaviest'); }
   else if (k === 'dur' || k === 'wdur') { if ((s.sec || 0) > rec.sec) out.push('Longest'); }
   else if ((s.dist || 0) > rec.dist) out.push('Farthest');
   return out;
@@ -1374,7 +1379,7 @@ function metricsFor(k) {
   return [['dist', T('Distance')], ['sec', T('Time')]];
 }
 function fmtMetric(metric, v, k) {
-  if (metric === 'reps') return TN(Math.round(v), '{n} reps', '{n} reps');
+  if (metric === 'reps') return TN(Math.round(v), '{n} rep', '{n} reps');
   if (metric === 'sec') return fmtClock(v);
   if (metric === 'dist') return dispDist(v, k) + ' ' + distUnit(k);
   if (metric === 'vol') return fmtVol(v);
@@ -1405,8 +1410,8 @@ function fmtSet(x, s, k, withEff = true) {
   const reps = `${s.r ?? 0}`;
   let t;
   if (k === 'wr') t = `${dispW(s.w || 0)} × ${reps}`;
-  else if (k === 'bw') t = s.w ? `${signed('+' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
-  else if (k === 'aw') t = s.w ? `${signed('−' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} reps', '{n} reps');
+  else if (k === 'bw') t = s.w ? `${signed('+' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} rep', '{n} reps');
+  else if (k === 'aw') t = s.w ? `${signed('−' + dispW(s.w))} × ${reps}` : TN(s.r ?? 0, '{n} rep', '{n} reps');
   else if (k === 'dur') t = fmtClock(s.sec || 0);
   else if (k === 'wdur') t = `${dispW(s.w || 0)} · ${fmtClock(s.sec || 0)}`;
   else if (k === 'dist') t = `${dispDist(s.dist || 0, k)} ${distUnit(k)}${s.sec ? ' · ' + fmtClock(s.sec) : ''}`;
@@ -1435,7 +1440,7 @@ function fmtLine(x, s, k) {
   k = k || getEx(x.exId).k;
   const parts = [];
   if (hasWeight(k) && s.w != null) parts.push(signed(`${k === 'bw' ? '+' : k === 'aw' ? '−' : ''}${dispW(s.w)} ${U()}`));
-  if (hasReps(k)) parts.push(TN(s.r ?? 0, '{n} reps', '{n} reps'));
+  if (hasReps(k)) parts.push(TN(s.r ?? 0, '{n} rep', '{n} reps'));
   if (hasDist(k) && s.dist != null) parts.push(`${dispDist(s.dist, k)} ${distUnit(k)}`);
   if (hasTime(k) && s.sec != null) parts.push(fmtClock(s.sec));
   if (s.rir != null && hasReps(k) && state.settings.effort !== 'off') parts.push(`${effDisp(s.rir)} ${effName()}`);
@@ -1842,13 +1847,21 @@ function renderHud() {
   el.innerHTML = `<span>LS-OS v1.3</span><b>SYS:OK</b><span class="hud-jp">稼働中</span><span data-hud="t"></span><span class="hud-w" data-hud="w"></span><span class="hud-log"><span>${log.map(esc).map(x => '&gt; ' + x).join('&nbsp;&nbsp;&nbsp;')}</span></span>`;
   tickHud();
 }
+let hudMin = -1, hudWorld = '';
 function tickHud() {
   const t = $('[data-hud="t"]'), w = $('[data-hud="w"]');
   if (!t) return;
   const d = new Date(), p = n => String(n).padStart(2, '0');
   setText(t, `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`);
-  const zone = tz => { try { return d.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (e) { return '--:--'; } };
-  if (w) setText(w, `UTC ${zone('UTC')} · TYO ${zone('Asia/Tokyo')} · NYC ${zone('America/New_York')}`);
+  if (w) {
+    const min = Math.floor(d.getTime() / 60000);
+    if (min !== hudMin) {
+      hudMin = min;
+      const zone = tz => { try { return d.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (e) { return '--:--'; } };
+      hudWorld = `UTC ${zone('UTC')} · TYO ${zone('Asia/Tokyo')} · NYC ${zone('America/New_York')}`;
+    }
+    setText(w, hudWorld);
+  }
 }
 function renderTabs() {
   const el = $('#tabs');
@@ -2704,9 +2717,9 @@ function splitCard(split) {
   const t = days[pos] && !isRest(days[pos]) ? days[pos] : null;
   const last = t ? tplLastDone(t.id) : null;
   const est = t ? estMinutes(t) : 0;
-  const head = !t ? '' : st.state === 'rest' ? `<p class="eyebrow good">${icon('moon')}${T('Rest day today')}</p><h3>${T('Recover')}</h3><p class="muted">${TN(t ? t.ex.length : 0, 'Next up: <b>{name}</b> {when} · {n} exercises', 'Next up: <b>{name}</b> {when} · {n} exercises', { name: esc(t ? t.name : ''), when: whenText(st.due) })}</p>`
+  const head = !t ? '' : st.state === 'rest' ? `<p class="eyebrow good">${icon('moon')}${T('Rest day today')}</p><h3>${T('Recover')}</h3><p class="muted">${TN(t ? t.ex.length : 0, 'Next up: <b>{name}</b> {when} · {n} exercise', 'Next up: <b>{name}</b> {when} · {n} exercises', { name: esc(t ? t.name : ''), when: whenText(st.due) })}</p>`
     : st.state === 'done' ? `<p class="eyebrow good">${icon('check')}${T('Done for today')}</p><h3>${T('Nice work')}</h3><p class="muted">${st.rests ? TN(st.rests, 'Next up: <b>{name}</b> {when}, after a rest day', 'Next up: <b>{name}</b> {when}, after {n} rest days', { name: esc(t ? t.name : ''), when: whenText(st.due) }) : T('Next up: <b>{name}</b> {when}', { name: esc(t ? t.name : ''), when: whenText(st.due) })}</p>`
-    : `<p class="eyebrow accent">${T('Up next · Day {day} of {n}', { day: pos + 1, n })}</p><h3>${esc(t.name)}</h3><div class="facts"><span>${icon('dumbbell')}${TN(t.ex.length, '{n} exercises', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(t), '{n} working sets', '{n} working sets', { n: trimNum(tplWorkingSets(t), 1) })}</span><span>${icon('clock')}${TN(est, 'about {n} min', 'about {n} min')}</span><span>${icon('calendar')}${last ? T('last done {when}', { when: relDay(last.start) }) : T('not done yet')}</span></div>`;
+    : `<p class="eyebrow accent">${T('Up next · Day {day} of {n}', { day: pos + 1, n })}</p><h3>${esc(t.name)}</h3><div class="facts"><span>${icon('dumbbell')}${TN(t.ex.length, '{n} exercise', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(t), '{n} working set', '{n} working sets', { n: trimNum(tplWorkingSets(t), 1) })}</span><span>${icon('clock')}${TN(est, 'about {n} min', 'about {n} min')}</span><span>${icon('calendar')}${last ? T('last done {when}', { when: relDay(last.start) }) : T('not done yet')}</span></div>`;
   const strip = t ? t.ex.filter(x => artOf(x.exId) || photos.get(x.exId)).slice(0, 4) : [];
   // today's workout starts from the top of its card, above the list of what's in it (no scrolling to begin); on a
   // rest day or once it's done, training anyway stays under the list
@@ -2894,7 +2907,7 @@ function templatesSection(split) {
 }
 function tplCard(t) {
   const last = tplLastDone(t.id);
-  return `<article class="tpl-card"><button class="tpl-main" data-a="tplPreview" data-id="${t.id}"><b>${esc(t.name)}</b><span class="muted">${TN(t.ex.length, '{n} exercises · {when}', '{n} exercises · {when}', { when: last ? relDay(last.start) : T('not done yet') })}</span><span class="tpl-ex">${esc(t.ex.slice(0, 4).map(x => getEx(x.exId).name).join(', '))}${t.ex.length > 4 ? '…' : ''}</span></button>
+  return `<article class="tpl-card"><button class="tpl-main" data-a="tplPreview" data-id="${t.id}"><b>${esc(t.name)}</b><span class="muted">${TN(t.ex.length, '{n} exercise · {when}', '{n} exercises · {when}', { when: last ? relDay(last.start) : T('not done yet') })}</span><span class="tpl-ex">${esc(t.ex.slice(0, 4).map(x => getEx(x.exId).name).join(', '))}${t.ex.length > 4 ? '…' : ''}</span></button>
     <div class="tpl-btns"><button class="btn sm primary" data-a="tplStart" data-id="${t.id}">${icon('play')}${T('Start')}</button><button class="icon-btn" data-a="tplMenu" data-id="${t.id}" aria-label="${T('More for {name}', { name: esc(t.name) })}">${icon('dots')}</button></div></article>`;
 }
 function programLibrary() {
@@ -3171,7 +3184,7 @@ function finishPrompt() {
   }
   confirmSheet({
     title: editing ? T('Save changes?') : T('Finish {name}?', { name: w.name }),
-    text: `${TN(total, '{done} of {n} sets checked.', '{done} of {n} sets checked.', { done })}${done < total ? ' ' + T('Unchecked sets are left out.') : ''}${half ? ' ' + TN(half, 'One set has only one side checked: check the other side to keep it.', '{n} sets have only one side checked: check the other side to keep them.') : ''}`,
+    text: `${TN(total, '{done} of {n} set checked.', '{done} of {n} sets checked.', { done })}${done < total ? ' ' + T('Unchecked sets are left out.') : ''}${half ? ' ' + TN(half, 'One set has only one side checked: check the other side to keep it.', '{n} sets have only one side checked: check the other side to keep them.') : ''}`,
     ok: editing ? T('Save') : T('Finish workout'), cancel: T('Keep going'),
     onOk: () => { setTimeout(finishWorkout, 30); }
   });
@@ -3186,7 +3199,7 @@ function finishWorkout() {
   state.workouts.push(w);
   state.workouts.sort((a, b) => a.start - b.start);
   // a new workout at the end only needs its own records; an edit or a past workout can change later ones
-  if (state.workouts[state.workouts.length - 1] === w) w.prs = workoutPRs(w); else recalcPRs();
+  if (!editing && state.workouts[state.workouts.length - 1] === w) w.prs = workoutPRs(w); else recalcPRs();
   if (!editing && w.splitId) {
     const sp = splitById(w.splitId);
     if (sp && w.day != null && sp.days[w.day] === w.tplId) sp.pos = (w.day + 1) % Math.max(1, sp.days.length);
@@ -4911,7 +4924,7 @@ function addWarmups(i) {
   const made = plan.filter(([wt]) => wt < target - 0.01 && !seen.has(wt) && seen.add(wt)).map(([wt, r]) => ({ id: uid(), t: 'W', w: wt, r, done: false }));
   x.sets = [...(x.uni ? pairUp(made, firstSide(x)) : made), ...x.sets.filter(s => s.t !== 'W' || s.done)];
   save(); renderWorkout();
-  toast(TN(made.length, 'Added {n} warm-up sets up to {w}.', 'Added {n} warm-up sets up to {w}.', { w: fmtW(target) }));
+  toast(TN(made.length, 'Added {n} warm-up set up to {w}.', 'Added {n} warm-up sets up to {w}.', { w: fmtW(target) }));
 }
 function woInput(el) { if (el.dataset.note) noteInput(el); else woSetField(+el.dataset.e, +el.dataset.s, el.dataset.f, el.value); }
 function woSetField(i, j, f, v) {
@@ -5635,7 +5648,7 @@ function templateEditor(tplId, opts = {}) {
     render: () => (tidySupersets(d.ex), `${sheetHead(isNew ? T('New template') : T('Edit template'), `<button class="btn primary sm" data-a="save">${T('Save')}</button>`, `<button class="btn ghost sm" data-a="sheetClose">${T('Cancel')}</button>`)}
       <div class="sheet-body pad tpl-ed">
         <label class="tpl-name"><span class="eyebrow">${T('Template')}</span><input data-f="name" value="${esc(d.name)}" autocomplete="off" aria-label="${T('Name')}" placeholder="${T('Name')}"></label>
-        ${d.ex.length ? `<div class="facts tpl-facts"><span>${icon('dumbbell')}${TN(d.ex.length, '{n} exercise', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(d), '{n} working sets', '{n} working sets', { n: trimNum(tplWorkingSets(d), 1) })}</span><span>${icon('clock')}${TN(estMinutes(d), 'about {n} min', 'about {n} min')}</span></div>` : ''}
+        ${d.ex.length ? `<div class="facts tpl-facts"><span>${icon('dumbbell')}${TN(d.ex.length, '{n} exercise', '{n} exercises')}</span><span>${icon('rows')}${TN(tplWorkingSets(d), '{n} working set', '{n} working sets', { n: trimNum(tplWorkingSets(d), 1) })}</span><span>${icon('clock')}${TN(estMinutes(d), 'about {n} min', 'about {n} min')}</span></div>` : ''}
         <label class="tpl-note"><span class="eyebrow">${icon('note')}${T('Notes')}</span><textarea data-f="note" rows="2" placeholder="${T('Focus, tempo, anything to remember')}">${esc(d.note || '')}</textarea></label>
         ${d.ex.map((x, i) => {
           const ex = getEx(x.exId);
@@ -5772,7 +5785,7 @@ function splitEditor(splitId) {
           const name = t ? t.name : T('Rest day');
           const moves = `<button class="icon-btn" data-a="up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${T('Move {name} up', { name: esc(name) })}">${icon('up')}</button>
             <button class="icon-btn" data-a="down" data-i="${i}" ${i === d.days.length - 1 ? 'disabled' : ''} aria-label="${T('Move {name} down', { name: esc(name) })}">${icon('down')}</button>`;
-          return t ? `<div class="split-day"><span class="tex-n">${i + 1}</span><span class="tex-name"><b>${esc(t.name)}</b><small>${TN(t.ex.length, '{n} exercises', '{n} exercises')}${i === d.pos ? ' · ' + T('up next') : ''}</small></span>
+          return t ? `<div class="split-day"><span class="tex-n">${i + 1}</span><span class="tex-name"><b>${esc(t.name)}</b><small>${TN(t.ex.length, '{n} exercise', '{n} exercises')}${i === d.pos ? ' · ' + T('up next') : ''}</small></span>
             ${moves}<button class="icon-btn" data-a="editDay" data-i="${i}" aria-label="${T('Edit {name}', { name: esc(t.name) })}">${icon('edit')}</button>
             <button class="icon-btn" data-a="rm" data-i="${i}" aria-label="${T('Remove {name} from split', { name: esc(t.name) })}">${icon('x')}</button></div>`
             : `<div class="split-day rest"><span class="tex-n">${icon('moon')}</span><span class="tex-name"><b>${T('Rest day')}</b><small>${T('Passes by itself with the calendar')}</small></span>
@@ -5796,7 +5809,7 @@ function splitEditor(splitId) {
       addExisting: (b, def) => {
         const list = state.templates.filter(t => !d.days.includes(t.id));
         if (!list.length) { toast(T('Every template is already in this split.')); return; }
-        menuSheet(T('Add a template'), list.map(t => [t.name, 'copy', () => { d.days.push(t.id); refreshSheet(def); }, { sub: TN(t.ex.length, '{n} exercises', '{n} exercises') }]));
+        menuSheet(T('Add a template'), list.map(t => [t.name, 'copy', () => { d.days.push(t.id); refreshSheet(def); }, { sub: TN(t.ex.length, '{n} exercise', '{n} exercises') }]));
       },
       activate: (b, def) => { keep(); Object.assign(orig, d); state.activeSplit = d.id; save(); closeSheet(def); render(); toast(T('{name} is now your split.', { name: d.name })); },
       del: (b, def) => confirmSheet({ title: T('Delete {name}?', { name: d.name }), text: T('Its templates and your history are kept. Only the split itself is removed.'), ok: T('Delete split'), danger: true,
@@ -5856,7 +5869,7 @@ function histCard(w) {
   const prs = (w.prs || []).length;
   return `<button class="hist-card" data-a="openWorkout" data-id="${w.id}">
     <div class="hist-top"><span class="stack" aria-hidden="true">${w.ex.slice(0, 4).map(x => thumb(x.exId, 'sm')).join('')}</span><span class="hist-n">#${n}</span><b>${esc(w.name)}</b>${w.demo ? `<span class="pill">${T('sample')}</span>` : ''}${prs ? `<span class="pill good">${icon('trophy')}${prs}</span>` : ''}<span class="muted hist-date">${esc(fmtDate(w.start))}</span></div>
-    <div class="hist-stats"><span>${fmtDuration(w.end - w.start)}</span><span>${TN(workingSets(w), '{n} sets', '{n} sets')}</span><span>${fmtVol(workoutVolume(w))}</span></div>
+    <div class="hist-stats"><span>${fmtDuration(w.end - w.start)}</span><span>${TN(workingSets(w), '{n} set', '{n} sets')}</span><span>${fmtVol(workoutVolume(w))}</span></div>
     <div class="hist-ex">${w.ex.slice(0, 5).map(x => `<span>${trimNum(sum(x.sets, s => s.t !== 'W' ? setWeight(s) : 0), 1)} × ${esc(getEx(x.exId).name)}</span>`).join('')}${w.ex.length > 5 ? `<span class="muted">${T('+{n} more', { n: w.ex.length - 5 })}</span>` : ''}</div></button>`;
 }
 function calendarHTML(mStart) {
@@ -5979,7 +5992,7 @@ function exerciseSheet(exId) {
           <div class="exd-map"><figure>${figure('front', ex, 'full', true, true)}<figcaption>${T('Front')}</figcaption></figure><figure>${figure('back', ex, 'full', true, true)}<figcaption>${T('Back')}</figcaption></figure></div></div>
         ${muscleKey(ex)}
         <div class="exd-legend"><button class="btn sm" data-a="photo">${icon('camera')}${photo ? T('Change photo') : T('Add your own photo')}</button>${photo ? `<button class="btn sm ghost" data-a="photoDel">${T('Remove photo')}</button>` : ''}</div>
-        ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}${T('How to do it')}<span class="muted">${TN(steps.length, '{n} steps', '{n} steps')}</span>${icon('down', 'chev')}</summary>
+        ${steps ? `<details class="howto" ${st.howto ? 'open' : ''}><summary data-a="howto">${icon('info')}${T('How to do it')}<span class="muted">${TN(steps.length, '{n} step', '{n} steps')}</span>${icon('down', 'chev')}</summary>
           <ol class="steps">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol><p class="muted small">${T('Instructions from the open {link} (MIT).', { link: '<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">exercises-dataset</a>' })}</p></details>` : ''}
         ${scienceHTML(exId)}
         <div class="exd-tags"><span class="pill">${esc(MUSCLES[ex.m])}</span>${ex.sec.map(m => `<span class="pill quiet">${esc(MUSCLES[m])}</span>`).join('')}<span class="pill quiet">${esc(EQUIP[ex.eq])}</span><span class="pill quiet">${esc(KINDS[k])}</span>
@@ -6383,7 +6396,7 @@ VIEWS.progress = function () {
   const weeks = Array.from({ length: 12 }, (_, i) => weekFrom(wk, i - 11));
   const vol = weeks.map(s => ({ s, ws: workoutsIn(s, weekFrom(s, 1)) }));
   const archived = state.blocks.slice(0, -1).reverse();
-  let h = `<header class="page-h"><div><p class="eyebrow">${TN(mine(state.workouts).length, '{n} sessions all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
+  let h = `<header class="page-h"><div><p class="eyebrow">${TN(mine(state.workouts).length, '{n} session all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
   h += ranksSection();
   h += weekCard();
   h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(blkName(b))}${icon('edit')}</button></h2>
@@ -6408,7 +6421,7 @@ VIEWS.progress = function () {
   if (prs.length) h += `<section class="section"><h2 class="section-h">${T('Recent records')}</h2><div class="card list-card">${prs.map(({ w, p }) => `<button class="pr-item" data-a="openEx" data-id="${p.exId}">${icon('trophy')}<span><b>${esc(getEx(p.exId).name)}</b><small>${esc(kindName[p.kind] || p.kind)} · ${esc(fmtShort(w.start))}</small></span><span class="num">${esc(fmtSet({ uni: p.uni, exId: p.exId }, p.set))}</span></button>`).join('')}</div></section>`;
   if (archived.length) h += `<section class="section"><h2 class="section-h">${T('Earlier blocks')}</h2><p class="muted section-sub">${T('Saved progress from before each reset.')}</p><div class="tpl-grid">${archived.map(bk => {
     const [f, t] = blockRange(bk), ws = workoutsIn(f, t);
-    return `<button class="tpl-card block-old" data-a="openBlock" data-id="${bk.id}"><span class="tpl-main"><b>${esc(blkName(bk))}</b><span class="muted">${bk.start ? `${esc(fmtShort(bk.start))} – ${esc(fmtShort(t))}` : T('Start – {to}', { to: esc(fmtShort(t)) })}</span><span class="tpl-ex">${TN(ws.length, '{n} sessions', '{n} sessions')} · ${esc(fmtVol(sum(ws, workoutVolume)))}</span></span>${icon('right', 'chev')}</button>`;
+    return `<button class="tpl-card block-old" data-a="openBlock" data-id="${bk.id}"><span class="tpl-main"><b>${esc(blkName(bk))}</b><span class="muted">${bk.start ? `${esc(fmtShort(bk.start))} – ${esc(fmtShort(t))}` : T('Start – {to}', { to: esc(fmtShort(t)) })}</span><span class="tpl-ex">${TN(ws.length, '{n} session', '{n} sessions')} · ${esc(fmtVol(sum(ws, workoutVolume)))}</span></span>${icon('right', 'chev')}</button>`;
   }).join('')}</div></section>`;
   return h;
 };
@@ -6613,6 +6626,10 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 55, items: [
+    ['trophy', 'Records that count', 'More weight on a weighted pull-up or dip is a Heaviest record now, even with fewer reps. Moving an older workout past your newest one works every record out again, so no workout keeps a record it no longer beats.'],
+    ['check', 'Small things, put right', 'One of something reads “1 set”, “1 exercise”, “1 rep”. Lift ranks no longer drop a step on your 36th birthday. A comma for thousands (1,000.5) reads the way you meant it. A look changed in another open tab shows in this one too.'],
+  ] },
   { v: 54, items: [
     ['check', 'Train and Progress agree', 'Progress counts your week, your sets this week, your streak and your block the same way Train does: sample workouts are left out. The charts and lists still show them, so there’s something to look at.'],
     ['layout', 'Pictures and names', 'An exercise picture that’s still on its way shows a body outline instead of a blank tile. On an iPad, long exercise names in the list beside a workout wrap to a second line instead of being cut off.']
@@ -6749,7 +6766,7 @@ function backupNudge() {
   const b = backupInfo();
   if (state.active || b.real < 3 || (state.flags.backupSnooze || 0) > Date.now()) return '';
   if (b.at && !(b.days >= 7 && b.since >= 1) && b.since < 8) return '';
-  return `<div class="notice backup-nudge">${icon('download')}<p><b>${b.at ? TN(b.since, '{n} workout since your last backup.', '{n} workouts since your last backup.') : TN(b.real, 'Your {n} workouts are only on this device.', 'Your {n} workouts are only on this device.')}</b> ${T('Save a copy to Files or iCloud Drive, so losing your phone doesn’t lose them.')}</p>
+  return `<div class="notice backup-nudge">${icon('download')}<p><b>${b.at ? TN(b.since, '{n} workout since your last backup.', '{n} workouts since your last backup.') : TN(b.real, 'Your {n} workout is only on this device.', 'Your {n} workouts are only on this device.')}</b> ${T('Save a copy to Files or iCloud Drive, so losing your phone doesn’t lose them.')}</p>
     <div class="nudge-btns"><button class="btn sm primary" data-a="exportFile">${T('Back up now')}</button><button class="btn sm ghost" data-a="backupLater">${T('Later')}</button></div></div>`;
 }
 // one copy of your data a day on this device, for the last few days: a way back from a mistake or a damaged save.
@@ -6868,7 +6885,7 @@ function importText(text, opts = {}) {
   if (!problem) try { next = migrate(JSON.parse(JSON.stringify(data))); } catch (e) { problem = T('it couldn’t be read'); }
   if (problem) { toast(T('This backup can’t be restored: {problem}. Nothing was changed.', { problem })); return; }
   const pics = obj.photos && typeof obj.photos === 'object' ? Object.entries(obj.photos).filter(([id, url]) => typeof url === 'string' && url.startsWith('data:image/')) : [];
-  const has = { w: TN(next.workouts.length, '<b>{n}</b> workouts', '<b>{n}</b> workouts'), t: TN(next.templates.length, '<b>{n}</b> templates', '<b>{n}</b> templates'), p: TN(pics.length, '<b>{n}</b> photo', '<b>{n}</b> photos'), date: obj.exported ? esc(fmtDateY(obj.exported)) : '' };
+  const has = { w: TN(next.workouts.length, '<b>{n}</b> workout', '<b>{n}</b> workouts'), t: TN(next.templates.length, '<b>{n}</b> template', '<b>{n}</b> templates'), p: TN(pics.length, '<b>{n}</b> photo', '<b>{n}</b> photos'), date: obj.exported ? esc(fmtDateY(obj.exported)) : '' };
   confirmSheet({
     title: opts.copy ? T('Go back to this copy?') : T('Restore this backup?'),
     text: pics.length
@@ -7480,7 +7497,7 @@ window.addEventListener('storage', ev => {
   let next;
   try { next = migrate(JSON.parse(ev.newValue)); } catch (e) { return; }
   state = next;
-  closeAllSheets(); rebuildCustom(); renderWorkout(); renderRest(); render();
+  closeAllSheets(); rebuildCustom(); applyTheme(); renderWorkout(); renderRest(); render();
 });
 let resizeT;
 let padMode = null;
@@ -7655,6 +7672,10 @@ function selfCheck() {
   check('Numbers typed on an Arabic or Persian keyboard read the same as 0–9', () => {
     const got = [parseNum('٨٢٫٥'), parseNum('۸۲,۵'), parseNum('82,5'), parseTime('١:٣٠'), parseTime('٩٠'), parseNum('١٬٢٠٠')];
     return JSON.stringify(got) === JSON.stringify([82.5, 82.5, 82.5, 90, 90, 1200]) || JSON.stringify(got);
+  });
+  check('A thousands comma or a decimal comma reads the way it was meant', () => {
+    const got = [parseNum('1,000.5'), parseNum('1.000,5'), parseNum('1,000'), parseNum('62,5'), parseNum('2.5')];
+    return JSON.stringify(got) === JSON.stringify([1000.5, 1000.5, 1000, 62.5, 2.5]) || JSON.stringify(got);
   });
   check('A damaged backup is refused before anything changes', () => {
     const bad = backupProblem({ workouts: [{ start: 1, ex: 'oops' }] }), good = backupProblem(clone({ ...state, active: null }));

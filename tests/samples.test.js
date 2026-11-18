@@ -54,5 +54,13 @@ const { open, report } = require('./lib');
   const long = await ipad.p.evaluate(() => [...document.querySelectorAll('#workout .nav-name')].map(n => n.textContent).find(t => t.length > 26));
   r.ok(long && !cut.length, 'on an iPad the exercise list beside a workout wraps long names instead of cutting them off', { long, cut });
   await ipad.ctx.close();
+  // the app open in a second tab changes the look: this one follows (theme and text size), not only the data
+  const p2 = await t.ctx.newPage();
+  await p2.goto(new URL('manifest.webmanifest', t.p.url()).href);
+  await p2.evaluate(() => { const k = 'liftingsanity:data:v1', d = JSON.parse(localStorage.getItem(k)); d.settings.theme = 'light'; d.settings.text = 'xl'; localStorage.setItem(k, JSON.stringify(d)); });
+  await t.p.waitForTimeout(500);
+  const look = await t.p.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.text]);
+  r.ok(look[0] === 'light' && look[1] === 'xl', 'a look changed in another open tab shows here too', look);
+  await p2.close();
   await r.done(t);
 })();

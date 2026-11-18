@@ -16,6 +16,21 @@ const w = (id, ago, exs) => ({ id, name: id, ago, ex: exs.map(([exId, sets], i) 
   r.ok((await prsOf('B')).length === 0 && (await prsOf('P')).includes('Heaviest 120x5'), 'logging a heavier past workout takes the record from the later one');
   await t.ev(`(() => { state.workouts = state.workouts.filter(w => w.id !== 'P'); recalcPRs(); })()`);
   r.ok((await prsOf('B')).includes('Heaviest 105x5'), 'deleting it gives the record back');
+  // editing an older workout and moving it past the newest one works every record out again
+  await history([w('A', 10, [['barbell-bench-press', [[100, 5]]]]), w('B', 3, [['barbell-bench-press', [[105, 5]]]])]);
+  await t.ev(`(() => { editWorkout('A'); state.active.start = Date.now() - 864e5; state.active.end = state.active.start + 3600e3; finishWorkout(); })()`); await t.p.waitForTimeout(400);
+  await t.inSheet('[data-a="sheetClose"]', 400).catch(() => {});
+  const moved = [await prsOf('B'), await prsOf('A'), await t.ev(`state.workouts.map(w => w.id).join('')`)];
+  r.ok(moved[0].length === 0 && moved[1].length === 0 && moved[2] === 'BA', 'moving an older workout past the newest one takes back the records it no longer beats', moved);
+  // a weighted pull-up with more weight is a record, even with fewer reps
+  const bwId = await t.ev(`(LIB.find(e => e.k === 'bw' && /pull-?up/.test(e.id)) || LIB.find(e => e.k === 'bw')).id`);
+  await history([w('A', 10, [[bwId, [[10, 8]]]]), w('B', 3, [[bwId, [[20, 5]]]])]);
+  r.ok((await prsOf('B')).includes('Heaviest 20x5'), 'more weight on a bodyweight move (' + bwId + ') is a Heaviest record, with fewer reps', await prsOf('B'));
+  // one of something reads in the singular
+  await t.ev(`(() => { state.workouts = []; state.templates.push({ id: 'one', name: 'Solo', ex: [{ exId: 'barbell-bench-press', sets: [{ t: 'N', r: '5' }] }] }); save(true); render(); })()`);
+  const one = await t.ev(`[tplCard(state.templates.find(t => t.id === 'one')), fmtMetric('reps', 1), TN(1, '{n} working set', '{n} working sets')].join(' ')`);
+  r.ok(/1 exercise /.test(one) && /1 rep\b/.test(one) && /1 working set\b/.test(one) && !/1 (exercises|reps|working sets)/.test(one), 'one exercise, one rep, one working set: singular', one.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160));
+  await t.ev(`(() => { state.templates = state.templates.filter(t => t.id !== 'one'); save(true); })()`);
   // the same exercise twice in one workout
   await history([w('A', 10, [['barbell-bench-press', [[95, 5]]]]), w('B', 2, [['barbell-bench-press', [[110, 3]]], ['barbell-bench-press', [[100, 5]]]])]);
   const dup = await prsOf('B');

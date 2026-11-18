@@ -1,6 +1,6 @@
 /* Lifting Sanity offline helper: keeps the app on the device so it opens at the gym without signal.
    Your workouts live in the app's own storage, not in this cache. */
-const CACHE = 'liftingsanity-v54';
+const CACHE = 'liftingsanity-v55';
 // exercise illustrations and fonts live in their own caches so app updates don't throw them away
 const ART = 'liftingsanity-art';
 const FONTS = 'liftingsanity-fonts';
@@ -36,8 +36,9 @@ self.addEventListener('fetch', e => {
   } else if (url.origin === self.location.origin) {
     // the app itself: the saved copy opens at once (no waiting on gym signal), and a fresh copy is saved behind it for next time
     e.respondWith(caches.open(CACHE).then(async c => {
-      const hit = await c.match(req, { ignoreSearch: true });
-      const net = fetch(req).then(res => { if (res && res.ok) c.put(req, res.clone()); return res; });
+      const key = new Request(url.origin + url.pathname);
+      const hit = await c.match(key, { ignoreSearch: true });
+      const net = fetch(req).then(res => { if (res && res.ok) c.put(key, res.clone()); return res; });
       if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
       // offline and never saved: pages fall back to the app, anything else just fails (a picture shows its stand-in)
       return net.catch(() => req.mode === 'navigate' ? c.match('index.html') : Response.error());

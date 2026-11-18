@@ -157,5 +157,8 @@ const ex = (id, exId, sets) => ({ id, exId, rest: 90, uni: false, ss: null, note
   r.ok(!(await t.state()).settings.ranks && await p.evaluate(() => !document.querySelector('.rank-card')), 'turned off, the ranks go (your details are kept for next time)');
   await t.click('[data-a="rankPromoOff"]', 400);
   r.ok(await p.evaluate(() => !document.querySelector('.rank-promo')), '“Not now” puts the offer away');
+  // age: a smooth curve, no step on a 23rd or 36th birthday
+  const ages = await t.ev(`[22, 23, 35, 36, 37].map(a => +LS_RANKS.ageFactor('MS', a).toFixed(3))`);
+  r.ok(ages[1] === 1 && ages[2] === 1 && ages[0] > 0.988 && ages[3] > 0.98 && ages[3] < 1 && ages[4] < ages[3], 'the age adjustment has no step at 23 or 36', ages);
   await r.done(t);
 })();

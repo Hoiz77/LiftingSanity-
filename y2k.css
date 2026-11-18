@@ -48,8 +48,8 @@
   background-size: 7px 7px, 280px 280px;
 }
 [data-style="y2k"] body::after { content: ""; position: fixed; inset: 0; z-index: 300; pointer-events: none;
-  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 10, .22) 2px 3px), radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(0, 0, 20, .45) 100%); mix-blend-mode: multiply; }
-[data-style="y2k"] * { border-radius: 0 !important; }
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 10, .22) 2px 3px), radial-gradient(120% 90% at 50% 50%, transparent 60%, rgba(0, 0, 20, .45) 100%); }
+[data-style="y2k"] *:not(.fin-card) { border-radius: 0 !important; }
 [data-style="y2k"] ::selection { background: var(--magenta); color: #fff; }
 
 /* ---------- HUD strip ---------- */
@@ -172,10 +172,9 @@
 
 /* ---------- workout: header as a player, exercise list as a tracklist ---------- */
 [data-style="y2k"] .wo-h { background: var(--titlebar); border-bottom: 2px solid var(--cyan); }
-[data-style="y2k"] .wo-name { font-family: var(--display); font-weight: 900; text-transform: uppercase; color: #fff; text-shadow: 2px 2px 0 #05060F, 0 0 10px color-mix(in srgb, var(--cyan) 70%, transparent); }
+[data-style="y2k"] .wo-name { font-family: var(--display); font-weight: 900; font-size: calc(18px * var(--fs, 1)); text-transform: uppercase; color: #fff; text-shadow: 2px 2px 0 #05060F, 0 0 10px color-mix(in srgb, var(--cyan) 70%, transparent); }
 [data-style="y2k"] .wo-meta { color: color-mix(in srgb, var(--cobalt) 18%, #fff); font-size: calc(16px * var(--fs, 1)); line-height: 1.1; gap: 0 10px; }
 [data-style="y2k"] .wo-meta .clock { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); font-size: calc(18px * var(--fs, 1)); }
-[data-style="y2k"] .wo-name { font-size: calc(18px * var(--fs, 1)); }
 [data-style="y2k"] .wo-prog { gap: 2px; background: var(--well); }
 [data-style="y2k"] .wo-prog span { height: 8px; background: var(--track); }
 [data-style="y2k"] .wo-prog i { background: repeating-linear-gradient(90deg, var(--cyan) 0 4px, transparent 4px 6px); }

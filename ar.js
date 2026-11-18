@@ -1049,6 +1049,7 @@ window.LS_AR = {
 "More help to start: {from} → <b>{to}</b> of assistance.": "مساعدة أكبر في البداية: {from} ← <b>{to}</b> من المساعدة.",
 "More than two years": "أكثر من سنتين",
 "More to see at the end": "المزيد في نهاية التمرين",
+"More weight on a weighted pull-up or dip is a Heaviest record now, even with fewer reps. Moving an older workout past your newest one works every record out again, so no workout keeps a record it no longer beats.": "وزن أكبر في العقلة أو المتوازي بوزن إضافي صار رقمًا قياسيًا للأثقل، حتى مع تكرارات أقل. ونقل تمرين قديم إلى ما بعد أحدث تمرين يعيد حساب كل الأرقام القياسية، فلا يحتفظ أي تمرين برقم قياسي لم يعد يتفوق فيه.",
 "Morning workout": "حصة الصباح",
 "Most added": "أكبر وزن مضاف",
 "Most people guess about one rep low at first; it gets easier with practice.": "يقدّر معظم الناس أقل من الحقيقة بنحو تكرار واحد في البداية، ويصبح التقدير أسهل مع الممارسة.",
@@ -1210,6 +1211,7 @@ window.LS_AR = {
 "One exercise at a time with big next and previous buttons, or every exercise in one list.": "تمرين واحد في كل مرة مع زرّين كبيرين للتالي والسابق، أو كل التمارين في قائمة واحدة.",
 "One long full-body machine session, then a rest day.": "حصة طويلة للجسم كامل على الأجهزة، ثم يوم راحة.",
 "One muscle group a day, five days a week.": "مجموعة عضلية واحدة في اليوم، خمسة أيام في الأسبوع.",
+"One of something reads “1 set”, “1 exercise”, “1 rep”. Lift ranks no longer drop a step on your 36th birthday. A comma for thousands (1,000.5) reads the way you meant it. A look changed in another open tab shows in this one too.": "العدد الواحد يُكتب بالمفرد بالإنجليزية: “1 set” و“1 exercise” و“1 rep”. لم تعد رتب الرفعات تنزل فجأة في عيد ميلادك السادس والثلاثين. والفاصلة للآلاف (1,000.5) تُقرأ كما قصدت. وتغيير المظهر في تبويب آخر مفتوح يظهر هنا أيضًا.",
 "One or two muscle groups a day, five days a week. Each muscle gets one big day; the plan review shows ways to spread it.": "مجموعة عضلية أو اثنتان في اليوم، خمسة أيام في الأسبوع. لكل عضلة يوم واحد مكثّف؛ وتعرض لك مراجعة الخطة طرقًا لتوزيعه.",
 "One power of bodyweight doesn’t fit every size, so each lift and each rank gets its own fitted curve.": "لا تناسب قوةٌ واحدة لوزن الجسم كل الأحجام، لذا لكل رفعة ولكل رتبة منحناها الخاص.",
 "One row": "صف واحد",
@@ -1363,6 +1365,7 @@ window.LS_AR = {
 "Records and charts fill in as you log. Tap a lift for its chart; a fresh start on one exercise is here too.": "تمتلئ الأرقام القياسية والرسوم البيانية كلما سجّلت. اضغط تمرينًا لترى رسمه البياني؛ وهنا أيضًا يمكنك بدء تمرين واحد من جديد.",
 "Records feel like records": "أرقام قياسية تستحق الاحتفال",
 "Records for the heaviest set, estimated 1RM, most reps and volume, marked as they happen.": "أرقام قياسية للمجموعة الأثقل و1RM التقديري وأكثر تكرارات والحجم، تُعلَّم فور تحقيقها.",
+"Records that count": "الأرقام القياسية التي تُحتسب",
 "Records, charts and tips count from today.": "تُحتسب الأرقام القياسية والرسوم البيانية والنصائح بدءًا من اليوم.",
 "Records, charts and “try more weight” tips for this exercise start fresh from today. Other exercises are not touched. Nothing is deleted: earlier sessions stay in History and in the All time view, and you can undo this.": "تبدأ الأرقام القياسية والرسوم البيانية ونصائح «جرّب وزنًا أكبر» لهذا التمرين من جديد بدءًا من اليوم، ولا تتأثر التمارين الأخرى. لن يُحذف شيء: تبقى الحصص السابقة في السجل وفي عرض «كل الوقت»، ويمكنك التراجع عن ذلك.",
 "Records, charts, “try more weight” tips and progress all start fresh from today.": "الأرقام القياسية والرسوم البيانية ونصائح «جرّب وزنًا أكبر» والتقدم، كلها تبدأ من جديد اليوم.",
@@ -1591,6 +1594,7 @@ window.LS_AR = {
 "Slides to it one at a time, or scrolls down to it in the list.": "ينتقل إليه في عرض التمرين الواحد، أو ينزل إليه في القائمة.",
 "Slow lowering": "إنزال بطيء",
 "Slow lowering only. Not used for records.": "إنزال بطيء فقط. لا تُعتمد للأرقام القياسية.",
+"Small things, put right": "تفاصيل صغيرة صُحّحت",
 "Smaller things": "تحسينات صغيرة",
 "Smith machine": "جهاز سميث",
 "So every exercise in your plan is one you can do.": "لتكون كل تمارين خطتك مما يمكنك أداؤه.",
@@ -2380,10 +2384,10 @@ window.LS_AR = {
 "{n} rep": {
 "few": "{n} تكرارات",
 "many": "{n} تكرارًا",
-"one": "تكرار واحد",
+"one": "{n} تكرار",
 "other": "{n} تكرار",
-"two": "تكراران",
-"zero": "لا تكرارات"
+"two": "{n} تكرار",
+"zero": "{n} تكرار"
 },
 "{n} reps": {
 "few": "{n} تكرارات",

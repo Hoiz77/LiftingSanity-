@@ -86,7 +86,7 @@ const day = 864e5;
   r.ok((await q.state()).workouts.length === 1 && (await q.p.evaluate(() => document.querySelector('#view').innerHTML.length)) > 500, 'a backup with empty lists in it restores without breaking the app');
   await q.tab('settings');
   await paste(text);
-  r.ok(/1<\/b> workouts|1 workouts/.test(await q.p.evaluate(() => [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().innerHTML)), 'restoring asks first and says what’s in the backup');
+  r.ok(/1<\/b> workout(?!s)/.test(await q.p.evaluate(() => [...document.querySelectorAll('#sheets .sheet-wrap.in')].pop().innerHTML)), 'restoring asks first and says what’s in the backup');
   await q.inSheet('[data-a="ok"]', 700);
   await q.p.reload(); await q.p.waitForTimeout(800);
   const rs = await q.state();

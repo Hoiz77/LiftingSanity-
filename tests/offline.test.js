@@ -9,6 +9,12 @@ const { open, report } = require('./lib');
   r.ok(await p.evaluate(() => !!navigator.serviceWorker.controller), 'the app installs its offline helper');
   const cacheNames = await p.evaluate(async () => (await caches.keys()).join(','));
   r.ok(/liftingsanity-v\d+/.test(cacheNames), 'the app’s files are saved on the device', cacheNames);
+  const extra = await p.evaluate(async () => {
+    await fetch('index.html?from=link').then(q => q.text()); await new Promise(res => setTimeout(res, 500));
+    const c = await caches.open((await caches.keys()).find(k => /liftingsanity-v/.test(k)));
+    return (await c.keys()).map(q => q.url).filter(u => u.includes('?'));
+  });
+  r.ok(extra.length === 0, 'opening the app from a link with ?… on the end refreshes the saved copy, not a second one beside it', extra);
   await t.ctx.setOffline(true);
   await p.reload(); await p.waitForTimeout(900);
   r.ok(await p.evaluate(() => document.querySelectorAll('#tabs .tab').length === 5 && document.querySelector('#view').innerHTML.length > 500), 'with no signal, the app still opens');

@@ -33,7 +33,7 @@
   // a word that needs a different translation in one place (a narrow column heading): TC('Set', 'column')
   window.TC = (s, ctx, v) => { const d = dict(), t = d && d[s + '|' + ctx]; return typeof t === 'string' ? fill(t, v) : window.T(s, v); };
   window.TN = (n, one, other, v) => {
-    const vars = Object.assign({ n }, v), f = full(), d = dict(), forms = (f && f[one]) || (d && d[one]);
+    const vars = Object.assign({ n }, v), f = full(), d = dict(), forms = (f && (f[one] || f[other])) || (d && (d[one] || d[other]));
     if (forms && typeof forms === 'object' && plural) return fill(forms[plural.select(n)] || forms.other, vars);
     return fill(n === 1 ? one : other, vars);
   };

@@ -28,6 +28,8 @@ const ENGLISH = (names) => {
   await Promise.all([p.waitForEvent('load'), t.click('[data-a="setLang"][data-v="ar"]', 0)]);
   await p.waitForFunction(() => window.LiftingSanity); await p.waitForTimeout(600);
   r.ok(await p.evaluate(() => document.documentElement.dir === 'rtl' && document.documentElement.lang === 'ar'), 'choosing العربية turns the app right to left');
+  const counts = await p.evaluate(() => [TN(1, '{n} working set', '{n} working sets'), TN(1, '{n} session all time', '{n} sessions all time'), TN(2, '{n} rep', '{n} reps'), TN(1, '{n} rep', '{n} reps')]);
+  r.ok(counts.every(s => /[؀-ۿ]/.test(s) && !/[a-z]/i.test(s)) && /2/.test(counts[2]) && /1/.test(counts[3]), 'counts of one read in Arabic too, and rep counts keep their number', counts);
   r.ok(await p.evaluate(() => /[؀-ۿ]/.test(document.querySelector('#tabs').textContent)), 'the tabs are in Arabic');
   const names = await t.ev('[...LIB.map(e => e.name), ...state.custom.map(c => c.name)].sort((a, b) => b.length - a.length)');
   await p.evaluate(k => { window.__keep = new RegExp(k); }, KEEP.source);
