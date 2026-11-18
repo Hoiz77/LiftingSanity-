@@ -595,7 +595,7 @@ function pickPhoto(exId) {
 
 const KEY = 'liftingsanity:data:v1';
 // shown at the bottom of Settings; goes up with the offline cache in sw.js (a test checks they match)
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 let state;
 let storageOK = true;
 // set when saved data couldn't be read or set aside: the app then never writes over it
@@ -1380,9 +1380,11 @@ function fmtMetric(metric, v, k) {
   if (metric === 'vol') return fmtVol(v);
   return fmtW(v, metric === 'e1rm' ? 1 : null);
 }
+// weeks in a row with a workout of your own (sample workouts don't make a streak)
 function streakWeeks() {
-  if (!state.workouts.length) return 0;
-  const weeks = new Set(state.workouts.map(w => weekStart(w.start)));
+  const own = state.workouts.filter(w => !w.demo);
+  if (!own.length) return 0;
+  const weeks = new Set(own.map(w => weekStart(w.start)));
   let wk = weekStart(Date.now());
   if (!weeks.has(wk)) wk = weekStart(wk - 3 * DAY);
   let n = 0;
@@ -6371,26 +6373,28 @@ function rankSetup() {
 
 VIEWS.progress = function () {
   const b = curBlock(), [from] = blockRange(b);
-  const inBlock = workoutsIn(from, Infinity);
+  // what counts as yours (this week, the block's sessions and volume) leaves the sample workouts out, as Train does; the
+  // charts and lists still show them, so there's something to look at
+  const inBlock = workoutsIn(from, Infinity), ownBlock = mine(inBlock);
   const wk = weekStart(Date.now());
-  const thisWeek = workoutsIn(wk, Infinity);
+  const thisWeek = mine(workoutsIn(wk, Infinity));
   // weeks counted on the calendar, so a week with a clock change (167 or 169 hours) is neither skipped nor cut short
   const weekFrom = (ts, n) => { const d = new Date(ts); d.setDate(d.getDate() + 7 * n); return d.getTime(); };
   const weeks = Array.from({ length: 12 }, (_, i) => weekFrom(wk, i - 11));
   const vol = weeks.map(s => ({ s, ws: workoutsIn(s, weekFrom(s, 1)) }));
   const archived = state.blocks.slice(0, -1).reverse();
-  let h = `<header class="page-h"><div><p class="eyebrow">${TN(state.workouts.length, '{n} sessions all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
+  let h = `<header class="page-h"><div><p class="eyebrow">${TN(mine(state.workouts).length, '{n} sessions all time', '{n} sessions all time')}</p><h1>${T('Progress')}</h1></div></header>`;
   h += ranksSection();
   h += weekCard();
   h += `<section class="card block-card"><div class="block-top"><div><p class="eyebrow accent">${T('Current block')}</p><h2><button class="link-h" data-a="blockRename">${esc(blkName(b))}${icon('edit')}</button></h2>
-      <p class="muted">${b.why ? `${esc(T(BLOCK_WHY.find(x => x[0] === b.why)[1]))}${b.load ? ` (${esc(loadName(b.load))})` : ''} · ` : ''}${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(inBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
+      <p class="muted">${b.why ? `${esc(T(BLOCK_WHY.find(x => x[0] === b.why)[1]))}${b.load ? ` (${esc(loadName(b.load))})` : ''} · ` : ''}${b.start ? `${T('Since {date}', { date: esc(fmtDateY(b.start)) })} · ` : ''}${TN(ownBlock.length, '{n} session', '{n} sessions')} · ${T('{vol} lifted', { vol: fmtVol(sum(inBlock, workoutVolume)) })}</p></div>
       <div class="block-btns"><button class="btn" data-a="blockReset">${icon('reset')}${T('Reset progression')}</button>${archived.length ? `<button class="btn ghost" data-a="blockUndo">${icon('undo')}${T('Undo reset')}</button>` : ''}</div></div>
     <p class="small muted">${T('Starting a new block gives you fresh records and charts for everything, for a new program, after a break or after an injury. To start just one exercise fresh, tap {icon} next to it under Your lifts, or use its ⋯ menu in a workout. Everything stays saved below and in History.', { icon: icon('reset', 'inline') })}</p></section>`;
   h += `<div class="tiles four">
     <div class="tile"><span>${T('This week')}</span><b>${thisWeek.length}</b><small>${TN(thisWeek.length, 'session', 'sessions')}</small></div>
     <div class="tile"><span>${T('Week streak')}</span><b>${streakWeeks()}</b><small>${T('weeks in a row')}</small></div>
     <div class="tile"><span>${T('Sets this week')}</span><b>${trimNum(sum(thisWeek, workingSets), 1)}</b><small>${T('working sets')}</small></div>
-    <div class="tile"><span>${T('Block volume')}</span><b>${esc(fmtVol(sum(inBlock, workoutVolume)).replace(' ' + U(), ''))}</b><small>${T('{unit} lifted', { unit: U() })}</small></div></div>`;
+    <div class="tile"><span>${T('Block volume')}</span><b>${esc(fmtVol(sum(ownBlock, workoutVolume)).replace(' ' + U(), ''))}</b><small>${T('{unit} lifted', { unit: U() })}</small></div></div>`;
   h += `<section class="card chart-card"><div class="chart-top"><h3>${T('Weekly volume')}</h3><span class="muted small">${T('last 12 weeks, {unit}', { unit: U() })}</span></div>
     ${chartSlot({ type: 'bars', h: 200, bars: vol.map(v => ({ v: (isLb() ? KG_LB : 1) * sum(v.ws, workoutVolume), label: fmtShort(v.s), tip: `${T('Week of {date}', { date: fmtShort(v.s) })} · ${TN(v.ws.length, '{n} session', '{n} sessions')}` })), fmt: v => compact(v) + ' ' + U(), aria: T('Weekly volume, last 12 weeks'), empty: T('Finish a workout to start this chart.') })}</section>`;
   const ms = muscleSets(workoutsIn(Date.now() - 7 * DAY, Infinity));
@@ -6409,7 +6413,7 @@ VIEWS.progress = function () {
   return h;
 };
 function weekLines() {
-  const ws = workoutsIn(weekStart(Date.now()), Infinity);
+  const ws = mine(workoutsIn(weekStart(Date.now()), Infinity));
   const vol = sum(ws, workoutVolume), min = Math.round(sum(ws, w => (w.end || w.start) - w.start) / 60000), streak = streakWeeks();
   const num = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return [
@@ -6609,6 +6613,10 @@ VIEWS.settings = function () {
 // kept on the device, not in your data, so a restored backup doesn't bring old notes back
 const NEWS_KEY = 'liftingsanity:seen-version';
 const CHANGELOG = [
+  { v: 54, items: [
+    ['check', 'Train and Progress agree', 'Progress counts your week, your sets this week, your streak and your block the same way Train does: sample workouts are left out. The charts and lists still show them, so there’s something to look at.'],
+    ['layout', 'Pictures and names', 'An exercise picture that’s still on its way shows a body outline instead of a blank tile. On an iPad, long exercise names in the list beside a workout wrap to a second line instead of being cut off.']
+  ] },
   { v: 53, items: [
     ['trophy', 'Truly Olympian', 'The top rank is Greek now: a round hoplite shield with a Greek key running round its rim, the temple of Olympus in relief (a thunderbolt in its pediment), an olive wreath like the one victors wore at the ancient Games, tied with a ribbon, and a glory of rays behind. Platinum’s crest is level and symmetrical, its summit centred under a star.']
   ] },

@@ -117,7 +117,9 @@ p { margin: 0; }
 .thumb { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: radial-gradient(120% 100% at 50% 30%, #FFFFFF, #F1F2F5 55%, #E3E6EB); overflow: hidden; }
 .thumb svg { width: 100%; height: 100%; display: block; }
 .thumb.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.thumb.art { position: relative; background: #d7f0fc; }
+/* while an exercise's picture loads (or if it can't), a body outline sits where it will be, so a tile is never blank */
+:root { --art-wait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23a9cde0'%3E%3Ccircle cx='20' cy='7.4' r='4.1'/%3E%3Cpath d='M12.6 13.2Q20 11.2 27.4 13.2L29.6 24.4L26.7 24.9L25.1 18.4L25.3 38H21.4L20 27.4L18.6 38H14.7L14.9 18.4L13.3 24.9L10.4 24.4Z'/%3E%3C/g%3E%3C/svg%3E") center / auto 62% no-repeat; }
+.thumb.art { position: relative; background: var(--art-wait), #d7f0fc; }
 /* Everkinetic line drawings: white paper becomes the tile colour */
 .ek img { mix-blend-mode: multiply; }
 .thumb.art.ek img { transform: scale(1.05); object-fit: contain; }
@@ -644,11 +646,13 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
   .nav-ex { max-width: none; width: 100%; min-height: 60px; padding: 6px 12px 6px 6px; background: transparent; }
   .nav-ex .thumb { width: 46px; height: 46px; }
   .nav-ex:not(.cur):hover { background: var(--panel); }
+  .nav-name { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.22; overflow-wrap: anywhere; }
   .wo-main { padding: 20px 32px 0; }
   .wo-h { padding-left: max(14px, env(safe-area-inset-left, 0px)); }
 }
 .exc { --pt: 18px; --px: 14px; max-width: 800px; margin: 0 auto; background: var(--panel); border-radius: 26px; padding: var(--pt) var(--px) 16px; display: grid; gap: 14px; box-shadow: var(--hi); overflow: hidden; }
 .exc-hero { position: relative; display: flex; align-items: center; justify-content: center; height: 176px; margin: calc(-1 * var(--pt)) calc(-1 * var(--px)) 0; background: #d7f0fc; overflow: hidden; }
+.exc-hero.art { background: var(--art-wait), #d7f0fc; }
 .exc-hero img { height: 100%; width: auto; aspect-ratio: 1; object-fit: cover; }
 .exc-hero .hero-pic { position: relative; flex: none; height: 100%; aspect-ratio: 1; }
 .exc-hero .hero-pic img { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1056,7 +1060,7 @@ body.wo-open.wo-moving #view, body.wo-open.wo-moving #tabs { visibility: visible
 .exd-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
 .exd-tags .btn { margin-inline-start: auto; }
 .exd-hero { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.exd-art { position: relative; margin: 0; flex: 1 1 100%; aspect-ratio: 4 / 3; border-radius: 24px; overflow: hidden; background: #d7f0fc; }
+.exd-art { position: relative; margin: 0; flex: 1 1 100%; aspect-ratio: 4 / 3; border-radius: 24px; overflow: hidden; background: var(--art-wait), #d7f0fc; }
 .exd-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .exd-art figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 12px 9px; background: linear-gradient(rgba(215, 240, 252, 0), rgba(215, 240, 252, .94) 45%); font: 500 calc(11px * var(--fs, 1)) var(--ui); color: #3d5a6b; }
 .exd-art.moving figcaption { padding-inline-end: 64px; }

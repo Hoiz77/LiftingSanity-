@@ -1,5 +1,6 @@
 // the sample workouts (for looking around) stay out of what's yours: the week's goal, the spreadsheet export and a
-// finished block's summary count only workouts you logged; and a message can be flicked away
+// finished block's summary count only workouts you logged, and Progress counts the same way as Train; a message can be
+// flicked away; a picture on its way has an outline behind it, and an iPad's list keeps long exercise names
 const { open, report } = require('./lib');
 (async () => {
   const r = report('Samples stay samples; messages can be flicked away');
@@ -10,6 +11,12 @@ const { open, report } = require('./lib');
   await t.tab('train');
   const wk = await t.text('.week-sum');
   r.ok(await t.ev('state.workouts.every(w => w.demo) && state.workouts.length > 5') && /^0 of 3 workouts this week/.test(wk || ''), 'sample workouts don’t count towards the week’s goal', wk);
+  // Progress agrees with Train: its week, sets this week, streak and the block's sessions and volume are yours alone
+  await t.tab('progress');
+  const tiles = await p.evaluate(() => [...document.querySelectorAll('.tiles.four .tile b')].map(b => b.textContent.trim()));
+  const blockLine = await t.text('.block-card .block-top p.muted');
+  r.ok(JSON.stringify(tiles) === JSON.stringify(['0', '0', '0', '0']) && /\b0 sessions\b/.test(blockLine || '') && !(await t.text('.page-h-side .streak')), 'Progress counts the week, the streak and the block the same way as Train: samples left out', { tiles, blockLine });
+  r.ok(await p.evaluate(() => !!document.querySelector('.chart-card .chart-bars, .chart-card svg, .chart-card canvas, .chart-card [data-chart]')), 'while the charts still show the samples, so there’s something to look at');
   await t.tab('settings'); await t.click('[data-a="exportCSV"]', 400);
   r.ok(/Nothing logged yet/.test(await t.text('#toast.in') || ''), 'with only samples there’s nothing to export', await t.text('#toast'));
 
@@ -39,5 +46,13 @@ const { open, report } = require('./lib');
   await t.tab('progress'); await t.click('[data-a="blockReset"]', 500); await t.inSheet('[data-a="ok"]', 1500);
   const show = await p.evaluate(() => { const s = document.querySelector('.sheet-wrap.in.block-show .bs-past'); return s && s.textContent.replace(/\s+/g, ' '); });
   r.ok(show && /1\s*session/.test(show) && !/Biggest gains/.test(show), 'a finished block’s summary counts your workouts, not the samples', show);
+  // a picture on its way shows a body outline, not a blank tile; on an iPad the list beside a workout keeps long names
+  r.ok(await p.evaluate(() => { const el = document.body.appendChild(Object.assign(document.createElement('span'), { className: 'thumb art' })), bg = getComputedStyle(el).backgroundImage; el.remove(); return /^url\("data:image\/svg\+xml/.test(bg); }), 'an exercise picture still loading has a body outline behind it');
+  const ipad = await open({ width: 1024, height: 768, settings: { installHint: false } });
+  await ipad.start(); await ipad.p.waitForTimeout(500);
+  const cut = await ipad.p.evaluate(() => [...document.querySelectorAll('#workout .nav-name')].filter(n => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1).map(n => n.textContent));
+  const long = await ipad.p.evaluate(() => [...document.querySelectorAll('#workout .nav-name')].map(n => n.textContent).find(t => t.length > 26));
+  r.ok(long && !cut.length, 'on an iPad the exercise list beside a workout wraps long names instead of cutting them off', { long, cut });
+  await ipad.ctx.close();
   await r.done(t);
 })();
